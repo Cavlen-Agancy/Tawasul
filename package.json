@@ -5,13 +5,17 @@
   "description": "Tawasul Academy — Online mental health counseling platform",
   "scripts": {
     "dev": "nuxt dev",
+    "dev:db": "docker compose up -d postgres",
+    "dev:db:stop": "docker compose stop postgres",
     "build": "nuxt build",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:api": "vitest run tests/api",
+    "test:api:watch": "vitest tests/api"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

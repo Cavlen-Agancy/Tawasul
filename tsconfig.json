@@ -7,7 +7,6 @@
     "project overview",
     "nuxt.config.ts",
     "node_modules",
-    ".output",
-    ".nuxt"
+    ".output"
   ]
 }

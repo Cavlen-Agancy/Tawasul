@@ -1,5 +1,33 @@
 // Tawasul Academy — Nuxt Configuration
 
+import { readdirSync, existsSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+interface ModulePage {
+  name: string
+  path: string
+  file: string
+}
+
+function registerModulePages(pages: ModulePage[], dir: string, moduleName: string, prefix = ''): void {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (entry.name.startsWith('_')) continue
+      registerModulePages(pages, resolve(dir, entry.name), moduleName, `${prefix}${entry.name}/`)
+      continue
+    }
+    if (!entry.name.endsWith('.vue')) continue
+    const base = entry.name.replace(/\.vue$/, '')
+    if (base.startsWith('_')) continue
+    const routePath = `/${prefix}${base}`
+    pages.push({
+      name: `${moduleName}-${prefix.replace(/\//g, '-')}${base}`,
+      path: routePath,
+      file: resolve(dir, entry.name),
+    })
+  }
+}
+
 export default defineNuxtConfig({
 
   // ─────────────────────────────────────────
@@ -74,8 +102,13 @@ export default defineNuxtConfig({
   // ─────────────────────────────────────────
   hooks: {
     'pages:extend'(pages) {
-      // Pages are auto-discovered from modules/*/pages/
-      // No manual registration needed — Nuxt scans all dirs below
+      // Register pages kept inside module directories (modules/*/pages/)
+      // Each module page file maps to a flat URL from its filename.
+      for (const moduleName of readdirSync(resolve(process.cwd(), 'modules'))) {
+        const pagesDir = resolve(process.cwd(), 'modules', moduleName, 'pages')
+        if (!existsSync(pagesDir)) continue
+        registerModulePages(pages, pagesDir, moduleName)
+      }
     },
   },
 
@@ -89,20 +122,9 @@ export default defineNuxtConfig({
 
   // ─────────────────────────────────────────
   // Server (Nitro)
+  // Module server directories are registered by each module's index.ts
+  // via addServerScanDir (see modules/*/index.ts).
   // ─────────────────────────────────────────
-  nitro: {
-    // Scan server routes from module server directories
-    scanDirs: [
-      'server',
-      'modules/auth/server',
-      'modules/booking/server',
-      'modules/payment/server',
-      'modules/patient/server',
-      'modules/doctor/server',
-      'modules/admin/server',
-      'modules/session/server',
-    ],
-  },
 
   // ─────────────────────────────────────────
   // Components

@@ -1,4 +1,12 @@
 # Tawasul Academy — Docker Compose (Development)
+#
+# Development architecture:
+#   Docker: PostgreSQL (+ pgAdmin for browsing)
+#   Host:   Nuxt app via `npm run dev` (uses DATABASE_URL @ localhost:5433)
+#
+# The Nuxt app is NOT run as a container during local development, so no
+# container ever writes to the host's .nuxt/ directory (avoids permission
+# conflicts). Production uses docker-compose.prod.yml.
 
 services:
 
@@ -38,30 +46,6 @@ services:
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
     ports:
       - "5050:80"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - tawasul_network
-
-  # ─────────────────────────────────────────
-  # Nuxt App
-  # ─────────────────────────────────────────
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    container_name: tawasul_app
-    restart: unless-stopped
-    env_file:
-      - .env
-    ports:
-      - "3000:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.nuxt
-      - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,6 +1,19 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+let resend: Resend | null = null
+
+function getResend(): Resend | null {
+  if (resend) return resend
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) return null
+  try {
+    resend = new Resend(apiKey)
+  } catch (error) {
+    console.error('[email] Failed to initialise Resend client:', error)
+    return null
+  }
+  return resend
+}
 
 const BRAND_PRIMARY = '#E91E8C'
 const BRAND_DEEP = '#C4157A'
@@ -45,9 +58,14 @@ function button(url: string, label: string): string {
 }
 
 export async function sendEmail({ to, subject, html }: { to: string; subject: string; html: string }): Promise<void> {
+  const client = getResend()
+  if (!client) {
+    console.warn(`[email] RESEND_API_KEY is not configured — skipping email to ${to} (subject: "${subject}")`)
+    return
+  }
   const from = `${process.env.RESEND_FROM_NAME || 'Tawasul Academy'} <${process.env.RESEND_FROM_EMAIL}>`
   try {
-    await resend.emails.send({ from, to, subject, html })
+    await client.emails.send({ from, to, subject, html })
   } catch (error) {
     console.error('[email] Failed to send email via Resend:', error)
     throw error
