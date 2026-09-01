@@ -1,0 +1,28 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Build outputs
+.nuxt/
+.output/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Uploads
+uploads/
+
+# Prisma
+*.db
+*.db-journal
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/

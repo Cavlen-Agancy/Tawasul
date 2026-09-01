@@ -1,0 +1,269 @@
+// Tawasul Academy — Prisma Schema v2
+// Database: PostgreSQL
+// ORM: Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────
+
+enum AccountType {
+  PATIENT
+  DOCTOR
+  STAFF
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+// ─────────────────────────────────────────
+// PERMISSIONS
+// ─────────────────────────────────────────
+
+// Resources that can have permissions assigned
+enum Resource {
+  APPOINTMENTS
+  PATIENTS
+  DOCTORS
+  PAYMENTS
+  SETTINGS
+  STAFF
+}
+
+// Actions available per resource
+enum Action {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+}
+
+// ─────────────────────────────────────────
+// USER (all account types)
+// ─────────────────────────────────────────
+
+model User {
+  id          String      @id @default(cuid())
+  email       String      @unique
+  password    String
+  name        String
+  phone       String?
+  photo       String?
+  accountType AccountType @default(PATIENT)
+
+  emailVerified           Boolean   @default(false)
+  emailVerificationToken  String?
+  emailVerificationExpiry DateTime?
+
+  passwordResetToken  String?
+  passwordResetExpiry DateTime?
+
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  doctor       Doctor?
+  permissions  Permission[]
+  bookings     Booking[]     @relation("PatientBookings")
+
+  @@map("users")
+}
+
+// ─────────────────────────────────────────
+// PERMISSION
+// ─────────────────────────────────────────
+
+model Permission {
+  id       String   @id @default(cuid())
+  userId   String
+  resource Resource
+  action   Action
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, resource, action])
+  @@map("permissions")
+}
+
+// ─────────────────────────────────────────
+// DOCTOR
+// ─────────────────────────────────────────
+
+model Doctor {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  bio             String?
+  slug            String   @unique
+  specializations String[]
+  isActive        Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  availability Availability[]
+  blockedSlots BlockedSlot[]
+  bookings     Booking[]     @relation("DoctorBookings")
+
+  @@map("doctors")
+}
+
+// ─────────────────────────────────────────
+// AVAILABILITY
+// ─────────────────────────────────────────
+
+model Availability {
+  id              String @id @default(cuid())
+  doctorId        String
+  dayOfWeek       Int    // 0 = Sunday, 6 = Saturday
+  startTime       String // "09:00"
+  endTime         String // "17:00"
+  sessionDuration Int    // minutes: 30, 45, or 60
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, dayOfWeek])
+  @@map("availability")
+}
+
+// ─────────────────────────────────────────
+// BLOCKED SLOT
+// ─────────────────────────────────────────
+
+model BlockedSlot {
+  id        String   @id @default(cuid())
+  doctorId  String
+  date      DateTime @db.Date
+  startTime String   // "10:00"
+  endTime   String   // "11:00"
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@map("blocked_slots")
+}
+
+// ─────────────────────────────────────────
+// BOOKING
+// ─────────────────────────────────────────
+
+model Booking {
+  id        String        @id @default(cuid())
+  userId    String
+  doctorId  String
+  date      DateTime      @db.Date
+  startTime String        // "10:00"
+  endTime   String        // "11:00"
+  service   String
+  status    BookingStatus @default(PENDING)
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user        User         @relation("PatientBookings", fields: [userId], references: [id], onDelete: Cascade)
+  doctor      Doctor       @relation("DoctorBookings", fields: [doctorId], references: [id], onDelete: Cascade)
+  payment     Payment?
+  sessionRoom SessionRoom?
+
+  @@map("bookings")
+}
+
+// ─────────────────────────────────────────
+// PAYMENT
+// ─────────────────────────────────────────
+
+model Payment {
+  id               String        @id @default(cuid())
+  bookingId        String        @unique
+  amount           Decimal       @db.Decimal(10, 2)
+  currency         String        @default("EGP")
+  status           PaymentStatus @default(PENDING)
+  gatewayReference String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+// ─────────────────────────────────────────
+// SESSION ROOM (Jitsi)
+// ─────────────────────────────────────────
+
+model SessionRoom {
+  id        String   @id @default(cuid())
+  bookingId String   @unique
+  roomName  String   @unique // Jitsi room name — used to construct the meeting URL
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("session_rooms")
+}
+
+// ─────────────────────────────────────────
+// SETTINGS (singleton)
+// ─────────────────────────────────────────
+
+model Settings {
+  id String @id @default("singleton")
+
+  platformName   String @default("Tawasul Academy")
+  contactEmail   String @default("")
+  contactPhone   String @default("")
+  whatsappNumber String @default("")
+
+  paymentGateway       String  @default("paymob") // "paymob" or "stripe"
+  paymentGatewayKey    String  @default("")
+  paymentGatewaySecret String  @default("")
+
+  sessionPricePerHour    Decimal @default(0) @db.Decimal(10, 2)
+  defaultSessionDuration Int     @default(60) // minutes
+  defaultWorkingStart    String  @default("09:00")
+  defaultWorkingEnd      String  @default("17:00")
+
+  // Jitsi config
+  jitsiDomain String @default("meet.jit.si") // use meet.jit.si for MVP, self-hosted later
+
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
