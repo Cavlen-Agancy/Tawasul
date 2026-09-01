@@ -1,0 +1,13 @@
+{
+  "extends": "./.nuxt/tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "nuxt"]
+  },
+  "exclude": [
+    "project overview",
+    "nuxt.config.ts",
+    "node_modules",
+    ".output",
+    ".nuxt"
+  ]
+}
