@@ -1,6 +1,14 @@
 # Phase 0 — Project Setup
 ## flow.md
 
+> **Post-Phase-0 amendments (user-approved)** — see `phase-0/notes.md` §7–§9. Steps that
+> describe the original build ("inside Docker", three branches, `ts-node` seed,
+> HeroUI, `process.env` reads) are superseded: dev now runs on the host
+> (`npm run dev` + postgres/pgAdmin in Docker, port 5433), Git has a single `main`
+> branch, the seed uses `tsx`, the UI layer is shadcn-vue, and server config is read via
+> `useRuntimeConfig()` with a Vitest-only fallback. Follow the up-to-date checklists in
+> overview.md / expected-output.md / testing.md.
+
 ---
 
 ## Feature 1 — Nuxt Project Initialization
@@ -164,12 +172,13 @@ Exports the following functions:
 - Return the boolean result.
 
 **`generateJWT(payload: { userId: string; email: string; accountType: string }): string`**
-- Read `JWT_SECRET` from `process.env`.
-- Call `jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' })`.
+- Read the config via `getServerRuntimeConfig()` from `server/utils/runtime.ts`
+  (`jwtSecret`, `jwtExpiresIn`) — falls back to `process.env` only under standalone Vitest.
+- Call `jwt.sign(payload, secret, { expiresIn })`.
 - Return the token string.
 
 **`verifyJWT(token: string): { userId: string; email: string; accountType: string }`**
-- Read `JWT_SECRET` from `process.env`.
+- Read the secret the same way (see above).
 - Call `jwt.verify(token, secret)`.
 - Return the decoded payload cast to the correct type.
 - If verification fails (expired, invalid), let the error propagate — the caller handles it.
@@ -188,15 +197,14 @@ Exports the following functions:
 
 ### `server/utils/email.ts`
 
-Imports: `Resend` from `resend`.
+Imports: `Resend` from `resend`, `getServerRuntimeConfig` from `server/utils/runtime`.
 
-Instantiate Resend once at the top of the file:
-```typescript
-const resend = new Resend(process.env.RESEND_API_KEY)
-```
+Create the Resend client lazily inside the `sendEmail` helper, reading
+`resendApiKey` / `resendFromEmail` / `resendFromName` via `getServerRuntimeConfig()`
+(with the standalone-Vitest-only `process.env` fallback).
 
 **`sendEmail({ to, subject, html }: { to: string; subject: string; html: string }): Promise<void>`**
-- Call `resend.emails.send({ from: \`${process.env.RESEND_FROM_NAME} <${process.env.RESEND_FROM_EMAIL}>\`, to, subject, html })`.
+- Call `resend.emails.send({ from: \`${fromName} <${fromEmail}>\`, to, subject, html })`.
 - If the call throws, log the error and rethrow it.
 
 **Email template functions — each returns an HTML string:**
@@ -217,9 +225,9 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 - Subject: `"Your session has been cancelled — Tawasul Academy"`
 - HTML: greeting, cancellation confirmation, cancelled session details, invitation to rebook.
 
-`doctorWelcomeTemplate(doctorName: string, email: string, temporaryPassword: string): string`
+`doctorWelcomeTemplate(doctorName: string, email: string, temporaryPassword: string, loginUrl: string): string`
 - Subject: `"Welcome to Tawasul Academy — Your account is ready"`
-- HTML: welcome message, login credentials (email and temporary password displayed clearly), strong instruction to change password after first login, login URL.
+- HTML: welcome message, login credentials (email and temporary password displayed clearly), strong instruction to change password after first login, a login button linking to `${loginUrl}/login` (the caller passes the app base URL explicitly).
 
 `sessionReminderTemplate(recipientName: string, doctorOrPatientLabel: string, date: string, time: string): string`
 - Subject: `"Reminder: Your session is tomorrow — Tawasul Academy"`
@@ -371,6 +379,4 @@ Steps:
 3. `git add .`
 4. `git commit -m "Phase 0: Project setup"`
 5. `git branch -M main`
-6. `git checkout -b dev`
-7. `git checkout -b feature/phase-0-setup`
-8. All Phase 0 work is committed to `feature/phase-0-setup`.
+6. All Phase 0 work lives on `main` (the later branch cleanup collapsed everything to a single `main` — see notes.md §7).

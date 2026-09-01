@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import jwt, { type SignOptions } from 'jsonwebtoken'
 import crypto from 'node:crypto'
 import { createError, type H3Event } from 'h3'
+import { getServerRuntimeConfig } from '~/server/utils/runtime'
 
 export interface AuthUser {
   userId: string
@@ -18,13 +19,15 @@ export function comparePassword(plain: string, hashed: string): Promise<boolean>
 }
 
 export function generateJWT(payload: AuthUser): string {
-  const secret = process.env.JWT_SECRET
+  const config = getServerRuntimeConfig()
+  const secret = config?.jwtSecret ?? process.env.JWT_SECRET
   if (!secret) throw new Error('JWT_SECRET is not set')
-  return jwt.sign(payload, secret, { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as SignOptions['expiresIn'] })
+  const expiresIn = (config?.jwtExpiresIn ?? (process.env.JWT_EXPIRES_IN || '7d')) as SignOptions['expiresIn']
+  return jwt.sign(payload, secret, { expiresIn })
 }
 
 export function verifyJWT(token: string): AuthUser {
-  const secret = process.env.JWT_SECRET
+  const secret = getServerRuntimeConfig()?.jwtSecret ?? process.env.JWT_SECRET
   if (!secret) throw new Error('JWT_SECRET is not set')
   return jwt.verify(token, secret) as AuthUser
 }

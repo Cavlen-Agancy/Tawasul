@@ -17,7 +17,12 @@ The test page (`pages/index.vue`) is verified manually only.
 
 ## Unit Tests
 
-Create test files inside `phase-0/tests/`. All tests use Vitest.
+Create test files in `tests/utils/` (Vitest `include` covers `tests/**/*.{test,spec}.ts`).
+Phase 0's unit tests are pure-function tests that run standalone under bare-node Vitest —
+no Nuxt/Nitro runtime is loaded, which is why the server utils keep a documented
+`process.env` fallback via `server/utils/runtime.ts` (see `phase-0/notes.md` §8).
+
+All tests use Vitest.
 
 Install test dependencies if not already installed:
 ```
@@ -146,12 +151,15 @@ vi.mock('resend', () => ({ Resend: vi.fn().mockImplementation(() => ({ emails: {
 
 **`doctorWelcomeTemplate`**
 
+Signature: `doctorWelcomeTemplate(doctorName: string, email: string, temporaryPassword: string, loginUrl: string)`.
+
 | Test case | Input | Expected |
 |---|---|---|
-| Returns a string | `('Dr. Amr', 'amr@email.com', 'TempPass123!')` | result is a string |
+| Returns a string | `('Dr. Amr', 'amr@email.com', 'TempPass123!', 'http://localhost:3000')` | result is a string |
 | Contains doctor name | above input | result includes `'Dr. Amr'` |
 | Contains email | above input | result includes `'amr@email.com'` |
 | Contains temporary password | above input | result includes `'TempPass123!'` |
+| Contains the login URL | above input | result includes `'http://localhost:3000/login'` |
 | Contains instruction to change password | any input | result includes `'change'` or `'password'` |
 
 ---
@@ -192,8 +200,8 @@ vi.mock('../../server/utils/auth', () => ({ requireAuth: vi.fn() }))
 Complete every item below before marking Phase 0 as done.
 
 **Docker**
-1. Run `docker compose up -d`. Verify output shows all three containers starting.
-2. Run `docker compose ps`. All three containers (postgres, pgadmin, app) show status `running` or `healthy`.
+1. Run `docker compose up -d`. Verify output shows both containers (postgres, pgAdmin) starting.
+2. Run `docker compose ps`. Both containers show status `running` or `healthy`.
 3. Open http://localhost:5050 in browser. pgAdmin login page appears.
 4. Log in to pgAdmin with `PGADMIN_DEFAULT_EMAIL` and `PGADMIN_DEFAULT_PASSWORD`.
 5. Add a server connection to postgres (host: `postgres`, port: `5432`, user: `tawasul`, password: `tawasul_pass`).
@@ -202,26 +210,26 @@ Complete every item below before marking Phase 0 as done.
 **Seed**
 7. Query the `users` table in pgAdmin. One row exists with email matching `SEED_ADMIN_EMAIL` and `accountType = STAFF`.
 8. Query the `settings` table. One row exists with `id = 'singleton'` and `platformName = 'Tawasul Academy'`.
-9. Run `docker compose exec app npx prisma db seed` a second time. No error thrown. Row counts unchanged.
+9. Run `npx prisma db seed` a second time (on the host). No error thrown. Row counts unchanged.
 
-**Nuxt and HeroUI**
-10. Open http://localhost:3000 in browser. Test page renders with heading "Tawasul Academy — Setup Complete".
-11. The HeroUI Button on the test page is magenta/pink (the brand primary color `#E91E8C`). Not blue, not gray.
-12. The HeroUI Card renders with a border and rounded corners.
+**Nuxt and UI (host dev — see notes.md §7)**
+10. Run `npm run dev` on the host, open http://localhost:3000 in browser. Test page renders with heading "Tawasul Academy — Setup Complete".
+11. The shadcn-vue Button on the test page is magenta/pink (the brand primary color `#E91E8C`). Not blue, not gray.
+12. The Card renders with a border and rounded corners.
 13. Hot reload: change the heading text in `pages/index.vue` and save. Browser updates without a full page refresh.
 
-**Resend**
+**Resend (deferred — requires a real Resend account; see notes.md §10)**
 14. Open a temporary test script or use Nuxt's server playground. Call `sendEmail` with a real recipient email address, subject "Test from Tawasul", and any HTML body.
 15. The email arrives in the recipient's inbox within 2 minutes.
 16. The sender name shows as "Tawasul Academy" and the sender address matches `RESEND_FROM_EMAIL`.
 
 **Git**
 17. Run `git status`. The `.env` file does not appear in the output (it is gitignored).
-18. Run `git branch`. Three branches exist: `main`, `dev`, `feature/phase-0-setup`.
-19. Current branch is `feature/phase-0-setup`.
+18. Run `git branch`. A single branch exists: `main` (post-cleanup amendment, notes.md §7).
+19. Current branch is `main`.
 
 **TypeScript**
-20. Run `npx tsc --noEmit` inside the app container. Zero errors.
+20. Run `npx tsc --noEmit` on the host. Zero errors.
 
 ---
 
@@ -232,15 +240,15 @@ Mark each item PASS or FAIL with a note before handing off to Phase 1.
 ```
 [ ] All unit tests pass — run `npm test`, output shows 0 failures
 [ ] TypeScript check passes — `npx tsc --noEmit` shows 0 errors
-[ ] Docker environment starts with no errors — `docker compose up -d` succeeds
+[ ] Docker environment starts with no errors — `docker compose up -d` succeeds (postgres + pgAdmin)
 [ ] All 9 database tables exist in PostgreSQL
 [ ] Seed data exists — admin user and settings singleton confirmed in pgAdmin
 [ ] Running seed twice does not throw errors
-[ ] Nuxt dev server accessible at http://localhost:3000
-[ ] HeroUI primary color is brand magenta on test page — visual check
+[ ] Nuxt dev server accessible at http://localhost:3000 (host `npm run dev`)
+[ ] shadcn-vue Button primary color is brand magenta on test page — visual check
 [ ] Hot reload works — change a file, browser updates without full refresh
-[ ] Test email sent and received successfully via Resend
-[ ] Git initialized with correct branches, .env not committed
+[ ] Test email sent and received successfully via Resend (deferred — requires real Resend account, see notes.md §10)
+[ ] Git repo clean on `main`, .env not committed
 [ ] No console errors in browser on test page
 ```
 

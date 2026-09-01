@@ -1,10 +1,11 @@
 import { Resend } from 'resend'
+import { getServerRuntimeConfig } from '~/server/utils/runtime'
 
 let resend: Resend | null = null
 
 function getResend(): Resend | null {
   if (resend) return resend
-  const apiKey = process.env.RESEND_API_KEY
+  const apiKey = getServerRuntimeConfig()?.resendApiKey ?? process.env.RESEND_API_KEY
   if (!apiKey) return null
   try {
     resend = new Resend(apiKey)
@@ -63,7 +64,10 @@ export async function sendEmail({ to, subject, html }: { to: string; subject: st
     console.warn(`[email] RESEND_API_KEY is not configured — skipping email to ${to} (subject: "${subject}")`)
     return
   }
-  const from = `${process.env.RESEND_FROM_NAME || 'Tawasul Academy'} <${process.env.RESEND_FROM_EMAIL}>`
+  const config = getServerRuntimeConfig()
+  const fromName = config?.resendFromName ?? process.env.RESEND_FROM_NAME ?? 'Tawasul Academy'
+  const fromEmail = config?.resendFromEmail ?? process.env.RESEND_FROM_EMAIL
+  const from = `${fromName} <${fromEmail}>`
   try {
     await client.emails.send({ from, to, subject, html })
   } catch (error) {
@@ -129,7 +133,7 @@ export function bookingCancellationTemplate(patientName: string, doctorName: str
 </td></tr>`)
 }
 
-export function doctorWelcomeTemplate(doctorName: string, email: string, temporaryPassword: string): string {
+export function doctorWelcomeTemplate(doctorName: string, email: string, temporaryPassword: string, loginUrl: string): string {
   return wrap(`<tr><td style="padding:24px 40px 8px 40px;">
   <h1 style="margin:0;font-size:22px;font-weight:600;color:${INK};">Welcome, ${doctorName}</h1>
   <p style="margin:16px 0 0 0;font-size:16px;line-height:1.6;color:#4D4D4D;">Your Tawasul Academy account is ready. Use the credentials below to log in for the first time.</p>
@@ -141,7 +145,7 @@ export function doctorWelcomeTemplate(doctorName: string, email: string, tempora
   </table>
 </td></tr>
 <p style="margin:0;font-size:14px;line-height:1.5;color:#4D4D4D;padding:16px 40px 8px 40px;"><strong>Please change your password after your first login.</strong></p>
-${button(`${process.env.APP_URL || ''}/login`, 'Log in to Tawasul Academy')}`)
+${button(`${loginUrl}/login`, 'Log in to Tawasul Academy')}`)
 }
 
 export function sessionReminderTemplate(recipientName: string, doctorOrPatientLabel: string, date: string, time: string): string {

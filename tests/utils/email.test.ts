@@ -117,23 +117,31 @@ describe('bookingCancellationTemplate', () => {
 
 describe('doctorWelcomeTemplate', () => {
   it('returns a string', () => {
-    expect(typeof doctorWelcomeTemplate('Dr. Amr', 'amr@email.com', 'TempPass123!')).toBe('string')
+    expect(typeof doctorWelcomeTemplate('Dr. Amr', 'amr@email.com', 'TempPass123!', 'http://localhost:3000')).toBe('string')
   })
 
   it('contains doctor name', () => {
-    expect(doctorWelcomeTemplate('Dr. Amr', 'amr@email.com', 'TempPass123!')).toContain('Dr. Amr')
+    expect(doctorWelcomeTemplate('Dr. Amr', 'amr@email.com', 'TempPass123!', 'http://localhost:3000')).toContain('Dr. Amr')
   })
 
   it('contains email', () => {
-    expect(doctorWelcomeTemplate('Dr. Amr', 'amr@email.com', 'TempPass123!')).toContain('amr@email.com')
+    expect(doctorWelcomeTemplate('Dr. Amr', 'amr@email.com', 'TempPass123!', 'http://localhost:3000')).toContain('amr@email.com')
   })
 
   it('contains temporary password', () => {
-    expect(doctorWelcomeTemplate('Dr. Amr', 'amr@email.com', 'TempPass123!')).toContain('TempPass123!')
+    expect(doctorWelcomeTemplate('Dr. Amr', 'amr@email.com', 'TempPass123!', 'http://localhost:3000')).toContain(
+      'TempPass123!',
+    )
+  })
+
+  it('contains the login URL', () => {
+    expect(doctorWelcomeTemplate('Dr. Amr', 'amr@email.com', 'TempPass123!', 'http://localhost:3000')).toContain(
+      'http://localhost:3000/login',
+    )
   })
 
   it('contains instruction to change password', () => {
-    const html = doctorWelcomeTemplate('Dr. Amr', 'amr@email.com', 'TempPass123!')
+    const html = doctorWelcomeTemplate('Dr. Amr', 'amr@email.com', 'TempPass123!', 'http://localhost:3000')
     expect(html.toLowerCase()).toMatch(/change|password/)
   })
 })

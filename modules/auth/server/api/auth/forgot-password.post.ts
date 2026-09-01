@@ -3,6 +3,7 @@ import { prisma } from '~/server/utils/prisma'
 import { generateToken } from '~/server/utils/auth'
 import { sendEmail, passwordResetTemplate } from '~/server/utils/email'
 import { forgotPasswordSchema } from '~/server/utils/validation'
+import { getServerRuntimeConfig } from '~/server/utils/runtime'
 
 const SUCCESS_MESSAGE = 'If this email exists, a reset link has been sent.'
 
@@ -30,7 +31,8 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  const resetUrl = `${process.env.APP_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`
+  const appUrl = getServerRuntimeConfig()?.public?.appUrl ?? process.env.APP_URL ?? 'http://localhost:3000'
+  const resetUrl = `${appUrl}/reset-password?token=${resetToken}`
   try {
     await sendEmail({
       to: user.email,

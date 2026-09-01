@@ -13,7 +13,7 @@ None. Phase 0 produces no API endpoints.
 
 | Route | Layout Used | Middleware | Description |
 |---|---|---|---|
-| `/` | default | none | Temporary test page to verify HeroUI and layout render correctly. Replaced in Phase 2. |
+| `/` | default | none | Temporary test page to verify the shadcn-vue components and layout render correctly. Replaced in Phase 2. |
 
 ---
 
@@ -82,11 +82,11 @@ None during setup. The `sendEmail` utility is tested with one manual test call d
 
 | File | Purpose |
 |---|---|
-| `nuxt.config.ts` | Nuxt + HeroUI + module configuration |
-| `tailwind.config.ts` | Tailwind with HeroUI plugin and all content paths |
-| `docker-compose.yml` | Development: postgres, pgAdmin, app |
+| `nuxt.config.ts` | Nuxt + shadcn-vue tokens + module configuration |
+| `tailwind.config.ts` | Tailwind theme tokens mapped to the brand palette |
+| `docker-compose.yml` | Development: postgres + pgAdmin (app runs on the host with `npm run dev`) |
 | `docker-compose.prod.yml` | Production: postgres, app, nginx, certbot |
-| `Dockerfile.dev` | Development image with hot reload |
+| `Dockerfile.dev` | Legacy dev image — retained but unused since the dev-separation amendment (§7) |
 | `Dockerfile.prod` | Multi-stage production image |
 | `.env` | Development environment variables (not committed) |
 | `.env.example` | Template for environment variables (committed) |
@@ -116,7 +116,7 @@ None during setup. The `sendEmail` utility is tested with one manual test call d
 
 ## What the Next Phase (Phase 1) Will Receive
 
-- A running Docker environment with PostgreSQL accessible at `postgresql://tawasul:tawasul_pass@postgres:5432/tawasul_db`
+- A running dev environment with PostgreSQL accessible on the host at `postgresql://tawasul:tawasul_pass@localhost:5433/tawasul_db` (postgres + pgAdmin in Docker, Nuxt dev server on the host)
 - All database tables created and ready
 - Seed admin account in the `users` table
 - `server/utils/prisma.ts` — ready to import and use
@@ -125,5 +125,5 @@ None during setup. The `sendEmail` utility is tested with one manual test call d
 - `server/utils/permissions.ts` — requirePermission ready to use
 - `server/middleware/auth.ts` — running on every request, attaching user to `event.context.user`
 - `layouts/default.vue` and `layouts/dashboard.vue` — ready to use
-- HeroUI configured with brand primary color `#E91E8C`
+- shadcn-vue configured with brand primary color `#E91E8C`
 - All module folders exist and are ready to receive files

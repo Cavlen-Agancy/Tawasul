@@ -3,6 +3,7 @@ import { prisma } from '~/server/utils/prisma'
 import { hashPassword, generateToken } from '~/server/utils/auth'
 import { sendEmail, emailVerificationTemplate } from '~/server/utils/email'
 import { authRegisterSchema, validationMessage } from '~/server/utils/validation'
+import { getServerRuntimeConfig } from '~/server/utils/runtime'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody<unknown>(event).catch(() => undefined)
@@ -35,7 +36,8 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  const verificationUrl = `${process.env.APP_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`
+  const appUrl = getServerRuntimeConfig()?.public?.appUrl ?? process.env.APP_URL ?? 'http://localhost:3000'
+  const verificationUrl = `${appUrl}/verify-email?token=${verificationToken}`
   try {
     await sendEmail({
       to: user.email,
