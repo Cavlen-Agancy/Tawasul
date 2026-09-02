@@ -1,0 +1,146 @@
+import { describe, expect, it, afterAll } from 'vitest'
+import crypto from 'node:crypto'
+import handler from '~/modules/payment/server/api/payment/webhook.post'
+import { prisma } from '~/server/utils/prisma'
+import { createApiEvent, expectApiError, createTestUser, deleteTestUser } from '../helpers'
+import { createTestDoctor, deleteTestDoctor, deleteTestBooking, nextDateWithDayOfWeek } from '../booking/helpers'
+
+const toDeleteUsers: string[] = []
+const toDeleteBookings: string[] = []
+let doctorUserId: string | null = null
+let doctorId: string | null = null
+
+async function createPendingBooking(ownerId: string) {
+  const dateStr = nextDateWithDayOfWeek(0)
+  const fixture = await createTestDoctor({
+    dayOfWeek: new Date(`${dateStr}T00:00:00`).getDay(),
+    startTime: '09:00',
+    endTime: '12:00',
+    sessionDuration: 60,
+  })
+  doctorId = fixture.doctor.id
+  doctorUserId = fixture.user.id
+
+  const booking = await prisma.booking.create({
+    data: {
+      userId: ownerId,
+      doctorId: fixture.doctor.id,
+      date: new Date(`${dateStr}T00:00:00`),
+      startTime: '09:00',
+      endTime: '10:00',
+      service: 'Marital Counseling',
+      status: 'PENDING',
+    },
+  })
+  await prisma.payment.create({ data: { bookingId: booking.id, amount: 500, currency: 'EGP', status: 'PENDING' } })
+  return booking.id
+}
+
+function buildApiEvent(body: Record<string, unknown>, headerName: string, headerValue: string) {
+  const event = createApiEvent({
+    method: 'POST',
+    url: '/api/payment/webhook',
+    body,
+    context: {},
+  })
+  ;(event.node.req.headers as Record<string, string>)[headerName] = headerValue
+  return event
+}
+
+afterAll(async () => {
+  await Promise.all(toDeleteBookings.map((id) => deleteTestBooking(id)))
+  if (doctorId && doctorUserId) await deleteTestDoctor(doctorId, doctorUserId)
+  await Promise.all(toDeleteUsers.map((id) => deleteTestUser(id)))
+})
+
+function setPaymobEnv(hmacSecret: string | undefined) {
+  process.env.PAYMENT_GATEWAY = 'paymob'
+  if (hmacSecret === undefined) delete process.env.PAYMOB_HMAC_SECRET
+  else process.env.PAYMOB_HMAC_SECRET = hmacSecret
+}
+
+function setStripeEnv(webhookSecret: string | undefined) {
+  process.env.PAYMENT_GATEWAY = 'stripe'
+  if (webhookSecret === undefined) delete process.env.STRIPE_WEBHOOK_SECRET
+  else process.env.STRIPE_WEBHOOK_SECRET = webhookSecret
+}
+
+describe('POST /api/payment/webhook', () => {
+  it('marks payment success + booking confirmed for a Paymob success webhook', async () => {
+    setPaymobEnv('paymob-hmac-secret')
+    const patient = await createTestUser({ emailVerified: true, email: `wh-paymob-ok-${Date.now()}@test.com` })
+    toDeleteUsers.push(patient.id)
+    const bookingId = await createPendingBooking(patient.id)
+
+    const body = { success: 'true', message: 'Approved', metadata: { bookingId } }
+    const signature = crypto.createHmac('sha512', 'paymob-hmac-secret').update(JSON.stringify(body)).digest('hex')
+    const event = buildApiEvent(body, 'hmac', signature)
+
+    const res = await handler(event) as { message: string }
+    expect(res.message).toBe('Webhook received')
+
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId } })
+    const payment = await prisma.payment.findUnique({ where: { bookingId } })
+    expect(booking?.status).toBe('CONFIRMED')
+    expect(payment?.status).toBe('SUCCESS')
+  })
+
+  it('marks payment failed and leaves booking pending on a Paymob failed webhook', async () => {
+    setPaymobEnv('paymob-hmac-secret')
+    const patient = await createTestUser({ emailVerified: true, email: `wh-paymob-fail-${Date.now()}@test.com` })
+    toDeleteUsers.push(patient.id)
+    const bookingId = await createPendingBooking(patient.id)
+
+    const body = { success: 'false', message: 'Declined', metadata: { bookingId } }
+    const signature = crypto.createHmac('sha512', 'paymob-hmac-secret').update(JSON.stringify(body)).digest('hex')
+    const event = buildApiEvent(body, 'hmac', signature)
+
+    await handler(event)
+
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId } })
+    const payment = await prisma.payment.findUnique({ where: { bookingId } })
+    expect(booking?.status).toBe('PENDING')
+    expect(payment?.status).toBe('FAILED')
+  })
+
+  it('rejects a Paymob webhook with an invalid signature with 400', async () => {
+    setPaymobEnv('paymob-hmac-secret')
+    const event = buildApiEvent({ success: 'true', metadata: {} }, 'hmac', 'invalid-signature')
+    try {
+      await handler(event)
+      expect.unreachable('should have thrown')
+    } catch (e) {
+      expectApiError(e, 400, 'Invalid signature')
+    }
+  })
+
+  it('marks payment success + booking confirmed for a Stripe success webhook', async () => {
+    setStripeEnv('whsec_test_secret')
+    const patient = await createTestUser({ emailVerified: true, email: `wh-stripe-ok-${Date.now()}@test.com` })
+    toDeleteUsers.push(patient.id)
+    const bookingId = await createPendingBooking(patient.id)
+
+    const body = { type: 'checkout.session.completed', metadata: { bookingId } }
+    const signature = crypto.createHmac('sha256', 'whsec_test_secret').update(JSON.stringify(body)).digest('hex')
+    const event = buildApiEvent(body, 'stripe-signature', signature)
+
+    const res = await handler(event) as { message: string }
+    expect(res.message).toBe('Webhook received')
+
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId } })
+    const payment = await prisma.payment.findUnique({ where: { bookingId } })
+    expect(booking?.status).toBe('CONFIRMED')
+    expect(payment?.status).toBe('SUCCESS')
+  })
+
+  it('rejects a Stripe webhook with an invalid signature with 400', async () => {
+    setStripeEnv('whsec_test_secret')
+    const event = buildApiEvent({ type: 'checkout.session.completed', metadata: {} }, 'stripe-signature', 'invalid')
+    try {
+      await handler(event)
+      expect.unreachable('should have thrown')
+    } catch (e) {
+      expectApiError(e, 400, 'Invalid signature')
+    }
+  })
+})

@@ -21,6 +21,28 @@ export const resetPasswordSchema = z.object({
   newPassword: z.string().min(8, 'Password must be at least 8 characters').max(128),
 })
 
+const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/
+
+export const availableDatesQuerySchema = z.object({
+  month: z.coerce.number().int().min(1).max(12),
+  year: z.coerce.number().int().min(1000).max(9999),
+})
+
+export const availableSlotsQuerySchema = z.object({
+  date: z.string().regex(dateRegex, 'Invalid date format'),
+})
+
+export const createBookingSchema = z.object({
+  date: z.string().regex(dateRegex, 'Invalid date format'),
+  startTime: z.string().regex(timeRegex, 'Invalid time format'),
+  doctorId: z.string().min(1, 'Doctor is required'),
+})
+
+export const initiatePaymentSchema = z.object({
+  bookingId: z.string().min(1, 'Booking ID is required'),
+})
+
 /**
  * Extracts a single human-readable message from a ZodError.
  * Falls back to the first issue message, then a generic message.
