@@ -26,7 +26,7 @@ async function loginAsPatient(page: Page) {
   await page.getByTestId('login-email').fill(patient.email)
   await page.getByTestId('login-password').fill(patient.password)
   await page.getByTestId('login-submit').click()
-  await page.waitForURL('**/dashboard', { timeout: 30_000 })
+  await page.waitForURL('**/dashboard/**', { timeout: 30_000 })
   await page.waitForTimeout(500)
 }
 

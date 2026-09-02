@@ -31,6 +31,18 @@ export function formatDateISO(d: Date): string {
 }
 
 /**
+ * Formats a Date into a human-readable label like "Monday, 4 March 2024".
+ */
+export function formatBookingDateLabel(date: Date): string {
+  return date.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+/**
  * Parses "YYYY-MM-DD" into a local Date at midnight.
  */
 export function parseISODate(date: string): Date {

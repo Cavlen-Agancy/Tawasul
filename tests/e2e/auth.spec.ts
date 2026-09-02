@@ -81,8 +81,8 @@ test.describe('Email Verification Flow', () => {
 test.describe('Login Flow', () => {
   test('patient logs in and is redirected to /dashboard', async ({ page }) => {
     await loginAs(page, patient.email, patient.password)
-    await page.waitForURL('**/dashboard')
-    await expect(page.getByRole('heading', { name: 'Patient Dashboard' })).toBeVisible()
+    await page.waitForURL('**/dashboard/**', { timeout: 30_000 })
+    await expect(page.getByRole('heading', { name: 'My Appointments' })).toBeVisible()
   })
 
   test('doctor logs in and is redirected to /doctor', async ({ page }) => {
@@ -107,7 +107,7 @@ test.describe('Login Flow', () => {
 test.describe('Logout Flow', () => {
   test('logs out and redirects to /login with cookie cleared', async ({ page }) => {
     await loginAs(page, patient.email, patient.password)
-    await page.waitForURL('**/dashboard')
+    await page.waitForURL('**/dashboard/**', { timeout: 30_000 })
 
     const cookiesAfterLogin = await page.context().cookies()
     expect(cookiesAfterLogin.some((c) => c.name === 'auth_token')).toBe(true)
@@ -121,10 +121,10 @@ test.describe('Logout Flow', () => {
 test.describe('Guest Middleware Redirects', () => {
   test('logged-in patient visiting /login is redirected to /dashboard', async ({ page }) => {
     await loginAs(page, patient.email, patient.password)
-    await page.waitForURL('**/dashboard')
+    await page.waitForURL('**/dashboard/**', { timeout: 30_000 })
     await gotoReady(page, '/login')
-    await page.waitForURL('**/dashboard')
-    await expect(page.getByRole('heading', { name: 'Patient Dashboard' })).toBeVisible()
+    await page.waitForURL('**/dashboard/**', { timeout: 30_000 })
+    await expect(page.getByRole('heading', { name: 'My Appointments' })).toBeVisible()
   })
 })
 
@@ -150,6 +150,7 @@ test.describe('Reset Password Flow', () => {
   test('resets the password and redirects to login', async ({ page }) => {
     const prisma = new PrismaClient()
     const email = `reset-${Date.now()}@example.com`
+    const token = `reset-token-${Date.now()}`
     const hashed = await bcrypt.hash('OldPass123!', 12)
     await prisma.user.create({
       data: {
@@ -159,13 +160,13 @@ test.describe('Reset Password Flow', () => {
         accountType: 'PATIENT',
         emailVerified: true,
         isActive: true,
-        passwordResetToken: 'reset-token-e2e',
+        passwordResetToken: token,
         passwordResetExpiry: new Date(Date.now() + 60 * 60 * 1000),
       },
     })
     await prisma.$disconnect()
 
-    await gotoReady(page, '/reset-password?token=reset-token-e2e')
+    await gotoReady(page, `/reset-password?token=${token}`)
     await page.getByTestId('reset-password').fill('NewPass123!')
     await page.getByTestId('reset-confirm').fill('NewPass123!')
     await page.getByTestId('reset-submit').click()

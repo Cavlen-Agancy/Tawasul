@@ -43,6 +43,15 @@ export const initiatePaymentSchema = z.object({
   bookingId: z.string().min(1, 'Booking ID is required'),
 })
 
+export const patientProfileSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  phone: z.string().max(30).optional().or(z.literal('')),
+})
+
+export const patientAppointmentsQuerySchema = z.object({
+  tab: z.enum(['upcoming', 'past']).optional().default('upcoming'),
+})
+
 /**
  * Extracts a single human-readable message from a ZodError.
  * Falls back to the first issue message, then a generic message.
