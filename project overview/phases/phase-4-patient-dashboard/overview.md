@@ -60,7 +60,7 @@ Phase 4 builds the complete patient-facing dashboard for the Tawasul Academy pla
 
 ```
 nuxt: ^3.x
-@heroui/nuxt: latest
+shadcn-vue: latest
 @nuxtjs/tailwindcss: latest
 jitsi-meet: ^1.x (via External API script)
 ```
@@ -115,7 +115,7 @@ only layouts, composables, components, and server API handlers.
 - **Session Room**: Use Jitsi Meet External API (not iframe) for more control (mute, leave, events).
 - **Time Window**: Session room is accessible from 5 minutes before `startTime` to 15 minutes after `endTime`.
 - **Photo Uploads**: Save to `UPLOAD_PATH/patients/{userId}-{timestamp}.ext`. Ensure the `uploads` directory exists and is mounted in Docker.
-- **Error Handling**: Show user-friendly error messages. Use HeroUI Toast for success/error notifications.
+- **Error Handling**: Show user-friendly error messages. Use shadcn-vue Toast for success/error notifications.
 - **Environment variables:** Two rules apply depending on context:
   1. Server utilities (`server/utils/*.ts`): Read directly from `process.env`. These files are server-only and not part of Nuxt's module system, so `useRuntimeConfig()` is not available.
   2. Nitro route handlers (`server/api/**/*.ts` and `modules/*/server/api/**/*.ts`): Use `useRuntimeConfig()` to read variables defined in `nuxt.config.ts` under `runtimeConfig`. Never call `process.env` directly in route handlers — use the runtime config object instead.

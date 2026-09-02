@@ -51,7 +51,7 @@ Phase 2 builds all public-facing marketing pages for the Tawasul Academy platfor
 
 ```
 nuxt: ^3.x
-@heroui/nuxt: latest
+shadcn-vue: latest
 @nuxtjs/tailwindcss: latest
 resend: ^3.x
 ```
@@ -96,10 +96,10 @@ public/
 - **Pages**: Use `definePageMeta` to set layout and middleware.
 - **SEO**: Use `useSeoMeta` in each page for title, description, and OpenGraph tags.
 - **Data Fetching**: Use `useAsyncData` or `useFetch` for server-side data fetching.
-- **HeroUI**: Use HeroUI components for all UI elements (buttons, cards, inputs, etc.).
+- **shadcn-vue**: Use shadcn-vue components for all UI elements (buttons, cards, inputs, etc.).
 - **Navigation**: Use NuxtLink for internal navigation.
 - **Error Handling**: Show user-friendly error messages for failed data fetching (e.g., "No experts available at this time.").
-- **Empty States**: Use HeroUI EmptyState or custom empty states for lists with no data.
+- **Empty States**: Use shadcn-vue EmptyState or custom empty states for lists with no data.
 
 ---
 

@@ -11,10 +11,10 @@
 - **Desktop:**
   - Left: Logo (`/public/logo.png`) linked to `/`.
   - Center: Navigation links (Home, About, Services, Our Experts, Contact).
-  - Right: Login button (HeroUI Button, variant="bordered") + Book Now button (HeroUI Button, color="primary").
+  - Right: Login button (shadcn-vue Button, variant="bordered") + Book Now button (shadcn-vue Button, color="primary").
 - **Mobile:**
   - Hide center links and right buttons.
-  - Show hamburger icon (HeroUI IconButton) that opens a HeroUI Drawer.
+  - Show hamburger icon (shadcn-vue IconButton) that opens a shadcn-vue Drawer.
   - Drawer contains stacked navigation links + Login + Book Now buttons.
 
 **Server Logic:**
@@ -32,7 +32,7 @@
 
 **Frontend Behavior:**
 - Render 5 sections in order: Hero, Services, Our Experts, Testimonials, CTA.
-- Show loading skeleton (HeroUI Skeleton) while fetching dynamic data (experts).
+- Show loading skeleton (shadcn-vue Skeleton) while fetching dynamic data (experts).
 
 **Sections:**
 
@@ -55,24 +55,24 @@
   4. Psychological Support
   5. Personal Development
 - **Card Structure:**
-  - HeroUI Card with icon (HeroUI Icon), title, short description, "Book Now" button (links to `/book`).
+  - shadcn-vue Card with icon (shadcn-vue Icon), title, short description, "Book Now" button (links to `/book`).
 
 ### Our Experts Section
 - **Title:** "Meet Our Experts"
 - **Content:**
   - Fetch up to 4 active doctors from `GET /api/public/doctors`.
   - Grid of doctor cards (4 columns on desktop, 2 on tablet, 1 on mobile).
-  - Each card: photo (fallback to placeholder if missing), name, specializations (as HeroUI Chips).
+  - Each card: photo (fallback to placeholder if missing), name, specializations (as shadcn-vue Chips).
   - "View All Experts" button (links to `/experts`).
-- **Loading State:** HeroUI Skeleton for each card while fetching.
+- **Loading State:** shadcn-vue Skeleton for each card while fetching.
 - **Empty State:** If no doctors, show "No experts available at this time."
 
 ### Testimonials Section
 - **Title:** "What Our Clients Say"
-- **Content:** 3 static testimonial cards (HeroUI Card) with:
+- **Content:** 3 static testimonial cards (shadcn-vue Card) with:
   - Quote text
   - Client name
-  - Star rating (5 stars, HeroUI Icon)
+  - Star rating (5 stars, shadcn-vue Icon)
 
 ### CTA Section
 - **Background:** Full-width magenta (`#E91E8C`).
@@ -150,8 +150,8 @@
 - **Experts Grid:**
   - Fetch all active doctors from `GET /api/public/doctors`.
   - Grid of doctor cards (3 columns on desktop, 2 on tablet, 1 on mobile).
-  - Each card: photo, name, specializations (HeroUI Chips), "View Profile" button (links to `/experts/[slug]`).
-- **Loading State:** HeroUI Skeleton for grid while fetching.
+  - Each card: photo, name, specializations (shadcn-vue Chips), "View Profile" button (links to `/experts/[slug]`).
+- **Loading State:** shadcn-vue Skeleton for grid while fetching.
 - **Empty State:** "No experts available at this time. Check back later."
 
 **Server Logic:**
@@ -168,13 +168,13 @@
 **User Action:** User visits `/experts/dr-ahmed-hassan`.
 
 **Frontend Behavior:**
-- **Loading State:** HeroUI Skeleton while fetching doctor data.
+- **Loading State:** shadcn-vue Skeleton while fetching doctor data.
 - **Content:**
   - Photo (large, centered)
   - Name (heading)
-  - Specializations (HeroUI Chips)
+  - Specializations (shadcn-vue Chips)
   - Bio (formatted text)
-  - "Book a Session" button (HeroUI Button, primary, links to `/book`)
+  - "Book a Session" button (shadcn-vue Button, primary, links to `/book`)
 - **404 State:** If doctor not found or inactive, show 404 page with "Expert not found" message.
 
 **Server Logic:**
@@ -198,9 +198,9 @@
   - Subheadline: "We're here to help. Get in touch with us today."
 - **Contact Form:**
   - Fields: Name (required), Email (required, valid format), Phone (optional), Message (required, min 10 chars).
-  - Submit button (HeroUI Button, primary).
+  - Submit button (shadcn-vue Button, primary).
   - On submit: Call `POST /api/public/contact`.
-  - On success: Show success message (HeroUI Alert) + clear form.
+  - On success: Show success message (shadcn-vue Alert) + clear form.
   - On error: Show error message (but never reveal if email sending failed).
 - **Contact Details:**
   - Fetched from `GET /api/public/settings` (or directly from Settings singleton).

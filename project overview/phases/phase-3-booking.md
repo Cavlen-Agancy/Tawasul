@@ -9,7 +9,7 @@ Build the complete booking flow. After this phase, a logged-in patient can view 
 - Nitro API endpoints
 - Prisma (Booking, Payment, Availability, BlockedSlot, Settings models)
 - FullCalendar (slot display)
-- HeroUI (booking steps UI)
+- shadcn-vue (booking steps UI)
 - Resend (confirmation emails)
 - Paymob or Stripe (payment gateway)
 - Zod (validation)
@@ -193,12 +193,12 @@ FullCalendar instance:
 - Highlight available dates with `#E91E8C`. Gray out unavailable dates. Make unavailable dates non-clickable.
 - On month change (`datesSet` callback): fetch available dates for new month.
 - On date click (available date only): call `GET /api/booking/available-slots?date=DATE`.
-- Display returned slots as HeroUI Button chips below the calendar.
+- Display returned slots as shadcn-vue Button chips below the calendar.
 - On slot select: highlight selected slot, show Continue button.
 
 **Step 2 — Review**
 
-HeroUI Card showing:
+shadcn-vue Card showing:
 - Date (formatted: "Monday, 4 March 2024")
 - Time (formatted: "10:00 AM – 11:00 AM")
 - Doctor name

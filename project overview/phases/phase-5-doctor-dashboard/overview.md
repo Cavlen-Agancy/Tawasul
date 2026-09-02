@@ -65,7 +65,7 @@ Phase 5 builds the doctor-facing dashboard for the Tawasul Academy platform. Aft
 
 ```
 nuxt: ^3.x
-@heroui/nuxt: latest
+shadcn-vue: latest
 @nuxtjs/tailwindcss: latest
 fullcalendar: ^6.x
 jitsi-meet: ^1.x (via External API script)
@@ -119,7 +119,7 @@ The module folder contains only layouts, composables, components, and server API
 - **Session Room**: Reuse the same Jitsi integration as Phase 4 (patient dashboard).
 - **Time Window**: Session room is accessible from 5 minutes before `startTime` to 15 minutes after `endTime` (same as patient).
 - **Photo Uploads**: Save to `UPLOAD_PATH/doctors/{userId}-{timestamp}.ext`.
-- **Incomplete Profile Banner**: Show a yellow HeroUI Alert banner on all pages if `doctor.bio` is empty.
+- **Incomplete Profile Banner**: Show a yellow shadcn-vue Alert banner on all pages if `doctor.bio` is empty.
 - **Environment variables:** Two rules apply depending on context:
   1. Server utilities (`server/utils/*.ts`): Read directly from `process.env`. These files are server-only and not part of Nuxt's module system, so `useRuntimeConfig()` is not available.
   2. Nitro route handlers (`server/api/**/*.ts` and `modules/*/server/api/**/*.ts`): Use `useRuntimeConfig()` to read variables defined in `nuxt.config.ts` under `runtimeConfig`. Never call `process.env` directly in route handlers — use the runtime config object instead.

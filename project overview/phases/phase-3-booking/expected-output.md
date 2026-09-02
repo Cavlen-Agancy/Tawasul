@@ -29,7 +29,7 @@
 
 ## Components Delivered
 
-None. All booking pages use HeroUI and FullCalendar directly.
+None. All booking pages use shadcn-vue and FullCalendar directly.
 
 ---
 

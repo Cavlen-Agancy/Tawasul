@@ -1,6 +1,6 @@
 # Tawasul Academy — MVP Scope v2
 **Timeline: 45 days**
-**UI Library: HeroUI**
+**UI Library: shadcn-vue**
 **Stack: Nuxt 3 + Nitro + Prisma + PostgreSQL + Docker + Resend + Jitsi**
 
 ---
@@ -171,7 +171,7 @@ Permission System:
 
 | Days | Phase | Deliverable |
 |---|---|---|
-| 1 – 3 | Phase 0 | Project setup, Docker, Prisma, HeroUI, Resend, Jitsi config |
+| 1 – 3 | Phase 0 | Project setup, Docker, Prisma, shadcn-vue, Resend, Jitsi config |
 | 4 – 8 | Phase 1 | Authentication — register, login, verify, reset |
 | 9 – 13 | Phase 2 | Marketing pages — all 6 pages |
 | 14 – 20 | Phase 3 | Booking flow + payment integration |

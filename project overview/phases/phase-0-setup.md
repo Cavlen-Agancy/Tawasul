@@ -1,7 +1,7 @@
 # Phase 0 — Project Setup
 
 ## Goal
-Bootstrap the full project foundation. After this phase, the dev environment runs completely inside Docker, the database is connected, Prisma schema is applied, HeroUI is configured, and the module folder structure is in place.
+Bootstrap the full project foundation. After this phase, the dev environment runs completely inside Docker, the database is connected, Prisma schema is applied, shadcn-vue is configured, and the module folder structure is in place.
 
 ---
 
@@ -9,7 +9,7 @@ Bootstrap the full project foundation. After this phase, the dev environment run
 - Nuxt.js 3 + TypeScript
 - Nitro (backend API layer)
 - Prisma ORM + PostgreSQL
-- HeroUI + Tailwind CSS
+- shadcn-vue + Tailwind CSS
 - Resend (email)
 - Docker + Docker Compose
 - Jitsi (video — no setup needed for meet.jit.si)
@@ -21,7 +21,7 @@ Bootstrap the full project foundation. After this phase, the dev environment run
 Create a new Nuxt 3 project with TypeScript enabled. SSR must be on. Start clean — no starter template.
 
 Install all required dependencies:
-- `@heroui/nuxt`
+- `shadcn-vue`
 - `@nuxtjs/tailwindcss`
 - `@vueuse/nuxt`
 - `@nuxt/image`
@@ -206,12 +206,12 @@ Nitro server middleware that runs on every request:
 
 ---
 
-## Step 7 — HeroUI + Tailwind Setup
+## Step 7 — shadcn-vue + Tailwind Setup
 
 Create `tailwind.config.ts`:
 - Content paths must include all module page and component directories
-- Include HeroUI plugin: `const { heroui } = require('@heroui/nuxt')`
-- Add HeroUI to plugins array
+- Include shadcn-vue plugin: `const { shadcnVue } = require('shadcn-vue')`
+- Add shadcn-vue to plugins array
 
 Create `assets/css/tailwind.css`:
 ```css
@@ -232,7 +232,7 @@ Create `assets/css/main.css`:
 
 Create `layouts/default.vue` — public layout used by marketing pages:
 - No sidebar
-- Top navigation bar with logo, nav links, Login button, and Book Now CTA button (HeroUI Button, primary color)
+- Top navigation bar with logo, nav links, Login button, and Book Now CTA button (shadcn-vue Button, primary color)
 - Footer with contact info and copyright
 
 Create `layouts/dashboard.vue` — base dashboard layout:
@@ -272,7 +272,7 @@ Create branches:
 - [ ] pgAdmin shows all tables from schema.prisma
 - [ ] `prisma db seed` creates the admin account and settings record
 - [ ] A test email sends successfully via the sendEmail utility
-- [ ] HeroUI components render correctly on a test page with brand primary color
+- [ ] shadcn-vue components render correctly on a test page with brand primary color
 - [ ] All module folders exist in the correct structure
 - [ ] `.env` is not committed to Git
 
@@ -283,5 +283,5 @@ Create branches:
 - Use the exact `schema.prisma`, `.env.example`, `nuxt.config.ts`, `docker-compose.yml`, and Dockerfile files provided. Do not modify them.
 - The Prisma singleton pattern in `server/utils/prisma.ts` is required — without it, hot reload creates too many database connections and crashes.
 - The seed file must use `upsert` not `create` — running it twice must not throw errors.
-- Do not create any pages beyond a simple `/test` page to verify HeroUI renders correctly. All real pages start in Phase 1.
+- Do not create any pages beyond a simple `/test` page to verify shadcn-vue renders correctly. All real pages start in Phase 1.
 - If `prisma db push` fails, check that the postgres container is healthy before the app starts — the healthcheck in docker-compose.yml handles this.

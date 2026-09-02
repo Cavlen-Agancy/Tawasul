@@ -9,7 +9,7 @@ Build the doctor-facing dashboard. After this phase, a doctor can complete their
 - Nitro API endpoints
 - Prisma (User, Doctor, Booking, Availability, BlockedSlot, SessionRoom models)
 - FullCalendar (doctor calendar — month, week, day views)
-- HeroUI (dashboard layout, forms, cards)
+- shadcn-vue (dashboard layout, forms, cards)
 - Jitsi (session room embed)
 
 ---
@@ -33,7 +33,7 @@ Mobile: bottom navigation bar.
 
 Apply `auth` + `doctor-only` middleware to all doctor pages.
 
-If doctor's bio is empty on login, show a yellow HeroUI Alert banner on all pages: "Your profile is incomplete. Please complete your profile so patients can find you."
+If doctor's bio is empty on login, show a yellow shadcn-vue Alert banner on all pages: "Your profile is incomplete. Please complete your profile so patients can find you."
 
 ---
 
@@ -129,7 +129,7 @@ FullCalendar with three views: Month, Week, Day. View switcher buttons top right
 
 **Month view:**
 - Each confirmed booking = event block with patient name and time.
-- Clicking event = HeroUI Modal with booking details.
+- Clicking event = shadcn-vue Modal with booking details.
 
 **Week view:**
 - Hourly grid.
@@ -156,7 +156,7 @@ Behavior:
 ### `/doctor/profile` — Profile Page
 
 Left: profile photo with Upload Photo button.
-Right: Name, Phone, Bio (HeroUI Textarea), Specializations (tag input — type and press Enter to add, click X to remove).
+Right: Name, Phone, Bio (shadcn-vue Textarea), Specializations (tag input — type and press Enter to add, click X to remove).
 Email: read-only.
 
 Save Changes button.

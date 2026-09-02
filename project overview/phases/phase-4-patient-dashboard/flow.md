@@ -11,10 +11,10 @@
 - Extends `layouts/dashboard.vue` (from Phase 0).
 - **Desktop:**
   - Sidebar (240px wide) with links:
-    - My Appointments (HeroUI Icon + text)
-    - My Payments (HeroUI Icon + text)
-    - Profile (HeroUI Icon + text)
-    - Logout (HeroUI Icon + text)
+    - My Appointments (shadcn-vue Icon + text)
+    - My Payments (shadcn-vue Icon + text)
+    - Profile (shadcn-vue Icon + text)
+    - Logout (shadcn-vue Icon + text)
   - Main content area (flex-1, overflow-auto) for `<slot />`.
 - **Mobile:**
   - Bottom navigation bar with icons for the same links.
@@ -77,7 +77,7 @@
 **User Action:** User submits profile update form.
 
 **Frontend Behavior:**
-- On success: Show HeroUI Toast success notification.
+- On success: Show shadcn-vue Toast success notification.
 - On error: Show error message.
 
 **API Call:**
@@ -129,7 +129,7 @@
 
 **Frontend Behavior:**
 - On file selection: Immediately call this endpoint, update displayed photo.
-- On success: Show HeroUI Toast success notification.
+- On success: Show shadcn-vue Toast success notification.
 - On error: Show error message.
 
 **API Call:**
@@ -328,7 +328,7 @@
 **User Action:** Patient or staff cancels a booking.
 
 **Frontend Behavior:**
-- Patient: Cancel button visible only if more than 24 hours before session. On click: show HeroUI confirmation dialog. On confirm: call the API. On success: update local state.
+- Patient: Cancel button visible only if more than 24 hours before session. On click: show shadcn-vue confirmation dialog. On confirm: call the API. On success: update local state.
 - Staff: No 24-hour restriction. Cancel available any time.
 
 **API Call:**
@@ -389,9 +389,9 @@
 **Middleware:** `auth` + `patient-only`.
 
 **Behavior:**
-- **Tabs:** HeroUI Tabs for "Upcoming" and "Past".
+- **Tabs:** shadcn-vue Tabs for "Upcoming" and "Past".
 - **Upcoming Tab:**
-  - Show appointment cards (HeroUI Card) for each upcoming appointment:
+  - Show appointment cards (shadcn-vue Card) for each upcoming appointment:
     - Doctor photo (fallback to placeholder) + name.
     - Date formatted as "Monday, 4 March 2024".
     - Time formatted as "10:00 AM – 11:00 AM".
@@ -402,7 +402,7 @@
       - Links to `/dashboard/session/[bookingId]`.
     - "Cancel" button:
       - Visible only if more than 24 hours before session.
-      - On click: Open HeroUI Modal confirmation dialog.
+      - On click: Open shadcn-vue Modal confirmation dialog.
       - On confirm: Call `PATCH /api/booking/:id/cancel`, then move card to past tab (local state update).
   - Empty state: "No upcoming appointments. Book your first session." with Book Now button (links to `/book`).
 - **Past Tab:**
@@ -410,9 +410,9 @@
     - Doctor photo + name.
     - Date and time.
     - Service.
-    - Status badge: Completed (green) or Cancelled (gray) — HeroUI Chip.
+    - Status badge: Completed (green) or Cancelled (gray) — shadcn-vue Chip.
   - Empty state: "No past appointments."
-- **Loading State:** HeroUI Skeleton for cards while fetching.
+- **Loading State:** shadcn-vue Skeleton for cards while fetching.
 - **Auto-Update:** Recalculate Join Session button state every 60 seconds using `setInterval`.
 
 **Data Fetching:**
@@ -427,15 +427,15 @@
 **Middleware:** `auth` + `patient-only`.
 
 **Behavior:**
-- **Desktop:** HeroUI Table with columns:
+- **Desktop:** shadcn-vue Table with columns:
   - Date (formatted)
   - Doctor
   - Service
   - Amount (formatted with currency)
-  - Status (HeroUI Chip: SUCCESS=green, PENDING=yellow, FAILED=red, REFUNDED=gray)
+  - Status (shadcn-vue Chip: SUCCESS=green, PENDING=yellow, FAILED=red, REFUNDED=gray)
 - **Mobile:** Table collapses to card list (one card per row).
 - **Empty State:** "No payment history."
-- **Loading State:** HeroUI Skeleton for table rows while fetching.
+- **Loading State:** shadcn-vue Skeleton for table rows while fetching.
 
 **Data Fetching:**
 - On load: Call `GET /api/patient/payments`.
@@ -451,17 +451,17 @@
 - **Layout:** Two-column layout (desktop) or stacked (mobile).
   - **Left Column:**
     - Profile photo (circular, large).
-    - "Upload Photo" button (HeroUI Button, secondary).
+    - "Upload Photo" button (shadcn-vue Button, secondary).
     - On click: Open file picker, immediately upload on selection.
   - **Right Column:**
-    - Name input (HeroUI Input, required).
-    - Phone input (HeroUI Input, optional).
+    - Name input (shadcn-vue Input, required).
+    - Phone input (shadcn-vue Input, optional).
     - Email (read-only text, not input).
-    - "Save Changes" button (HeroUI Button, primary).
+    - "Save Changes" button (shadcn-vue Button, primary).
 - **Behavior:**
   - On load: Call `GET /api/patient/profile`, pre-fill fields.
   - Photo upload: On file selection, call `POST /api/patient/profile/photo`, update displayed photo.
-  - On save: Call `PATCH /api/patient/profile`, show HeroUI Toast success notification.
+  - On save: Call `PATCH /api/patient/profile`, show shadcn-vue Toast success notification.
   - Inline validation: Name required, min 2 chars.
 
 ---
@@ -512,8 +512,8 @@
   - Full-height video area (left 70%).
   - Text chat panel (right 30%, use Jitsi's built-in chat).
 - **Leave Session Button:**
-  - HeroUI Button, top right.
-  - On click: HeroUI Modal confirmation.
+  - shadcn-vue Button, top right.
+  - On click: shadcn-vue Modal confirmation.
   - On confirm: Disconnect Jitsi, redirect to `/dashboard/appointments`.
 
 **Edge Cases:**

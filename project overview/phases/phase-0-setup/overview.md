@@ -67,7 +67,7 @@ Required external accounts before starting:
 
 ```
 nuxt: ^3.x
-@heroui/nuxt: latest
+shadcn-vue: latest
 @nuxtjs/tailwindcss: latest
 @vueuse/nuxt: latest
 @nuxt/image: latest

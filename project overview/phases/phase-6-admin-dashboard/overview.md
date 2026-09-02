@@ -68,7 +68,7 @@ Phase 6 builds the complete admin dashboard with a flexible permission system fo
 
 ```
 nuxt: ^3.x
-@heroui/nuxt: latest
+shadcn-vue: latest
 @nuxtjs/tailwindcss: latest
 fullcalendar: ^6.x
 ```

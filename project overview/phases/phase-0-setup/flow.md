@@ -3,7 +3,7 @@
 
 > **Post-Phase-0 amendments (user-approved)** — see `phase-0/notes.md` §7–§9. Steps that
 > describe the original build ("inside Docker", three branches, `ts-node` seed,
-> HeroUI, `process.env` reads) are superseded: dev now runs on the host
+> shadcn-vue, `process.env` reads) are superseded: dev now runs on the host
 > (`npm run dev` + postgres/pgAdmin in Docker, port 5433), Git has a single `main`
 > branch, the seed uses `tsx`, the UI layer is shadcn-vue, and server config is read via
 > `useRuntimeConfig()` with a Vitest-only fallback. Follow the up-to-date checklists in
@@ -262,15 +262,15 @@ Steps:
 
 ---
 
-## Feature 6 — HeroUI and Tailwind Configuration
+## Feature 6 — shadcn-vue and Tailwind Configuration
 
-**Action:** Configure HeroUI with brand colors and Tailwind.
+**Action:** Configure shadcn-vue with brand colors and Tailwind.
 
 **Steps:**
 
 **Create `tailwind.config.ts`:**
 ```typescript
-import { heroui } from '@heroui/nuxt'
+import { shadcnVue } from 'shadcn-vue'
 import type { Config } from 'tailwindcss'
 
 export default {
@@ -280,11 +280,11 @@ export default {
     './pages/**/*.vue',
     './plugins/**/*.ts',
     './modules/**/*.{vue,ts}',
-    './node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}',
+    './node_modules/shadcn-vue/dist/**/*.{js,ts,jsx,tsx}',
   ],
   theme: { extend: {} },
   darkMode: 'class',
-  plugins: [heroui()],
+  plugins: [shadcnVue()],
 } satisfies Config
 ```
 
@@ -324,8 +324,8 @@ Structure:
 - `<header>` — fixed top navbar containing:
   - Left: logo image (`/logo.png`) wrapped in a NuxtLink to `/`
   - Center: navigation links (Home, About, Services, Our Experts, Contact) — use NuxtLink for each. Links are placeholder hrefs for now (`/`, `/about`, `/services`, `/experts`, `/contact`).
-  - Right: Login button (HeroUI Button, variant="bordered", size="sm") linking to `/login` + Book Now button (HeroUI Button, color="primary", size="sm") linking to `/book`.
-  - Mobile: hide center links and right buttons, show a hamburger icon that opens a HeroUI Drawer with the same links stacked vertically.
+  - Right: Login button (shadcn-vue Button, variant="bordered", size="sm") linking to `/login` + Book Now button (shadcn-vue Button, color="primary", size="sm") linking to `/book`.
+  - Mobile: hide center links and right buttons, show a hamburger icon that opens a shadcn-vue Drawer with the same links stacked vertically.
 - `<main>` — `<slot />` where page content renders.
 - `<footer>` — simple footer with: copyright text "© 2024 Tawasul Academy", placeholder contact email and phone (will be replaced with dynamic Settings data in Phase 2).
 
@@ -351,8 +351,8 @@ This layout provides the shell only. Each module's layout file fills the sidebar
 
 Create `pages/index.vue`:
 - Display a heading "Tawasul Academy — Setup Complete"
-- Display a HeroUI Button with `color="primary"` and text "Primary Color Test" to verify brand color is applied
-- Display a HeroUI Card with a short text inside to verify HeroUI renders
+- Display a shadcn-vue Button with `color="primary"` and text "Primary Color Test" to verify brand color is applied
+- Display a shadcn-vue Card with a short text inside to verify shadcn-vue renders
 - Use the `default` layout
 
 This page is replaced in Phase 2 with the real home page.

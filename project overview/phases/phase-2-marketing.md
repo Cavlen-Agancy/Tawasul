@@ -7,7 +7,7 @@ Build all public-facing marketing pages. After this phase, visitors can browse t
 
 ## Stack Used in This Phase
 - Nuxt pages + default layout
-- HeroUI components
+- shadcn-vue components
 - Prisma (Doctor, Settings models — read only)
 - Resend (contact form email)
 
@@ -24,9 +24,9 @@ All pages in this phase are public — no authentication required. They use the 
 Update `layouts/default.vue` with full navigation:
 
 Links: Home, About, Services, Our Experts, Contact
-Right side: Login button (HeroUI Button, variant outline) + Book Now button (HeroUI Button, primary color `#E91E8C`)
+Right side: Login button (shadcn-vue Button, variant outline) + Book Now button (shadcn-vue Button, primary color `#E91E8C`)
 
-On mobile: hamburger menu that opens a HeroUI Drawer with the same links.
+On mobile: hamburger menu that opens a shadcn-vue Drawer with the same links.
 
 Logo: display the Tawasul Academy logo from `/public/logo.png`. Link to `/`.
 
@@ -50,7 +50,7 @@ Sections in order:
 
 **Services Section**
 - Section title: "Our Services"
-- Grid of service cards (HeroUI Card) — 3 columns on desktop, 1 on mobile
+- Grid of service cards (shadcn-vue Card) — 3 columns on desktop, 1 on mobile
 - Services are static for MVP: Marital Counseling, Family Counseling, Parenting Consultation, Psychological Support, Personal Development
 - Each card: icon, title, short description, "Book Now" button → `/book`
 
@@ -112,7 +112,7 @@ Dynamic page:
 ### `/contact` — Contact Us
 
 Sections:
-- Contact form: Name, Email, Phone, Message fields (HeroUI Input + Textarea)
+- Contact form: Name, Email, Phone, Message fields (shadcn-vue Input + Textarea)
 - On submit: POST /api/public/contact — sends email to admin via Resend
 - Always show success message after submit
 - Contact details pulled from Settings: phone, email, WhatsApp
@@ -166,7 +166,7 @@ Add `useSeoMeta` to each page with relevant title and description:
 - [ ] Navigation links work correctly on desktop and mobile
 - [ ] Hamburger menu opens and closes on mobile
 - [ ] Logo links to home page
-- [ ] HeroUI components render with correct brand colors
+- [ ] shadcn-vue components render with correct brand colors
 
 ---
 

@@ -134,7 +134,7 @@
 
 **Frontend Behavior:**
 - Call this endpoint with the selected date.
-- Display returned slots as HeroUI Button chips below the calendar.
+- Display returned slots as shadcn-vue Button chips below the calendar.
 - On slot select: Highlight selected slot, show "Continue" button.
 
 **API Call:**
@@ -462,10 +462,10 @@
     - Gray out unavailable dates (use `display: none` or `opacity-50` + `pointer-events-none`).
     - On month change (`datesSet` callback): Fetch available dates for new month.
     - On date click (available date only): Call `GET /api/booking/available-slots?date=DATE`.
-  - Display returned slots as HeroUI Button chips below the calendar.
+  - Display returned slots as shadcn-vue Button chips below the calendar.
   - On slot select: Store selected slot, advance to Step 2.
 - **Step 2 — Review:**
-  - Show HeroUI Card with:
+  - Show shadcn-vue Card with:
     - Date (formatted: "Monday, 4 March 2024").
     - Time (formatted: "10:00 AM – 11:00 AM").
     - Doctor name.
@@ -501,7 +501,7 @@
   2. Call `GET /api/booking/:id`.
   3. If 404 or 403: Show error message + link to `/book`.
   4. If success: Show success state:
-     - HeroUI Icon (checkmark, magenta).
+     - shadcn-vue Icon (checkmark, magenta).
      - Headline: "Booking Confirmed"
      - Booking summary (date, time, doctor, service, price).
      - "Go to My Appointments" button → `/dashboard/appointments` (links to Phase 4).

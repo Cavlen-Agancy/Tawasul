@@ -47,7 +47,7 @@ Phase 1 builds the complete authentication system for the Tawasul Academy platfo
 
 ```
 nuxt: ^3.x
-@heroui/nuxt: latest
+shadcn-vue: latest
 zod: ^3.x
 bcryptjs: ^2.x
 jsonwebtoken: ^9.x

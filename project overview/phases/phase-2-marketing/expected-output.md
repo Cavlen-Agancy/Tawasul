@@ -28,7 +28,7 @@
 
 ## Components Delivered
 
-None. All pages use HeroUI components directly. Reusable components will be added in later phases if needed.
+None. All pages use shadcn-vue components directly. Reusable components will be added in later phases if needed.
 
 ---
 

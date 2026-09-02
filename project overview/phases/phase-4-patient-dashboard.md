@@ -8,7 +8,7 @@ Build the complete patient-facing dashboard. After this phase, a logged-in patie
 ## Stack Used in This Phase
 - Nitro API endpoints
 - Prisma (User, Booking, Payment, SessionRoom models)
-- HeroUI (dashboard layout, cards, tables)
+- shadcn-vue (dashboard layout, cards, tables)
 - Jitsi (session room embed)
 - Resend (cancellation email)
 
@@ -129,17 +129,17 @@ All inside `modules/patient/pages/`. All use PatientLayout.
 
 ### `/dashboard/appointments` — Appointments Page
 
-Two tabs: Upcoming and Past (HeroUI Tabs).
+Two tabs: Upcoming and Past (shadcn-vue Tabs).
 
 **Upcoming tab:**
 
-Appointment cards (HeroUI Card) showing:
+Appointment cards (shadcn-vue Card) showing:
 - Doctor photo + name
 - Date formatted as "Monday, 4 March 2024"
 - Time formatted as "10:00 AM – 11:00 AM"
 - Service name
 - "Join Session" button — active (magenta) only within time window (5 min before to 15 min after). Outside window: grayed out with tooltip "Available 5 minutes before your session".
-- "Cancel" button — visible only if more than 24 hours before session. On click: HeroUI Modal confirmation dialog before calling cancel API.
+- "Cancel" button — visible only if more than 24 hours before session. On click: shadcn-vue Modal confirmation dialog before calling cancel API.
 
 Empty state: "No upcoming appointments. Book your first session." with Book Now button.
 
@@ -149,23 +149,23 @@ Appointment cards showing:
 - Doctor photo + name
 - Date and time
 - Service
-- Status badge: Completed (green) or Cancelled (gray) — HeroUI Chip
+- Status badge: Completed (green) or Cancelled (gray) — shadcn-vue Chip
 
 Empty state: "No past appointments."
 
 Behavior:
 - On load: call GET /api/patient/appointments for both tabs.
 - After cancel: move card from upcoming to past without page reload.
-- Loading skeleton (HeroUI Skeleton) while fetching.
+- Loading skeleton (shadcn-vue Skeleton) while fetching.
 - Recalculate Join Session button state every 60 seconds using `setInterval`.
 
 ---
 
 ### `/dashboard/payments` — Payments Page
 
-HeroUI Table with columns: Date, Doctor, Service, Amount, Status.
+shadcn-vue Table with columns: Date, Doctor, Service, Amount, Status.
 
-Status column uses HeroUI Chip:
+Status column uses shadcn-vue Chip:
 - SUCCESS → green
 - PENDING → yellow
 - FAILED → red
@@ -182,12 +182,12 @@ Mobile: table collapses to card list — one card per row.
 Left: profile photo with "Upload Photo" button below.
 Right: Name input, Phone input, Email (read-only text, not input).
 
-Save Changes button (HeroUI Button, primary).
+Save Changes button (shadcn-vue Button, primary).
 
 Behavior:
 - On load: fetch GET /api/patient/profile and pre-fill fields.
 - Photo upload: file picker on click, immediately call POST /api/patient/profile/photo on selection, update displayed photo.
-- On save: PATCH /api/patient/profile, show HeroUI Toast success notification.
+- On save: PATCH /api/patient/profile, show shadcn-vue Toast success notification.
 - Inline validation: name required.
 
 ---
@@ -204,7 +204,7 @@ On load:
 - Initialize with `roomName` and `domain` from the API response.
 - Configure: display name = patient name, disable prejoin page, start with audio and video off.
 - Full-height video area (left 70%) + text chat panel (right 30%, use Jitsi's built-in chat).
-- "Leave Session" button — HeroUI Button, top right. On click: HeroUI Modal confirmation, then disconnect and redirect to `/dashboard/appointments`.
+- "Leave Session" button — shadcn-vue Button, top right. On click: shadcn-vue Modal confirmation, then disconnect and redirect to `/dashboard/appointments`.
 
 ---
 

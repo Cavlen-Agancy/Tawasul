@@ -20,7 +20,7 @@
     - Manage Staff (requires `STAFF READ`)
     - Settings (requires `SETTINGS READ`)
     - Logout
-  - Use HeroUI components for sidebar styling.
+  - Use shadcn-vue components for sidebar styling.
 - **Mobile:**
   - Bottom navigation bar with icons for the same links (filtered by permissions).
   - Hide desktop sidebar.
@@ -72,7 +72,7 @@
 
 **Frontend Behavior:**
 - Call this endpoint on page load to fetch stats.
-- Display stats in HeroUI stat cards.
+- Display stats in shadcn-vue stat cards.
 
 **API Call:**
 - **Method:** GET
@@ -1149,18 +1149,18 @@
 **Middleware:** `auth` + `staff-only`.
 
 **Behavior:**
-- **Stats Cards:** 2x2 grid of HeroUI stat cards:
+- **Stats Cards:** 2x2 grid of shadcn-vue stat cards:
   1. Total Bookings This Month (with % change vs last month if possible).
   2. Total Revenue This Month (formatted as EGP).
   3. Active Patients count.
   4. Active Doctors count.
-- **Recent Bookings:** HeroUI Table below stats with columns:
+- **Recent Bookings:** shadcn-vue Table below stats with columns:
   - Patient
   - Doctor
   - Date
   - Service
   - Status
-- **Loading State:** HeroUI Skeleton for stats and table while fetching.
+- **Loading State:** shadcn-vue Skeleton for stats and table while fetching.
 
 **Data Fetching:**
 - On load: Call `GET /api/admin/overview`.
@@ -1185,7 +1185,7 @@
   - Cancelled bookings: Reduced opacity (e.g., `opacity-50`).
   - Filter changes trigger re-fetch.
 - **Event Click:**
-  - Open HeroUI Modal with:
+  - Open shadcn-vue Modal with:
     - Full booking details (patient, doctor, date, time, service, status, payment status).
     - "Cancel Booking" button (visible only if user has `APPOINTMENTS DELETE` permission).
 
@@ -1201,18 +1201,18 @@
 
 **Behavior:**
 - **Search Input:** Filter by name or email (client-side or server-side).
-- **Doctors Table:** HeroUI Table with columns:
+- **Doctors Table:** shadcn-vue Table with columns:
   - Photo (small, circular)
   - Name
   - Email
-  - Specializations (comma-separated or HeroUI Chips)
+  - Specializations (comma-separated or shadcn-vue Chips)
   - Status badge (Active/Inactive)
   - Sessions This Month
   - Actions:
-    - Edit button (HeroUI IconButton) — opens edit modal.
+    - Edit button (shadcn-vue IconButton) — opens edit modal.
     - View Calendar button — opens `/admin/doctors/[id]` with calendar tab active.
-    - Toggle Active/Inactive (HeroUI Switch).
-- **Add Doctor Button:** Top right (HeroUI Button, primary) — opens add modal.
+    - Toggle Active/Inactive (shadcn-vue Switch).
+- **Add Doctor Button:** Top right (shadcn-vue Button, primary) — opens add modal.
 - **Add Doctor Modal:**
   - Fields: Name, Email, Phone (optional), Bio (optional), Specializations (tag input).
   - On success: Show toast "Doctor created. Credentials sent to their email."
@@ -1274,7 +1274,7 @@
 
 **Behavior:**
 - **Search Input:** Filter by name or email (server-side).
-- **Patients Table:** HeroUI Table with columns:
+- **Patients Table:** shadcn-vue Table with columns:
   - Photo (small, circular)
   - Name
   - Email
@@ -1282,7 +1282,7 @@
   - Total Sessions
   - Last Session
   - Registered (date)
-  - View button (HeroUI IconButton) — opens `/admin/patients/[id]`.
+  - View button (shadcn-vue IconButton) — opens `/admin/patients/[id]`.
 
 **Data Fetching:**
 - On load: Call `GET /api/admin/patients`.
@@ -1302,9 +1302,9 @@
 - **Patient Profile:**
   - Photo, name, email, phone, registered date.
 - **Booking History:**
-  - HeroUI Table with columns: Date, Doctor, Service, Status.
+  - shadcn-vue Table with columns: Date, Doctor, Service, Status.
 - **Payment History:**
-  - HeroUI Table with columns: Date, Amount, Status, Gateway Reference.
+  - shadcn-vue Table with columns: Date, Amount, Status, Gateway Reference.
 
 **Data Fetching:**
 - On load: Call `GET /api/admin/patients/[id]`.
@@ -1320,7 +1320,7 @@
 **Middleware:** `auth` + `staff-only`.
 
 **Behavior:**
-- **Stats Cards:** 3 HeroUI stat cards:
+- **Stats Cards:** 3 shadcn-vue stat cards:
   - Total Revenue (all time)
   - Revenue This Month
   - Total Refunded
@@ -1328,7 +1328,7 @@
   - Date range picker (start and end dates).
   - Doctor dropdown (all doctors + "All Doctors").
   - Status dropdown (All / SUCCESS / PENDING / FAILED / REFUNDED).
-- **Payments Table:** HeroUI Table with columns:
+- **Payments Table:** shadcn-vue Table with columns:
   - Date
   - Patient
   - Doctor
@@ -1352,15 +1352,15 @@
 **Middleware:** `auth` + `staff-only`.
 
 **Behavior:**
-- **Staff Table:** HeroUI Table with columns:
+- **Staff Table:** shadcn-vue Table with columns:
   - Name
   - Email
   - Permissions summary (e.g., "Appointments: CRUD, Patients: R")
   - Status badge (Active/Inactive)
   - Actions:
-    - Edit button (HeroUI IconButton) — opens edit modal.
-    - Deactivate button (HeroUI IconButton, red) — opens confirmation modal.
-- **Add Staff Button:** Top right (HeroUI Button, primary) — opens add modal.
+    - Edit button (shadcn-vue IconButton) — opens edit modal.
+    - Deactivate button (shadcn-vue IconButton, red) — opens confirmation modal.
+- **Add Staff Button:** Top right (shadcn-vue Button, primary) — opens add modal.
 - **Add Staff Modal:**
   - Fields: Name, Email, Phone (optional).
   - Permission Builder:
@@ -1394,23 +1394,23 @@
 **Behavior:**
 - **Sections with Individual Save Buttons:**
   - **Platform Info:**
-    - Platform name (HeroUI Input)
-    - Contact email (HeroUI Input)
-    - Contact phone (HeroUI Input)
-    - WhatsApp number (HeroUI Input)
+    - Platform name (shadcn-vue Input)
+    - Contact email (shadcn-vue Input)
+    - Contact phone (shadcn-vue Input)
+    - WhatsApp number (shadcn-vue Input)
     - Save button
   - **Session Pricing:**
-    - Price per session (HeroUI Input, number) + EGP label
-    - Default session duration (HeroUI Select: 30/45/60 minutes)
+    - Price per session (shadcn-vue Input, number) + EGP label
+    - Default session duration (shadcn-vue Select: 30/45/60 minutes)
     - Save button
   - **Default Working Hours:**
-    - Start time (HeroUI Input, time picker)
-    - End time (HeroUI Input, time picker)
+    - Start time (shadcn-vue Input, time picker)
+    - End time (shadcn-vue Input, time picker)
     - Note: "These are defaults only. Each doctor sets their own availability."
     - Save button
   - **Payment Gateway:**
-    - Gateway selector (Paymob / Stripe) (HeroUI Select)
-    - Key fields (HeroUI Input, password type):
+    - Gateway selector (Paymob / Stripe) (shadcn-vue Select)
+    - Key fields (shadcn-vue Input, password type):
       - For Paymob: API Key, Integration ID, HMAC Secret
       - For Stripe: Publishable Key, Secret Key, Webhook Secret
     - "Update Keys" toggle to reveal inputs (default: masked with `****`).

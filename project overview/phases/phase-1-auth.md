@@ -10,7 +10,7 @@ Build the complete authentication system. After this phase, patients can registe
 - Prisma (User, Permission models)
 - JWT stored in httpOnly cookies
 - Resend (verification + reset emails)
-- HeroUI (form components)
+- shadcn-vue (form components)
 - Zod (request validation)
 
 ---
@@ -193,7 +193,7 @@ Call `fetchMe()` in a Nuxt plugin `plugins/auth.ts` that runs on every page load
 ## Step 5 — Frontend Pages
 
 All pages inside `modules/auth/pages/`. Use the `default` layout (public, no sidebar).
-All forms use HeroUI components: `Input`, `Button`, `Card`, `CardBody`, `Link`.
+All forms use shadcn-vue components: `Input`, `Button`, `Card`, `CardBody`, `Link`.
 
 ---
 

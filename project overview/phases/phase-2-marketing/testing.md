@@ -211,7 +211,7 @@ Complete every item below before marking Phase 2 as done:
    - [ ] Services grid stacks on mobile.
 
 8. **Visuals:**
-   - [ ] HeroUI components render with brand colors.
+   - [ ] shadcn-vue components render with brand colors.
    - [ ] Magenta primary color is consistent.
    - [ ] No console errors in browser.
 

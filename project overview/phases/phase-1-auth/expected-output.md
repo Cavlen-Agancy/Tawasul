@@ -31,7 +31,7 @@
 
 ## Components Delivered
 
-None. All auth pages use HeroUI components directly (Input, Button, Card, Link, etc.).
+None. All auth pages use shadcn-vue components directly (Input, Button, Card, Link, etc.).
 
 ---
 

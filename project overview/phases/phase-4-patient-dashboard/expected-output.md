@@ -33,7 +33,7 @@
 
 ## Components Delivered
 
-None. All pages use HeroUI components directly.
+None. All pages use shadcn-vue components directly.
 
 ---
 

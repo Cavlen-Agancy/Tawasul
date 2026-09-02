@@ -59,7 +59,7 @@ Phase 3 builds the complete booking flow for the Tawasul Academy platform. After
 
 ```
 nuxt: ^3.x
-@heroui/nuxt: latest
+shadcn-vue: latest
 @nuxtjs/tailwindcss: latest
 zod: ^3.x
 fullcalendar: ^6.x

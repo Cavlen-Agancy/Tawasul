@@ -9,7 +9,7 @@ Build the complete admin dashboard with a flexible permission system. After this
 - Nitro API endpoints
 - Prisma (all models including Permission)
 - FullCalendar (master calendar)
-- HeroUI (dashboard layout, tables, modals, forms)
+- shadcn-vue (dashboard layout, tables, modals, forms)
 - Resend (doctor welcome email)
 
 ---
@@ -314,13 +314,13 @@ All inside `modules/admin/pages/`. All use AdminLayout.
 
 ### `/admin/overview` — Overview Page
 
-Four HeroUI stat cards (2×2 grid):
+Four shadcn-vue stat cards (2×2 grid):
 - Total Bookings This Month (with % change vs last month)
 - Total Revenue This Month (formatted as EGP)
 - Active Patients count
 - Active Doctors count
 
-Below: "Recent Bookings" HeroUI Table — last 5 bookings with Patient, Doctor, Date, Service, Status columns.
+Below: "Recent Bookings" shadcn-vue Table — last 5 bookings with Patient, Doctor, Date, Service, Status columns.
 
 ---
 
@@ -333,7 +333,7 @@ FullCalendar with Month, Week, Day views:
 - Color-code by doctor — assign a color from a 6-color palette based on doctor index in the list.
 - Cancelled bookings shown with reduced opacity.
 - Filter changes trigger re-fetch.
-- Click event → HeroUI Modal with full booking details + Cancel Booking button (APPOINTMENTS DELETE permission required to show button).
+- Click event → shadcn-vue Modal with full booking details + Cancel Booking button (APPOINTMENTS DELETE permission required to show button).
 
 ---
 
@@ -341,14 +341,14 @@ FullCalendar with Month, Week, Day views:
 
 Search input (filter by name/email).
 
-HeroUI Table: Photo, Name, Email, Specializations, Status badge, Sessions This Month, Actions.
+shadcn-vue Table: Photo, Name, Email, Specializations, Status badge, Sessions This Month, Actions.
 
 Actions per row:
-- Edit button → opens HeroUI Modal with edit form
+- Edit button → opens shadcn-vue Modal with edit form
 - View Calendar button → opens `/admin/doctors/:id` with calendar tab active
 - Toggle Active/Inactive
 
-"Add Doctor" button top right → HeroUI Modal with add form. On success: "Doctor created. Credentials sent to their email."
+"Add Doctor" button top right → shadcn-vue Modal with add form. On success: "Doctor created. Credentials sent to their email."
 
 ---
 
@@ -365,7 +365,7 @@ Session count stats.
 
 Search input.
 
-HeroUI Table: Photo, Name, Email, Phone, Total Sessions, Last Session, Registered, View button.
+shadcn-vue Table: Photo, Name, Email, Phone, Total Sessions, Last Session, Registered, View button.
 
 ---
 
@@ -377,19 +377,19 @@ Patient profile + booking history table + payment history table.
 
 ### `/admin/payments` — Manage Payments Page
 
-Three HeroUI stat cards: Total Revenue, Revenue This Month, Total Refunded.
+Three shadcn-vue stat cards: Total Revenue, Revenue This Month, Total Refunded.
 
 Filter bar: date range, doctor, status.
 
-HeroUI Table: Date, Patient, Doctor, Service, Amount, Status badge, Gateway Reference.
+shadcn-vue Table: Date, Patient, Doctor, Service, Amount, Status badge, Gateway Reference.
 
 ---
 
 ### `/admin/staff` — Manage Staff Page
 
-HeroUI Table: Name, Email, Permissions summary, Status, Actions (Edit, Deactivate).
+shadcn-vue Table: Name, Email, Permissions summary, Status, Actions (Edit, Deactivate).
 
-"Add Staff" button → HeroUI Modal with:
+"Add Staff" button → shadcn-vue Modal with:
 - Name, Email, Phone fields
 - Permission builder: for each resource (APPOINTMENTS, PATIENTS, DOCTORS, PAYMENTS, SETTINGS, STAFF), show checkboxes for each action (CREATE, READ, UPDATE, DELETE)
 

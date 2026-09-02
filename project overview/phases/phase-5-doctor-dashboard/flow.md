@@ -11,15 +11,15 @@
 - Extends `layouts/dashboard.vue` (from Phase 0).
 - **Desktop:**
   - Sidebar (240px wide) with links:
-    - My Calendar (HeroUI Icon + text)
-    - My Profile (HeroUI Icon + text)
-    - Logout (HeroUI Icon + text)
+    - My Calendar (shadcn-vue Icon + text)
+    - My Profile (shadcn-vue Icon + text)
+    - Logout (shadcn-vue Icon + text)
   - Main content area (flex-1, overflow-auto) for `<slot />`.
 - **Mobile:**
   - Bottom navigation bar with icons for the same links.
   - Hide desktop sidebar.
 - **Incomplete Profile Banner:**
-  - If the logged-in doctor's `bio` is empty or null, show a yellow HeroUI Alert banner at the top of the main content area:
+  - If the logged-in doctor's `bio` is empty or null, show a yellow shadcn-vue Alert banner at the top of the main content area:
     - Message: "Your profile is incomplete. Please complete your profile so patients can find you."
     - Link to `/doctor/profile`.
 
@@ -85,7 +85,7 @@
 **User Action:** Doctor submits profile update form.
 
 **Frontend Behavior:**
-- On success: Show HeroUI Toast success notification.
+- On success: Show shadcn-vue Toast success notification.
 - On error: Show error message.
 
 **API Call:**
@@ -144,7 +144,7 @@
 
 **Frontend Behavior:**
 - On file selection: Immediately call this endpoint, update displayed photo.
-- On success: Show HeroUI Toast success notification.
+- On success: Show shadcn-vue Toast success notification.
 - On error: Show error message.
 
 **API Call:**
@@ -368,7 +368,7 @@
     - Color: Primary magenta (`#E91E8C`).
   - Cancelled bookings: Show with reduced opacity (e.g., `opacity-50`).
 - **Event Click:**
-  - Open HeroUI Modal with booking details:
+  - Open shadcn-vue Modal with booking details:
     - Patient name.
     - Date and time.
     - Service.
@@ -392,21 +392,21 @@
 - **Layout:** Two-column layout (desktop) or stacked (mobile).
   - **Left Column:**
     - Profile photo (circular, large).
-    - "Upload Photo" button (HeroUI Button, secondary).
+    - "Upload Photo" button (shadcn-vue Button, secondary).
     - On click: Open file picker, immediately upload on selection.
   - **Right Column:**
-    - Name input (HeroUI Input, required, min 2 chars).
-    - Phone input (HeroUI Input, optional).
+    - Name input (shadcn-vue Input, required, min 2 chars).
+    - Phone input (shadcn-vue Input, optional).
     - Email (read-only text, not input).
-    - Bio (HeroUI Textarea, optional).
+    - Bio (shadcn-vue Textarea, optional).
     - Specializations (tag input component):
       - Type to add a new specialization, press Enter to confirm.
       - Click X on a tag to remove it.
-    - "Save Changes" button (HeroUI Button, primary).
+    - "Save Changes" button (shadcn-vue Button, primary).
 - **Behavior:**
   - On load: Call `GET /api/doctor/profile`, pre-fill fields.
   - Photo upload: On file selection, call `POST /api/doctor/profile/photo`, update displayed photo.
-  - On save: Call `PATCH /api/doctor/profile`, show HeroUI Toast success notification.
+  - On save: Call `PATCH /api/doctor/profile`, show shadcn-vue Toast success notification.
   - If `bio` is empty on load: Show inline warning below the bio field (e.g., "Please add a bio so patients can find you").
 
 **Specializations Tag Input:**
@@ -458,8 +458,8 @@
   - Full-height video area (left 70%).
   - Text chat panel (right 30%, use Jitsi's built-in chat).
 - **Leave Session Button:**
-  - HeroUI Button, top right.
-  - On click: HeroUI Modal confirmation.
+  - shadcn-vue Button, top right.
+  - On click: shadcn-vue Modal confirmation.
   - On confirm: Disconnect Jitsi, redirect to `/doctor/calendar`.
 
 **Edge Cases:**
