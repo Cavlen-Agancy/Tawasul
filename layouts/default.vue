@@ -16,13 +16,13 @@ const navLinks = [
 <template>
   <div class="flex min-h-screen flex-col bg-white">
     <header class="sticky top-0 z-50 border-b border-border bg-white/95 backdrop-blur">
-      <div class="mx-auto flex h-16 w-full max-w-[1200px] items-center justify-between px-4 lg:px-12">
+      <div class="mx-auto flex h-20 w-full max-w-[1200px] items-center justify-between px-4 lg:px-12">
         <NuxtLink to="/" class="flex shrink-0 items-center gap-2" aria-label="Tawasul Academy home">
           <img
             v-if="!showTextLogo"
             src="/logo.png"
             alt="Tawasul Academy"
-            class="h-8 w-auto"
+            class="h-14 w-auto"
             @error="showTextLogo = true"
           >
           <span v-else class="text-xl font-semibold tracking-tight">
