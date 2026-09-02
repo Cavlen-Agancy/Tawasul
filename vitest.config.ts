@@ -12,6 +12,8 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['tests/api/setup.ts'],
     include: ['tests/**/*.{test,spec}.ts'],
+    // e2e specs are run by Playwright, not Vitest
+    exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**', '.nuxt/**'],
     // API tests hit the shared dev PostgreSQL; keep them isolated per-file
     fileParallelism: false,
     sequence: {

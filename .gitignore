@@ -22,6 +22,11 @@ uploads/
 *.db
 *.db-journal
 
+# Playwright
+test-results/
+playwright-report/
+.blob-report/
+
 # Editor / OS
 .DS_Store
 .idea/
