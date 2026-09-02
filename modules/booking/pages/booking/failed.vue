@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { XCircle } from 'lucide-vue-next'
 
-definePageMeta({ layout: 'default' })
+definePageMeta({ layout: 'patient-layout' })
 
 const { fetchBookingDetail, retryPayment, bookingId, isLoading, error, reset } = useBooking()
 

@@ -86,6 +86,20 @@ export function usePatientDashboard() {
     }
   }
 
+  async function fetchAllAppointments(): Promise<void> {
+    isLoading.value = true
+    error.value = null
+    try {
+      const data = await $fetch<AppointmentResponse>('/api/patient/appointments', { query: { tab: 'all' } })
+      upcomingAppointments.value = data.appointments
+      pastAppointments.value = []
+    } catch (e) {
+      error.value = getApiMessage(e)
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   async function cancelAppointment(bookingId: string): Promise<void> {
     error.value = null
     try {
@@ -141,6 +155,7 @@ export function usePatientDashboard() {
     updateProfile,
     uploadPhoto,
     fetchAppointments,
+    fetchAllAppointments,
     cancelAppointment,
     fetchPayments,
     fetchSession,

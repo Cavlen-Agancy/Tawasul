@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { CheckCircle2 } from 'lucide-vue-next'
 
-definePageMeta({ layout: 'default' })
+definePageMeta({ layout: 'patient-layout' })
 
 const { fetchBookingDetail } = useBooking()
 

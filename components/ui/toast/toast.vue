@@ -19,6 +19,7 @@ const { dismiss } = useToast()
       'group pointer-events-auto relative flex w-full items-start gap-3 rounded-xl border bg-white p-4 shadow-lg',
       toast.variant === 'destructive' && 'border-destructive/40 text-destructive',
       toast.variant === 'success' && 'border-success/40',
+      toast.variant === 'info' && 'border-primary/40',
       props.class,
     )"
     :data-testid="`toast-${toast.variant || 'default'}`"

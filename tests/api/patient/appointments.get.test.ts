@@ -137,6 +137,38 @@ describe('GET /api/patient/appointments', () => {
     }
   })
 
+  it('returns all bookings with tab=all (confirmed past + future + cancelled)', async () => {
+    const patient = await createPatient({ email: `appt-all-${Date.now()}@test.com` })
+    const future = await createBookedFixture(patient, {
+      status: 'CONFIRMED',
+      date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    })
+    const pastConfirmed = await createBookedFixture(patient, {
+      status: 'CONFIRMED',
+      date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    })
+    const cancelled = await createBookedFixture(patient, {
+      status: 'CANCELLED',
+      date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    })
+    try {
+      const event = createApiEvent({
+        method: 'GET',
+        url: '/api/patient/appointments?tab=all',
+        context: { user: { userId: patient.id, email: patient.email, accountType: 'PATIENT' } },
+      })
+      const res = await handler(event) as { appointments: Appointment[] }
+      const ids = res.appointments.map((a) => a.id)
+      expect(ids).toContain(future.bookingId)
+      expect(ids).toContain(pastConfirmed.bookingId)
+      expect(ids).toContain(cancelled.bookingId)
+    } finally {
+      await deletePatientBookingFixture(future, patient)
+      await deletePatientBookingFixture(pastConfirmed, patient)
+      await deletePatientBookingFixture(cancelled, patient)
+    }
+  })
+
   it('rejects unauthenticated', async () => {
     const event = createApiEvent({ method: 'GET', url: '/api/patient/appointments' })
     try {

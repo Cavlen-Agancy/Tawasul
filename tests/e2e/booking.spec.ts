@@ -184,4 +184,14 @@ test.describe('Booking Flow', () => {
     await page.goto('/book')
     await page.waitForURL('**/login', { timeout: 20_000 })
   })
+
+  test('authenticated patient can hard-navigate to /book without hitting /login', async ({ page }) => {
+    await loginAsPatient(page)
+    // A full page load (like the dashboard "Book a Session" <a href="/book">) must
+    // restore the session server-side so the auth middleware does not bounce to /login.
+    await page.goto('/book')
+    await expect(page).not.toHaveURL(/\/login/)
+    await page.waitForURL('**/book', { timeout: 20_000 })
+    await expect(page.getByRole('heading', { name: 'Book a Session' })).toBeVisible({ timeout: 20_000 })
+  })
 })

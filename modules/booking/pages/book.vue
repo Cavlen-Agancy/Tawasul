@@ -6,7 +6,7 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-vue-
 import type { DateClickArg, DatesSetArg, DayCellContentArg } from '@fullcalendar/core'
 import type { Slot } from '../composables/types'
 
-definePageMeta({ layout: 'default', middleware: 'auth' })
+definePageMeta({ layout: 'patient-layout', middleware: 'auth' })
 
 const {
   step,

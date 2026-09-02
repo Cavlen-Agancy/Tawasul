@@ -1,10 +1,12 @@
 import type { Component } from 'vue'
 
+export type ToastVariant = 'default' | 'destructive' | 'success' | 'info'
+
 export interface ToastData {
   id: string
   title?: string
   description?: string
-  variant?: 'default' | 'destructive' | 'success'
+  variant?: ToastVariant
   component?: Component
   props?: Record<string, unknown>
 }

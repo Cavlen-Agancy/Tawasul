@@ -1,4 +1,5 @@
 import { prisma } from '~/server/utils/prisma'
+import { isHoliday } from '~/server/utils/holidays'
 
 export interface Slot {
   doctorId: string
@@ -69,6 +70,10 @@ function serviceFor(doctor: { specializations?: string[] }): string {
 export async function getAvailableSlots(date: string): Promise<Slot[]> {
   const target = parseISODate(date)
   const dayOfWeek = target.getDay()
+
+  // Public holidays are non-working days (see holidays.ts business rule):
+  // no slots are offered regardless of standing doctor availability.
+  if (isHoliday(date)) return []
 
   const today = new Date()
   const isToday = formatDateISO(today) === date
@@ -189,6 +194,9 @@ export async function getAvailableDates(month: number, year: number): Promise<st
     const dateISO = formatDateISO(current)
     const dayOfWeek = current.getDay()
     const isToday = formatDateISO(today) === dateISO
+
+    // Holidays are non-working: never report them as available.
+    if (isHoliday(dateISO)) continue
 
     const dayAvailabilities = availabilities.filter((a) => a.dayOfWeek === dayOfWeek)
 

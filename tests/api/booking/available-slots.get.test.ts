@@ -57,4 +57,27 @@ describe('GET /api/booking/available-slots', () => {
     const res = await handler(event) as { slots: unknown[] }
     expect(res.slots).toEqual([])
   })
+
+  it('returns empty slots on a public holiday even with availability (holiday blocks booking)', async () => {
+    // 2027-01-07 is Coptic Christmas (a fixed holiday) and lies in the future.
+    const holidayDate = '2027-01-07'
+    const dayOfWeek = new Date(`${holidayDate}T00:00:00`).getDay()
+    const fixture = await createTestDoctor({
+      dayOfWeek,
+      startTime: '09:00',
+      endTime: '12:00',
+      sessionDuration: 60,
+    })
+    try {
+      const event = createApiEvent({
+        method: 'GET',
+        url: `/api/booking/available-slots?date=${holidayDate}`,
+      })
+      const res = await handler(event) as { slots: unknown[] }
+      // Even though the doctor is available that weekday, a public holiday blocks all slots.
+      expect(res.slots).toEqual([])
+    } finally {
+      await deleteTestDoctor(fixture.doctor.id, fixture.user.id)
+    }
+  })
 })

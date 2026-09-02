@@ -38,7 +38,12 @@ export function useAuth() {
   async function fetchMe(): Promise<AuthUser | null> {
     loading.value = true
     try {
-      const me = await $fetch<AuthUser>('/api/auth/me')
+      // On the server, forwarding the incoming request's cookies is required so
+      // the httpOnly auth_token is sent to /api/me; otherwise SSR would treat an
+      // already-authenticated user as logged out. On the client this is the same
+      // as global $fetch.
+      const _fetch = import.meta.server ? useRequestFetch() : $fetch
+      const me = await _fetch<AuthUser>('/api/auth/me')
       user.value = me
       return me
     } catch {

@@ -17,18 +17,18 @@ export default defineEventHandler(async (event) => {
   const todayISO = formatDateISO(new Date())
   const today = new Date(`${todayISO}T00:00:00`)
 
+  let where: Record<string, unknown> = { userId: auth.userId }
+  if (tab === 'upcoming') {
+    where = { ...where, status: 'CONFIRMED', date: { gte: today } }
+  } else if (tab === 'past') {
+    where = {
+      ...where,
+      OR: [{ status: 'CANCELLED' }, { status: 'CONFIRMED', date: { lt: today } }],
+    }
+  }
+
   const bookings = await prisma.booking.findMany({
-    where: {
-      userId: auth.userId,
-      ...(tab === 'upcoming'
-        ? { status: 'CONFIRMED', date: { gte: today } }
-        : {
-            OR: [
-              { status: 'CANCELLED' },
-              { status: 'CONFIRMED', date: { lt: today } },
-            ],
-          }),
-    },
+    where,
     include: {
       doctor: { include: { user: { select: { name: true, photo: true } } } },
       sessionRoom: { select: { roomName: true } },

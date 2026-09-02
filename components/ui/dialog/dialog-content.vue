@@ -18,6 +18,7 @@ const close = inject<() => void>('dialog:close', () => {})
         <div class="fixed inset-0 bg-black/40" data-dialog-overlay @click="close" />
         <div
           :class="cn('relative z-10 w-full max-w-lg rounded-2xl bg-white p-6 shadow-lg', $attrs.class)"
+          v-bind="$attrs"
           data-dialog-content
         >
           <slot />

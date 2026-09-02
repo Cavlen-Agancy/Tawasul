@@ -49,7 +49,7 @@ export const patientProfileSchema = z.object({
 })
 
 export const patientAppointmentsQuerySchema = z.object({
-  tab: z.enum(['upcoming', 'past']).optional().default('upcoming'),
+  tab: z.enum(['upcoming', 'past', 'all']).optional().default('upcoming'),
 })
 
 /**
