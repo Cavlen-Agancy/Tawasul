@@ -1,15 +1,14 @@
 export interface Slot {
-  doctorId: string
-  doctorName: string
   startTime: string
   endTime: string
-  service: string
+  sessionDuration: number
 }
 
 export interface BookingDetail {
   id: string
   patientName: string
-  doctorName: string
+  doctorId: string | null
+  doctorName: string | null
   date: string
   startTime: string
   endTime: string

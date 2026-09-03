@@ -91,7 +91,6 @@ export function useBooking() {
         body: {
           date: selectedDate.value,
           startTime: selectedSlot.value.startTime,
-          doctorId: selectedSlot.value.doctorId,
         },
       })
       bookingId.value = created.bookingId

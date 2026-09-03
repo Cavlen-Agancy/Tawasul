@@ -7,7 +7,7 @@
 
 Phase 3 introduces complex logic for availability, booking, and payment. Testing includes:
 
-- **Unit Tests (Vitest)** — YES. Test `getAvailableSlots` and `getAvailableDates` in `server/utils/availability.ts`.
+- **Unit Tests (Vitest)** — YES. Test `getAdminAvailableSlots` and `getAdminAvailableDates` in `server/utils/admin-availability.ts`.
 - **API Tests (Vitest + supertest)** — YES. Test all 7 API endpoints.
 - **End-to-End Tests (Playwright)** — YES. Test complete booking flow (requires mocking payment gateway).
 
@@ -17,7 +17,7 @@ Phase 3 introduces complex logic for availability, booking, and payment. Testing
 
 ---
 
-### Test File: `tests/utils/availability.test.ts`
+### Test File: `tests/utils/admin-availability.test.ts`
 
 Mock Prisma using `vitest-mock-extended`:
 ```typescript
@@ -27,25 +27,27 @@ import { PrismaClient } from '@prisma/client'
 vi.mock('../../server/utils/prisma', () => ({ prisma: mockDeep<PrismaClient>() }))
 ```
 
-**`getAvailableSlots`**
+**`getAdminAvailableSlots`**
 
 | Test Case | Setup | Expected |
 |---|---|---|
-| Returns slots for a date with availability | Mock `prisma.availability.findMany` to return 1 active doctor with availability for day 0 (Sunday). Mock `prisma.booking.findMany` and `prisma.blockedSlot.findMany` to return empty arrays. | Returns array of slots with correct `startTime` and `endTime` based on `sessionDuration`. |
-| Excludes booked slots | Mock `prisma.booking.findMany` to return a confirmed booking for the doctor on the date at 10:00. | Returns slots excluding the 10:00 slot. |
-| Excludes blocked slots | Mock `prisma.blockedSlot.findMany` to return a blocked slot for the doctor on the date at 11:00. | Returns slots excluding the 11:00 slot. |
+| Returns slots for an active schedule | Mock `prisma.adminSchedule.findMany` to return 1 active schedule for day 0 (Sunday). Mock `prisma.booking.findMany` and `prisma.globalBlockedDate.findMany` to return empty arrays. | Returns array of slots with correct `startTime` and `endTime` based on `sessionDuration`. No `doctorId` on slots. |
+| Excludes booked slots | Mock `prisma.booking.findMany` to return a confirmed booking on the date at 10:00. | Returns slots excluding the 10:00 slot. |
+| Excludes fully-booked slots count | Mock `prisma.booking.findMany` to return confirmed bookings covering all slots on the schedule. | Returns `[]`. |
+| Excludes blocked dates | Mock `prisma.globalBlockedDate.findMany` to return a blocked date matching the requested date. | Returns `[]`. |
 | Excludes past slots for today | Call with today's date and mock a slot at 08:00 (past). | Returns slots excluding the 08:00 slot. |
-| Returns empty array for date with no availability | Mock `prisma.availability.findMany` to return empty array. | Returns `[]`. |
+| Returns empty array for date with no schedule | Mock `prisma.adminSchedule.findMany` to return empty array. | Returns `[]`. |
 | Returns empty array for past date | Call with a date in the past. | Returns `[]`. |
 | Sorts slots by startTime | Mock multiple slots at different times. | Slots are sorted by `startTime` ascending. |
 
-**`getAvailableDates`**
+**`getAdminAvailableDates`**
 
 | Test Case | Setup | Expected |
 |---|---|---|
-| Returns dates with available slots | Mock `prisma.availability.findMany` to return availability for day 0 and day 1. Mock no bookings or blocked slots. | Returns array of dates in the month that match day 0 or 1. |
+| Returns dates with available slots | Mock `prisma.adminSchedule.findMany` to return an active schedule for day 0 and day 1. Mock no bookings or blocked dates. | Returns array of dates in the month that match day 0 or 1. |
 | Excludes dates with all slots booked | Mock `prisma.booking.findMany` to return confirmed bookings for all slots on day 0. | Returns dates excluding those with all slots booked. |
-| Returns empty array for month with no availability | Mock `prisma.availability.findMany` to return empty array. | Returns `[]`. |
+| Excludes blocked dates | Mock `prisma.globalBlockedDate.findMany` to return blocked dates in the month. | Returns dates excluding the blocked dates. |
+| Returns empty array for month with no schedule | Mock `prisma.adminSchedule.findMany` to return empty array. | Returns `[]`. |
 
 ---
 
@@ -78,11 +80,11 @@ vi.mock('../../server/utils/prisma', () => ({ prisma: mockDeep<PrismaClient>() }
 
 | Test Case | Request Setup | Expected Status | Expected Response |
 |---|---|---|---|
-| Create booking with valid slot | Auth: PATIENT, Body: `{ date: "2024-03-04", startTime: "10:00", doctorId: "doc-1" }` | 201 | `{ bookingId, amount, currency }` |
-| Create booking with unavailable slot | Auth: PATIENT, Body: `{ date: "2024-03-04", startTime: "10:00", doctorId: "doc-1" }` (slot taken) | 400 | `{ message: "This slot is no longer available" }` |
-| Create booking with invalid date | Auth: PATIENT, Body: `{ date: "invalid", startTime: "10:00", doctorId: "doc-1" }` | 400 | `{ message: "Invalid date format" }` |
-| Create booking unauthenticated | No auth, Body: `{ date: "2024-03-04", startTime: "10:00", doctorId: "doc-1" }` | 401 | `{ message: "Unauthorized" }` |
-| Create booking as DOCTOR | Auth: DOCTOR, Body: `{ date: "2024-03-04", startTime: "10:00", doctorId: "doc-1" }` | 403 | `{ message: "Forbidden" }` |
+| Create booking with valid slot | Auth: PATIENT, Body: `{ date: "2024-03-04", startTime: "10:00" }` | 201 | `{ bookingId, amount, currency }`, booking created with `doctorId: null`, status PENDING |
+| Create booking with unavailable slot | Auth: PATIENT, Body: `{ date: "2024-03-04", startTime: "10:00" }` (slot taken) | 400 | `{ message: "This slot is no longer available" }` |
+| Create booking with invalid date | Auth: PATIENT, Body: `{ date: "invalid", startTime: "10:00" }` | 400 | `{ message: "Invalid date format" }` |
+| Create booking unauthenticated | No auth, Body: `{ date: "2024-03-04", startTime: "10:00" }` | 401 | `{ message: "Unauthorized" }` |
+| Create booking as DOCTOR | Auth: DOCTOR, Body: `{ date: "2024-03-04", startTime: "10:00" }` | 403 | `{ message: "Forbidden" }` |
 
 ---
 
@@ -90,7 +92,7 @@ vi.mock('../../server/utils/prisma', () => ({ prisma: mockDeep<PrismaClient>() }
 
 | Test Case | Request Setup | Expected Status | Expected Response |
 |---|---|---|---|
-| Fetch own booking | Auth: PATIENT (owner), Path: `/api/booking/book-1` | 200 | `{ id, patientName, doctorName, date, startTime, endTime, service, status, paymentStatus, amount, currency }` |
+| Fetch own booking | Auth: PATIENT (owner), Path: `/api/booking/book-1` | 200 | `{ id, patientName, doctorId, date, startTime, endTime, service, status, paymentStatus, amount, currency }` (doctor may be null) |
 | Fetch another user's booking | Auth: PATIENT (not owner), Path: `/api/booking/book-1` | 403 | `{ message: "Forbidden" }` |
 | Fetch as STAFF with permission | Auth: STAFF (APPOINTMENTS READ), Path: `/api/booking/book-1` | 200 | Booking details |
 | Fetch unauthenticated | No auth, Path: `/api/booking/book-1` | 401 | `{ message: "Unauthorized" }` |
@@ -126,10 +128,10 @@ vi.mock('../../server/utils/prisma', () => ({ prisma: mockDeep<PrismaClient>() }
 
 | Test Case | Request Setup | Expected Status | Expected Behavior |
 |---|---|---|---|
-| Paymob success webhook | Headers: `{ hmac: VALID_SIGNATURE }`, Body: `{ ...paymob payload..., bookingId: "book-1" }` | 200 | `Payment` status = SUCCESS, `Booking` status = CONFIRMED, emails sent |
+| Paymob success webhook | Headers: `{ hmac: VALID_SIGNATURE }`, Body: `{ ...paymob payload..., bookingId: "book-1" }` | 200 | `Payment` status = SUCCESS, `Booking` status stays PENDING, acknowledgment email sent to patient |
 | Paymob failed webhook | Headers: `{ hmac: VALID_SIGNATURE }`, Body: `{ ...paymob payload..., status: "FAILED", bookingId: "book-1" }` | 200 | `Payment` status = FAILED, `Booking` status = PENDING |
 | Paymob invalid signature | Headers: `{ hmac: INVALID_SIGNATURE }` | 400 | `{ message: "Invalid signature" }` |
-| Stripe success webhook | Headers: `{ stripe-signature: VALID_SIGNATURE }`, Body: `{ ...stripe payload..., bookingId: "book-1" }` | 200 | `Payment` status = SUCCESS, `Booking` status = CONFIRMED, emails sent |
+| Stripe success webhook | Headers: `{ stripe-signature: VALID_SIGNATURE }`, Body: `{ ...stripe payload..., bookingId: "book-1" }` | 200 | `Payment` status = SUCCESS, `Booking` status stays PENDING, acknowledgment email sent to patient |
 | Stripe failed webhook | Headers: `{ stripe-signature: VALID_SIGNATURE }`, Body: `{ ...stripe payload..., status: "failed", bookingId: "book-1" }` | 200 | `Payment` status = FAILED, `Booking` status = PENDING |
 | Stripe invalid signature | Headers: `{ stripe-signature: INVALID_SIGNATURE }` | 400 | `{ message: "Invalid signature" }` |
 
@@ -154,8 +156,8 @@ vi.mock('../../server/utils/prisma', () => ({ prisma: mockDeep<PrismaClient>() }
   6. Complete payment.
 - **Assertions:**
   - Redirected to `/booking/success?bookingId=...`.
-  - Success message and booking summary are visible.
-  - Booking status in DB is `CONFIRMED`.
+  - Success message ("Booking Request Received") and booking summary are visible.
+  - Booking status in DB is `PENDING`.
   - Payment status in DB is `SUCCESS`.
 
 #### Test: Booking Flow with Slot Taken
@@ -189,7 +191,8 @@ vi.mock('../../server/utils/prisma', () => ({ prisma: mockDeep<PrismaClient>() }
 - **Steps:**
   1. Click "Continue" to advance to Step 2.
 - **Assertions:**
-  - Date, time, doctor name, service, and price are visible.
+  - Date, time, session duration, and price are visible.
+  - No doctor name is shown (doctor is not assigned until admin confirms in Phase 6).
   - "Back" and "Confirm and Pay" buttons are visible.
 
 #### Test: Confirmation Page Shows Booking Details
@@ -198,7 +201,7 @@ vi.mock('../../server/utils/prisma', () => ({ prisma: mockDeep<PrismaClient>() }
   1. Navigate to `/booking/success?bookingId=book-1`.
 - **Assertions:**
   - Success message is visible.
-  - Booking details (date, time, doctor) are visible.
+  - Booking details (date, time) are visible.
 
 #### Test: Failed Payment Page Shows Retry Option
 - **Starting State:** Booking exists with `bookingId=book-1`, on `/booking/failed?bookingId=book-1`.
@@ -223,34 +226,35 @@ vi.mock('../../server/utils/prisma', () => ({ prisma: mockDeep<PrismaClient>() }
 Complete every item below before marking Phase 3 as done:
 
 1. **Availability:**
-   - [ ] Available dates load on `/book` calendar.
+   - [ ] Available dates load on `/book` calendar (from `AdminSchedule`).
    - [ ] Non-available dates are grayed out and non-clickable.
    - [ ] Clicking an available date shows correct time slots.
    - [ ] Already-booked slots do not appear.
-   - [ ] Blocked slots do not appear.
+   - [ ] Slots on globally blocked dates do not appear.
    - [ ] Past slots on today's date do not appear.
+   - [ ] Past dates return no slots.
 
 2. **Booking Flow:**
    - [ ] Selecting a date and slot advances to review step.
-   - [ ] Review step shows correct booking summary.
-   - [ ] "Confirm and Pay" creates booking and initiates payment.
+   - [ ] Review step shows correct booking summary (date, time, duration, price — no doctor).
+   - [ ] "Confirm and Pay" creates booking (doctorId null) and initiates payment.
    - [ ] Payment gateway (Paymob/Stripe) loads correctly.
 
 3. **Payment:**
    - [ ] Test payment with test card completes successfully.
-   - [ ] After payment, booking status is `CONFIRMED` in DB.
-   - [ ] Patient receives confirmation email.
-   - [ ] Doctor receives notification email.
+   - [ ] After payment, payment status is `SUCCESS` in DB.
+   - [ ] Booking status stays `PENDING` in DB (confirmation happens in Phase 6).
+   - [ ] Patient receives acknowledgment email (booking received).
 
 4. **Confirmation/Failure Pages:**
-   - [ ] Confirmation page shows correct booking details.
+   - [ ] Booking request page shows correct booking details.
    - [ ] Failed payment page allows retry.
    - [ ] Failed payment page allows choosing a different time.
 
 5. **Webhooks:**
    - [ ] Webhook signature validation works.
-   - [ ] Webhook updates booking and payment status.
-   - [ ] Webhook sends emails to patient and doctor.
+   - [ ] Webhook updates payment status.
+   - [ ] Webhook sends booking acknowledgment email to patient.
    - [ ] Webhook returns 200 even if internal processing fails.
 
 6. **Edge Cases:**

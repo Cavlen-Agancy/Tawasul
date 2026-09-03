@@ -13,11 +13,15 @@ Phase 6 builds the complete admin dashboard with a flexible permission system fo
 
 - **Admin Dashboard Layout**: `modules/admin/layouts/AdminLayout.vue` with dynamic sidebar (shows only links the user has permission for).
 - **Permission Middleware**: `requirePermission()` from `server/utils/permissions.ts` (created in Phase 0) is now applied to all admin API endpoints for the first time.
-- **API Endpoints**: 15+ endpoints for overview stats, bookings, doctors, patients, payments, staff, settings, and doctor availability management.
+- **API Endpoints**: 20+ endpoints for overview stats, bookings (including pending review and doctor assignment), schedule, blocked dates, doctors, patients, payments, staff, settings, and doctor availability management.
 - **Frontend Pages**: 8 pages (`/admin/overview`, `/admin/appointments`, `/admin/doctors`, `/admin/doctors/[id]`, `/admin/patients`, `/admin/patients/[id]`, `/admin/payments`, `/admin/staff`, `/admin/settings`).
 - **Admin Dashboard Composable**: `useAdminDashboard.ts` with state and methods for data fetching.
 - **Permission System**: Full CRUD for permissions, with UI for assigning permissions to staff.
 - **Master Calendar**: FullCalendar with all bookings across all doctors, color-coded by doctor.
+- **AdminSchedule Management**: CRUD endpoints for global schedule configuration (this is the source of truth for patient booking availability).
+- **GlobalBlockedDate Management**: CRUD endpoints for blocking specific dates.
+- **Booking Review Workflow**: Endpoints for admin to view pending bookings, assign doctors, and confirm.
+- **Booking assignment**: Admin assigns a doctor to a PENDING booking and changes status to CONFIRMED.
 
 ---
 
@@ -51,6 +55,7 @@ Phase 6 builds the complete admin dashboard with a flexible permission system fo
 
 **Must exist from Phase 3:**
 - `Booking`, `Payment`, `Doctor`, `User` models and API endpoints.
+- `AdminSchedule`, `GlobalBlockedDate` models (the source of truth for patient booking availability).
 
 **Must exist from Phase 4:**
 - Jitsi integration patterns (reuse for admin session management if needed).
@@ -104,9 +109,20 @@ modules/admin/
             ├── overview.get.ts              (create)
             ├── bookings.get.ts              (create)
             ├── bookings/
+            │   ├── pending.get.ts           (create — list PENDING bookings)
             │   ├── [id].get.ts               (create)
             │   └── [id]/
+            │       ├── assign.patch.ts       (create — assign doctor, confirm booking)
             │       └── cancel.patch.ts       (create)
+            ├── schedule/
+            │   ├── index.get.ts              (create — list AdminSchedule records)
+            │   ├── index.post.ts             (create — create AdminSchedule record)
+            │   ├── [id].patch.ts             (create — update AdminSchedule record)
+            │   └── [id].delete.ts            (create — delete AdminSchedule record)
+            ├── blocked-dates/
+            │   ├── index.get.ts              (create — list GlobalBlockedDate records)
+            │   ├── index.post.ts             (create — create GlobalBlockedDate record)
+            │   └── [id].delete.ts            (create — delete GlobalBlockedDate record)
             ├── doctors.get.ts               (create)
             ├── doctors/
             │   ├── [id].get.ts               (create)
@@ -164,3 +180,5 @@ The module folder contains only layouts, composables, components, and server API
 - The permission builder UI in the staff modal must make it visually clear which actions depend on others (e.g., UPDATE usually requires READ first). Enforce this in the UI only — the API accepts any combination.
 - Payment gateway keys: on `PATCH /api/admin/settings`, check if the submitted value starts with `****` — if yes, skip updating that field.
 - Doctor availability management from admin: full replace for availability (delete existing, create new).
+- **Admin-controlled booking availability**: The global `AdminSchedule` (and `GlobalBlockedDate`) is the single source of truth for what dates/slots patients can book. Managing it belongs in Admin (this phase). Doctor-controlled `Availability`/`BlockedSlot` is only for the doctor's calendar display (Phase 5) — it does NOT affect patient booking availability.
+- **Booking assignment**: Bookings stay `PENDING` after payment until the admin assigns a doctor. `PATCH /api/admin/bookings/:id/assign` sets `doctorId` and flips status to `CONFIRMED`, then sends confirmation emails to both patient and doctor.

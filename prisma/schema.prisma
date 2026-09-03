@@ -25,6 +25,7 @@ enum BookingStatus {
   PENDING
   CONFIRMED
   CANCELLED
+  IN_REVIEW // reserved for future use
 }
 
 enum PaymentStatus {
@@ -174,13 +175,48 @@ model BlockedSlot {
 }
 
 // ─────────────────────────────────────────
+// ADMIN SCHEDULE (global booking availability)
+// ─────────────────────────────────────────
+
+// Single source of truth for what patients can book. Admin-controlled.
+model AdminSchedule {
+  id              String  @id @default(cuid())
+  dayOfWeek       Int     // 0 = Sunday, 6 = Saturday
+  startTime       String  // "09:00"
+  endTime         String  // "17:00"
+  sessionDuration Int     // minutes: 30, 45, or 60
+  isActive        Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([dayOfWeek])
+  @@map("admin_schedules")
+}
+
+// ─────────────────────────────────────────
+// GLOBAL BLOCKED DATE (admin-controlled date blocks)
+// ─────────────────────────────────────────
+
+model GlobalBlockedDate {
+  id     String  @id @default(cuid())
+  date   DateTime @db.Date
+  reason String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([date])
+  @@map("global_blocked_dates")
+}
+
+// ─────────────────────────────────────────
 // BOOKING
 // ─────────────────────────────────────────
 
 model Booking {
   id        String        @id @default(cuid())
   userId    String
-  doctorId  String
+  doctorId  String?
   date      DateTime      @db.Date
   startTime String        // "10:00"
   endTime   String        // "11:00"
@@ -193,7 +229,7 @@ model Booking {
 
   // Relations
   user        User         @relation("PatientBookings", fields: [userId], references: [id], onDelete: Cascade)
-  doctor      Doctor       @relation("DoctorBookings", fields: [doctorId], references: [id], onDelete: Cascade)
+  doctor      Doctor?      @relation("DoctorBookings", fields: [doctorId], references: [id], onDelete: SetNull)
   payment     Payment?
   sessionRoom SessionRoom?
 

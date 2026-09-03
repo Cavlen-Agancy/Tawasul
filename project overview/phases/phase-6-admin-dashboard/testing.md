@@ -8,7 +8,7 @@
 Phase 6 introduces the admin dashboard, permission system, and complex data management. Testing includes:
 
 - **Unit Tests (Vitest)** — NO. No new utility functions are added in this phase.
-- **API Tests (Vitest + supertest)** — YES. Test all 21 admin API endpoints.
+- **API Tests (Vitest + supertest)** — YES. Test all 31 admin API endpoints.
 - **End-to-End Tests (Playwright)** — YES. Test all admin pages, permission flows, and data management.
 
 ---
@@ -218,6 +218,98 @@ Phase 6 introduces the admin dashboard, permission system, and complex data mana
 
 ---
 
+### Test File: `tests/api/admin/schedule/index.get.test.ts`
+
+| Test Case | Request Setup | Expected Status | Expected Response |
+|---|---|---|---|
+| Fetch all schedule records | Auth: STAFF (SETTINGS UPDATE), Path: `/api/admin/schedule` | 200 | `{ schedules: [...] }` (sorted by dayOfWeek) |
+| Returns empty array when none exist | Auth: STAFF (SETTINGS UPDATE), Path: `/api/admin/schedule` (empty DB) | 200 | `{ schedules: [] }` |
+| Fetch without permission | Auth: STAFF (no SETTINGS UPDATE), Path: `/api/admin/schedule` | 403 | `{ message: "You do not have permission..." }` |
+
+---
+
+### Test File: `tests/api/admin/schedule/index.post.test.ts`
+
+| Test Case | Request Setup | Expected Status | Expected Response |
+|---|---|---|---|
+| Create valid record | Auth: STAFF (SETTINGS UPDATE), Body: `{ dayOfWeek: 1, startTime: "09:00", endTime: "17:00", sessionDuration: 60 }` | 201 | `{ id, dayOfWeek, startTime, endTime, sessionDuration, isActive }` |
+| Invalid dayOfWeek | Auth: STAFF (SETTINGS UPDATE), Body: `{ dayOfWeek: 7, startTime: "09:00", endTime: "17:00", sessionDuration: 60 }` | 400 | `{ message: "Invalid day of week" }` |
+| startTime >= endTime | Auth: STAFF (SETTINGS UPDATE), Body: `{ dayOfWeek: 1, startTime: "17:00", endTime: "09:00", sessionDuration: 60 }` | 400 | `{ message: "Start time must be before end time" }` |
+| Invalid sessionDuration | Auth: STAFF (SETTINGS UPDATE), Body: `{ dayOfWeek: 1, startTime: "09:00", endTime: "17:00", sessionDuration: 90 }` | 400 | `{ message: "Invalid session duration" }` |
+| Without permission | Auth: STAFF (no SETTINGS UPDATE) | 403 | `{ message: "You do not have permission..." }` |
+
+---
+
+### Test File: `tests/api/admin/schedule/[id].patch.test.ts`
+
+| Test Case | Request Setup | Expected Status | Expected Response |
+|---|---|---|---|
+| Update record | Auth: STAFF (SETTINGS UPDATE), Path: `/api/admin/schedule/sched-1`, Body: `{ isActive: false }` | 200 | `{ id, isActive: false, ... }` |
+| Record not found | Auth: STAFF (SETTINGS UPDATE), Path: `/api/admin/schedule/nonexistent` | 404 | `{ message: "Schedule record not found" }` |
+
+---
+
+### Test File: `tests/api/admin/schedule/[id].delete.test.ts`
+
+| Test Case | Request Setup | Expected Status | Expected Response |
+|---|---|---|---|
+| Delete record | Auth: STAFF (SETTINGS UPDATE), Path: `/api/admin/schedule/sched-1` | 200 | `{ message: "Schedule record deleted successfully" }` |
+| Record not found | Auth: STAFF (SETTINGS UPDATE), Path: `/api/admin/schedule/nonexistent` | 404 | `{ message: "Schedule record not found" }` |
+
+---
+
+### Test File: `tests/api/admin/blocked-dates/index.get.test.ts`
+
+| Test Case | Request Setup | Expected Status | Expected Response |
+|---|---|---|---|
+| Fetch blocked dates | Auth: STAFF (SETTINGS UPDATE), Path: `/api/admin/blocked-dates` | 200 | `{ blockedDates: [...] }` (sorted by date ASC) |
+| Returns empty array when none exist | Auth: STAFF (SETTINGS UPDATE), Path: `/api/admin/blocked-dates` | 200 | `{ blockedDates: [] }` |
+| Without permission | Auth: STAFF (no SETTINGS UPDATE) | 403 | `{ message: "You do not have permission..." }` |
+
+---
+
+### Test File: `tests/api/admin/blocked-dates/index.post.test.ts`
+
+| Test Case | Request Setup | Expected Status | Expected Response |
+|---|---|---|---|
+| Create valid blocked date | Auth: STAFF (SETTINGS UPDATE), Body: `{ date: "2024-03-15", reason: "Holiday" }` | 201 | `{ blockedDate: { id, date, reason } }` |
+| Past date | Auth: STAFF (SETTINGS UPDATE), Body: `{ date: "2020-01-01" }` | 400 | `{ message: "Date must be in the future" }` |
+| Without permission | Auth: STAFF (no SETTINGS UPDATE) | 403 | `{ message: "You do not have permission..." }` |
+
+---
+
+### Test File: `tests/api/admin/blocked-dates/[id].delete.test.ts`
+
+| Test Case | Request Setup | Expected Status | Expected Response |
+|---|---|---|---|
+| Delete blocked date | Auth: STAFF (SETTINGS UPDATE), Path: `/api/admin/blocked-dates/block-1` | 200 | `{ message: "Blocked date removed successfully" }` |
+| Not found | Auth: STAFF (SETTINGS UPDATE), Path: `/api/admin/blocked-dates/nonexistent` | 404 | `{ message: "Blocked date not found" }` |
+
+---
+
+### Test File: `tests/api/admin/bookings/pending.get.test.ts`
+
+| Test Case | Request Setup | Expected Status | Expected Response |
+|---|---|---|---|
+| Fetch PENDING bookings | Auth: STAFF (APPOINTMENTS READ), Path: `/api/admin/bookings/pending` | 200 | `{ pendingBookings: [...] }` (only status PENDING, doctorId null) |
+| Returns empty array when none exist | Auth: STAFF (APPOINTMENTS READ), Path: `/api/admin/bookings/pending` | 200 | `{ pendingBookings: [] }` |
+| Without permission | Auth: STAFF (no APPOINTMENTS READ) | 403 | `{ message: "You do not have permission..." }` |
+
+---
+
+### Test File: `tests/api/admin/bookings/[id]/assign.patch.test.ts`
+
+| Test Case | Request Setup | Expected Status | Expected Response |
+|---|---|---|---|
+| Assign doctor to PENDING booking | Auth: STAFF (APPOINTMENTS UPDATE), Path: `/api/admin/bookings/book-1/assign`, Body: `{ doctorId: "doc-1" }` | 200 | Booking has `doctorId: "doc-1"`, status CONFIRMED; confirmation email sent to patient |
+| Assign non-PENDING booking | Auth: STAFF (APPOINTMENTS UPDATE), Path: `/api/admin/bookings/book-1/assign` (status CONFIRMED) | 400 | `{ message: "Only PENDING bookings can be assigned" }` |
+| Assign inactive doctor | Auth: STAFF (APPOINTMENTS UPDATE), Body: `{ doctorId: "doc-inactive" }` (isActive false) | 400 | `{ message: "Doctor not found or inactive" }` |
+| Assign doctor with conflicting booking | Auth: STAFF (APPOINTMENTS UPDATE), Body: `{ doctorId: "doc-1" }` (doctor already CONFIRMED at same date/time) | 400 | `{ message: "Doctor already has a booking at this time" }` |
+| Without permission | Auth: STAFF (no APPOINTMENTS UPDATE) | 403 | `{ message: "You do not have permission..." }` |
+| Sends email to doctor on success | Auth: STAFF (APPOINTMENTS UPDATE), Body: `{ doctorId: "doc-1" }` | 200 | Notification email sent to doctor (verify via mock) |
+
+---
+
 ## End-to-End Tests (Playwright)
 
 ---
@@ -290,6 +382,48 @@ Phase 6 introduces the admin dashboard, permission system, and complex data mana
   - Modal closes.
   - Booking is removed from calendar (or status updates to CANCELLED).
   - Cancellation email is sent to patient (verify via API or mock).
+
+#### Test: Admin Schedule Setup
+- **Starting State:** Logged in as admin, on `/admin/settings` (Schedule section).
+- **Steps:**
+  1. Go to Settings → Schedule section.
+  2. Enable Monday with 09:00–17:00, 60 min sessions.
+  3. Click "Save Schedule".
+  4. Visit `/book` as patient.
+- **Assertions:**
+  - Schedule save succeeds.
+  - Monday dates are now available on `/book`.
+
+#### Test: Admin Blocks a Date
+- **Starting State:** Logged in as admin, on `/admin/settings` (Blocked Dates section).
+- **Steps:**
+  1. Block tomorrow's date with an optional reason.
+  2. Visit `/book` as patient.
+- **Assertions:**
+  - Blocked date is saved and shown in the list.
+  - Tomorrow is not available on `/book`.
+
+#### Test: Admin Assigns Doctor to Pending Booking
+- **Starting State:** Patient has booked a session (payment succeeds, booking PENDING); STAFF logged in on `/admin/appointments`.
+- **Steps:**
+  1. Go to Appointments → Pending tab.
+  2. Click "Assign Doctor" on the booking.
+  3. Select an active doctor from the dropdown.
+  4. Click "Confirm Assignment".
+- **Assertions:**
+  - Booking moves from the Pending tab to the master calendar as CONFIRMED.
+  - Patient receives confirmation email (verify via mock).
+  - Doctor receives notification email (verify via mock).
+  - Success toast appears and the row is removed from the pending table.
+
+#### Test: Cannot Assign Inactive Doctor or Conflicting Doctor
+- **Starting State:** Patient PENDING booking exists; STAFF with APPOINTMENTS UPDATE.
+- **Steps:**
+  1. Open Assign Doctor modal.
+  2. Attempt to assign an inactive doctor, then a doctor already booked at that time.
+- **Assertions:**
+  - Error message "Doctor not found or inactive" / "Doctor already has a booking at this time" appears.
+  - Booking status remains PENDING.
 
 #### Test: Manage Doctors Page Loads
 - **Starting State:** Logged in as STAFF (DOCTORS READ), on `/admin/doctors`.
@@ -459,15 +593,25 @@ Complete every item below before marking Phase 6 as done:
    - [ ] Stats are accurate (verify against DB counts).
    - [ ] Recent bookings table shows correct data.
 
-4. **Master Calendar:**
+4. **Master Calendar / Appointments:**
    - [ ] Shows all bookings across all doctors.
    - [ ] Bookings are color-coded by doctor.
    - [ ] Doctor filter works correctly.
    - [ ] Status filter works correctly.
    - [ ] Clicking a booking opens detail modal.
    - [ ] Cancel button in modal works (if APPOINTMENTS DELETE permission).
+   - [ ] Pending Bookings tab lists PENDING bookings (doctorId null).
+   - [ ] Assign Doctor modal lists active doctors and shows their existing bookings for the date.
+   - [ ] Assigning a doctor confirms the booking (status CONFIRMED) and moves it to the master calendar.
+   - [ ] Assigning an inactive doctor or a doctor already booked at that time shows an error.
 
-5. **Doctors:**
+5. **Scheduling & Blocked Dates (Settings):**
+   - [ ] Schedule section shows a row per day of week with enable toggle, start/end time, session duration.
+   - [ ] Saving the schedule updates what is shown as available on `/book`.
+   - [ ] Blocked Dates section lists upcoming blocked dates with reason and remove button.
+   - [ ] Blocking a future date removes that date from `/book`.
+
+6. **Doctors:**
    - [ ] Add Doctor creates account and sends welcome email.
    - [ ] New doctor can log in with emailed credentials.
    - [ ] Edit Doctor updates profile correctly.
@@ -475,17 +619,17 @@ Complete every item below before marking Phase 6 as done:
    - [ ] Availability management works (add/edit/remove).
    - [ ] Blocked slots management works (add/remove).
 
-6. **Patients:**
+7. **Patients:**
    - [ ] Patients table shows all patients.
    - [ ] Search works correctly.
    - [ ] Patient detail page shows profile, booking history, and payment history.
 
-7. **Payments:**
+8. **Payments:**
    - [ ] Stats cards show correct totals.
    - [ ] Filters work correctly (date range, doctor, status).
    - [ ] Table shows all payments with correct data.
 
-8. **Staff:**
+9. **Staff:**
    - [ ] Staff table shows all staff (excluding seed admin).
    - [ ] Add Staff creates account with correct permissions.
    - [ ] Edit Staff updates permissions correctly.
@@ -494,20 +638,20 @@ Complete every item below before marking Phase 6 as done:
    - [ ] Deactivating staff prevents their login.
    - [ ] Seed admin cannot be deactivated.
 
-9. **Settings:**
-   - [ ] All sections load with correct data.
-   - [ ] Payment keys are always masked in API responses.
-   - [ ] Updating settings without changing keys does not overwrite existing keys.
-   - [ ] Individual save buttons work for each section.
+10. **Settings:**
+    - [ ] All sections load with correct data.
+    - [ ] Payment keys are always masked in API responses.
+    - [ ] Updating settings without changing keys does not overwrite existing keys.
+    - [ ] Individual save buttons work for each section.
 
-10. **UI/UX:**
+11. **UI/UX:**
     - [ ] All pages are mobile-responsive (375px viewport).
     - [ ] Loading states are shown during API calls.
     - [ ] Error messages are user-friendly.
     - [ ] Success toasts appear for actions.
     - [ ] Permission builder modal is scrollable on mobile.
 
-11. **Security:**
+12. **Security:**
     - [ ] Staff without PATIENTS READ cannot call GET /api/admin/patients.
     - [ ] Staff without DOCTORS READ cannot see Manage Doctors in sidebar.
     - [ ] Permission check queries the database on every request.
@@ -530,6 +674,9 @@ Mark each item PASS or FAIL with a note before handing off to Phase 7:
 [ ] Master calendar shows all bookings, color-coded by doctor
 [ ] Doctor filter works correctly on master calendar
 [ ] Admin can cancel any booking without 24hr restriction
+[ ] Admin can view PENDING bookings and assign a doctor (status -> CONFIRMED, emails sent)
+[ ] Admin can configure the global schedule; it drives patient booking availability on /book
+[ ] Admin can block dates; blocked dates are unavailable to patients on /book
 [ ] Add Doctor creates account and sends welcome email
 [ ] New doctor can log in with emailed credentials
 [ ] Add Staff creates account with correct permissions
@@ -544,6 +691,6 @@ Mark each item PASS or FAIL with a note before handing off to Phase 7:
 [ ] All pages are mobile-responsive
 ```
 
-**The phase is complete only when all 25 items above are marked PASS.**
+**The phase is complete only when all 28 items above are marked PASS.**
 
 If any item is FAIL, fix it before moving to Phase 7. Document what failed and what was done to fix it in a `notes.md` file inside the `phase-6/` folder.

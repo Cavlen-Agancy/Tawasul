@@ -1129,7 +1129,288 @@
 
 ---
 
-## Feature 4 — Frontend Pages
+## Feature 4 — AdminSchedule Management
+
+**Action:** Create `server/api/admin/schedule/index.get.ts`, `index.post.ts`, `[id].patch.ts`, `[id].delete.ts`.
+
+**Permission:** `SETTINGS UPDATE` for all endpoints (reuse existing permission).
+
+---
+
+### GET /api/admin/schedule
+
+**User Action:** Settings → Schedule section loads.
+
+**API Call:**
+- **Method:** GET
+- **Path:** `/api/admin/schedule`
+- **Auth:** STAFF with `SETTINGS UPDATE` permission.
+- **Response (Success):**
+  ```typescript
+  { schedules: [{ id, dayOfWeek, startTime, endTime, sessionDuration, isActive }] }
+  ```
+  - **Status:** 200
+
+**Server Logic:**
+1. Call `requirePermission(event, 'SETTINGS', 'UPDATE')`.
+2. Fetch all `AdminSchedule` records, sorted by `dayOfWeek` ASC.
+3. Return `{ schedules }`.
+
+**Edge Cases:**
+- No records: Return empty array.
+
+---
+
+### POST /api/admin/schedule
+
+**User Action:** Admin saves a schedule day row in Settings → Schedule.
+
+**API Call:**
+- **Method:** POST
+- **Path:** `/api/admin/schedule`
+- **Auth:** STAFF with `SETTINGS UPDATE` permission.
+- **Body:**
+  ```typescript
+  { dayOfWeek: number, startTime: string, endTime: string, sessionDuration: number }
+  ```
+- **Response (Success):**
+  ```typescript
+  { id, dayOfWeek, startTime, endTime, sessionDuration, isActive }
+  ```
+  - **Status:** 201
+
+**Server Logic:**
+1. Call `requirePermission(event, 'SETTINGS', 'UPDATE')`.
+2. Validate body with Zod:
+   - `dayOfWeek`: integer 0–6.
+   - `startTime` before `endTime`.
+   - `sessionDuration`: one of 30, 45, 60.
+3. Create `AdminSchedule` record.
+4. Return created record.
+
+**Edge Cases:**
+- Invalid `dayOfWeek` (< 0 or > 6): Return 400.
+- `startTime` >= `endTime`: Return 400.
+- Invalid `sessionDuration`: Return 400.
+
+---
+
+### PATCH /api/admin/schedule/:id
+
+**User Action:** Admin edits a schedule day row.
+
+**API Call:**
+- **Method:** PATCH
+- **Path:** `/api/admin/schedule/:id`
+- **Auth:** STAFF with `SETTINGS UPDATE` permission.
+- **Body:** `{ startTime?, endTime?, sessionDuration?, isActive? }` — all optional.
+- **Response (Success):**
+  ```typescript
+  { id, dayOfWeek, startTime, endTime, sessionDuration, isActive }
+  ```
+  - **Status:** 200
+
+**Server Logic:**
+1. Call `requirePermission(event, 'SETTINGS', 'UPDATE')`.
+2. Validate provided fields (same rules as POST).
+3. Update the record.
+4. Return updated record.
+
+**Edge Cases:**
+- Record not found: Return 404.
+
+---
+
+### DELETE /api/admin/schedule/:id
+
+**User Action:** Admin removes a schedule day row.
+
+**API Call:**
+- **Method:** DELETE
+- **Path:** `/api/admin/schedule/:id`
+- **Auth:** STAFF with `SETTINGS UPDATE` permission.
+- **Response (Success):**
+  ```typescript
+  { message: "Schedule record deleted successfully" }
+  ```
+  - **Status:** 200
+
+**Server Logic:**
+1. Call `requirePermission(event, 'SETTINGS', 'UPDATE')`.
+2. Delete the record by `id`.
+3. Return success message.
+
+**Edge Cases:**
+- Record not found: Return 404.
+
+---
+
+## Feature 5 — GlobalBlockedDate Management
+
+**Action:** Create `server/api/admin/blocked-dates/index.get.ts`, `index.post.ts`, `[id].delete.ts`.
+
+**Permission:** `SETTINGS UPDATE` for all endpoints.
+
+---
+
+### GET /api/admin/blocked-dates
+
+**User Action:** Settings → Blocked Dates section loads.
+
+**API Call:**
+- **Method:** GET
+- **Path:** `/api/admin/blocked-dates`
+- **Auth:** STAFF with `SETTINGS UPDATE` permission.
+- **Response (Success):**
+  ```typescript
+  { blockedDates: [{ id, date, reason }] }
+  ```
+  - **Status:** 200
+
+**Server Logic:**
+1. Call `requirePermission(event, 'SETTINGS', 'UPDATE')`.
+2. Fetch all future `GlobalBlockedDate` records, sorted by `date` ASC.
+3. Return `{ blockedDates }`.
+
+---
+
+### POST /api/admin/blocked-dates
+
+**User Action:** Admin blocks a specific date.
+
+**API Call:**
+- **Method:** POST
+- **Path:** `/api/admin/blocked-dates`
+- **Auth:** STAFF with `SETTINGS UPDATE` permission.
+- **Body:** `{ date: string (YYYY-MM-DD), reason?: string }`.
+- **Response (Success):**
+  ```typescript
+  { blockedDate: { id, date, reason } }
+  ```
+  - **Status:** 201
+
+**Server Logic:**
+1. Call `requirePermission(event, 'SETTINGS', 'UPDATE')`.
+2. Validate `date` is a valid future date.
+3. Create `GlobalBlockedDate` record.
+4. Return created record.
+
+**Edge Cases:**
+- Past date: Return 400.
+
+---
+
+### DELETE /api/admin/blocked-dates/:id
+
+**User Action:** Admin removes a blocked date.
+
+**API Call:**
+- **Method:** DELETE
+- **Path:** `/api/admin/blocked-dates/:id`
+- **Auth:** STAFF with `SETTINGS UPDATE` permission.
+- **Response (Success):**
+  ```typescript
+  { message: "Blocked date removed successfully" }
+  ```
+  - **Status:** 200
+
+**Server Logic:**
+1. Call `requirePermission(event, 'SETTINGS', 'UPDATE')`.
+2. Delete the record by `id`.
+3. Return success message.
+
+**Edge Cases:**
+- Record not found: Return 404.
+
+---
+
+## Feature 6 — Pending Booking Review & Doctor Assignment
+
+**Action:** Create `server/api/admin/bookings/pending.get.ts` and `server/api/admin/bookings/[id]/assign.patch.ts`.
+
+---
+
+### GET /api/admin/bookings/pending
+
+**User Action:** Appointments → Pending tab loads.
+
+**API Call:**
+- **Method:** GET
+- **Path:** `/api/admin/bookings/pending`
+- **Auth:** STAFF with `APPOINTMENTS READ` permission.
+- **Response (Success):**
+  ```typescript
+  {
+    pendingBookings: {
+      id: string,
+      patientName: string,
+      patientEmail: string,
+      patientPhone?: string,
+      date: string,
+      startTime: string,
+      endTime: string,
+      status: BookingStatus,   // PENDING
+      createdAt: string
+    }[]
+  }
+  ```
+  - **Status:** 200
+
+**Server Logic:**
+1. Call `requirePermission(event, 'APPOINTMENTS', 'READ')`.
+2. Fetch all `Booking` records with `status: PENDING`, sorted by `date` ASC then `startTime` ASC.
+3. For each booking, include patient details from linked `User`.
+4. Return `{ pendingBookings }`. Note: `doctorId` is null for all pending bookings — assignment has not happened yet.
+
+**Edge Cases:**
+- No pending bookings: Return empty array.
+
+---
+
+### PATCH /api/admin/bookings/:id/assign
+
+**User Action:** Admin assigns a doctor to a pending booking from Appointments → Pending.
+
+**API Call:**
+- **Method:** PATCH
+- **Path:** `/api/admin/bookings/:id/assign`
+- **Auth:** STAFF with `APPOINTMENTS UPDATE` permission.
+- **Body:** `{ doctorId: string }`.
+- **Response (Success):**
+  ```typescript
+  {
+    id: string,
+    doctorId: string,
+    status: BookingStatus,   // CONFIRMED
+    patientName: string,
+    doctorName: string,
+    date: string,
+    startTime: string,
+    endTime: string,
+    service: string
+  }
+  ```
+  - **Status:** 200
+
+**Server Logic:**
+1. Call `requirePermission(event, 'APPOINTMENTS', 'UPDATE')`.
+2. Fetch `Booking` by `id`. Verify `status` is `PENDING`. If not → return 400 `{ message: "Only PENDING bookings can be assigned" }`.
+3. Fetch `Doctor` by `doctorId`. Verify the doctor exists and `isActive` is `true`. If not → return 400 `{ message: "Doctor not found or inactive" }`.
+4. Check the doctor does not already have a `CONFIRMED` booking that overlaps with this booking's `date` + `startTime`/`endTime`. If overlap found → return 400 `{ message: "Doctor already has a booking at this time" }`.
+5. Update `Booking`: set `doctorId` and `status: CONFIRMED`.
+6. Send booking confirmation email to patient using `bookingConfirmationTemplate` with `patientName`, `doctorName`, `date`, `time`, `service`.
+7. Send booking notification email to doctor using `bookingConfirmationTemplate` with `patientName`, `doctorName`, `date`, `time`, `service`.
+8. Return 200 with the updated booking.
+
+**Edge Cases:**
+- Booking not PENDING: Return 400.
+- Doctor not found or inactive: Return 400.
+- Doctor has conflicting CONFIRMED booking at same date/time: Return 400.
+- Email sending fails: Log error but return 200.
+
+---
+
+## Feature 7 — Frontend Pages
 
 ---
 
@@ -1173,24 +1454,40 @@
 **Middleware:** `auth` + `staff-only`.
 
 **Behavior:**
-- **Filter Bar:** Above calendar:
-  - Doctor dropdown: All doctors + "All Doctors".
-  - Status dropdown: All / Confirmed / Cancelled.
-- **FullCalendar:**
-  - Views: Month, Week, Day.
-  - Each booking = event with:
-    - Title: `patientName + " - " + doctorName`.
-    - Start/End: `date` + `startTime`/`endTime`.
-    - Color: Assign from fixed array based on `doctorId` index (see Notes for the AI in overview.md).
-  - Cancelled bookings: Reduced opacity (e.g., `opacity-50`).
-  - Filter changes trigger re-fetch.
-- **Event Click:**
-  - Open shadcn-vue Modal with:
-    - Full booking details (patient, doctor, date, time, service, status, payment status).
-    - "Cancel Booking" button (visible only if user has `APPOINTMENTS DELETE` permission).
+- **Tabs:** "Master Calendar" and "Pending Bookings".
+- **Master Calendar Tab:**
+  - **Filter Bar:** Above calendar:
+    - Doctor dropdown: All doctors + "All Doctors".
+    - Status dropdown: All / Confirmed / Cancelled.
+  - **FullCalendar:**
+    - Views: Month, Week, Day.
+    - Each booking = event with:
+      - Title: `patientName + " - " + doctorName`.
+      - Start/End: `date` + `startTime`/`endTime`.
+      - Color: Assign from fixed array based on `doctorId` index (see Notes for the AI in overview.md).
+    - Cancelled bookings: Reduced opacity (e.g., `opacity-50`).
+    - Filter changes trigger re-fetch.
+  - **Event Click:**
+    - Open shadcn-vue Modal with:
+      - Full booking details (patient, doctor, date, time, service, status, payment status).
+      - "Cancel Booking" button (visible only if user has `APPOINTMENTS DELETE` permission).
+- **Pending Bookings Tab:**
+  - Table of pending bookings with columns: Patient, Date, Time, Requested On, Actions.
+  - "Assign Doctor" button on each row opens an Assign Doctor modal:
+    - Dropdown of active doctors.
+    - Shows the selected doctor's existing bookings for that date (to avoid conflicts).
+    - "Confirm Assignment" button → calls `PATCH /api/admin/bookings/:id/assign` with the selected `doctorId`.
+    - On success: Show success toast, remove the row from the pending table. Booking moves from the Pending tab to the master calendar as CONFIRMED.
 
 **Data Fetching:**
-- On load and on filter change: Call `GET /api/admin/bookings` with current filters and date range.
+- On load and on filter change (master calendar): Call `GET /api/admin/bookings` with current filters and date range.
+- On Pending tab load: Call `GET /api/admin/bookings/pending`.
+- For the Assign Doctor modal: Call `GET /api/admin/doctors` and `GET /api/admin/bookings?date=<booking.date>` to show doctor availability/conflicts.
+
+**Permissions:**
+- Master Calendar visible if user has `APPOINTMENTS READ`.
+- Pending Bookings tab visible if user has `APPOINTMENTS READ`.
+- "Assign Doctor" button visible only if user has `APPOINTMENTS UPDATE`.
 
 ---
 
@@ -1415,10 +1712,20 @@
       - For Stripe: Publishable Key, Secret Key, Webhook Secret
     - "Update Keys" toggle to reveal inputs (default: masked with `****`).
     - Save button
+  - **Schedule (Booking Availability):**
+    - Row per day of week (Sunday through Saturday).
+    - Each row: toggle to enable/disable (`isActive`), start time picker, end time picker, session duration selector (30/45/60 min).
+    - "Save Schedule" button → calls POST (new row) / PATCH (existing row) as needed, DELETE to remove a row.
+    - Preview below: "Based on this schedule, X slots are available per week."
+    - Note: This global schedule is the source of truth for what patients can book. Doctor `Availability` does not affect patient booking.
+  - **Blocked Dates:**
+    - List of upcoming blocked dates with date, reason, and remove button.
+    - "Block a Date" button opens a modal with a date picker and optional reason field.
+    - Save → calls POST `/api/admin/blocked-dates`; remove → calls DELETE `/api/admin/blocked-dates/:id`.
 
 **Data Fetching:**
-- On load: Call `GET /api/admin/settings`.
-- On save: Call `PATCH /api/admin/settings` with updated fields.
+- On load: Call `GET /api/admin/settings`, `GET /api/admin/schedule`, and `GET /api/admin/blocked-dates`.
+- On save: Call `PATCH /api/admin/settings` with updated fields; `POST`/`PATCH`/`DELETE /api/admin/schedule`; `POST`/`DELETE /api/admin/blocked-dates`.
 
 **Permissions:**
 - Page visible only if user has `SETTINGS READ` permission.
@@ -1426,7 +1733,7 @@
 
 ---
 
-## Feature 5 — Admin Dashboard Composable
+## Feature 8 — Admin Dashboard Composable
 
 **File:** `modules/admin/composables/useAdminDashboard.ts`
 
@@ -1439,6 +1746,9 @@ const patients = useState<Patient[]>('admin-patients', () => [])
 const payments = useState<Payment[]>('admin-payments', () => [])
 const staff = useState<Staff[]>('admin-staff', () => [])
 const settings = useState<Settings | null>('admin-settings', () => null)
+const schedules = useState<AdminSchedule[]>('admin-schedules', () => [])
+const blockedDates = useState<BlockedDate[]>('admin-blocked-dates', () => [])
+const pendingBookings = useState<PendingBooking[]>('admin-pending-bookings', () => [])
 const isLoading = useState<boolean>('admin-dashboard-loading', () => false)
 const error = useState<string | null>('admin-dashboard-error', () => null)
 
@@ -1449,6 +1759,15 @@ const doctorColors = useState<Map<string, string>>('doctor-colors', () => new Ma
 **Methods:**
 - `fetchOverview()`: Calls `GET /api/admin/overview`.
 - `fetchBookings(filters: { start?: string; end?: string; doctorId?: string; status?: BookingStatus })`: Calls `GET /api/admin/bookings`.
+- `fetchPendingBookings()`: Calls `GET /api/admin/bookings/pending`.
+- `assignDoctor(bookingId: string, doctorId: string)`: Calls `PATCH /api/admin/bookings/:id/assign`.
+- `fetchSchedules()`: Calls `GET /api/admin/schedule`.
+- `createSchedule(data)`: Calls `POST /api/admin/schedule`.
+- `updateSchedule(id: string, data)`: Calls `PATCH /api/admin/schedule/:id`.
+- `deleteSchedule(id: string)`: Calls `DELETE /api/admin/schedule/:id`.
+- `fetchBlockedDates()`: Calls `GET /api/admin/blocked-dates`.
+- `createBlockedDate(data: { date: string; reason?: string })`: Calls `POST /api/admin/blocked-dates`.
+- `deleteBlockedDate(id: string)`: Calls `DELETE /api/admin/blocked-dates/:id`.
 - `fetchDoctors()`: Calls `GET /api/admin/doctors`.
 - `fetchPatients(search?: string)`: Calls `GET /api/admin/patients`.
 - `fetchPayments(filters: { start?: string; end?: string; doctorId?: string; status?: PaymentStatus })`: Calls `GET /api/admin/payments`.
@@ -1478,3 +1797,9 @@ const doctorColors = useState<Map<string, string>>('doctor-colors', () => new Ma
 - Doctor availability management works from admin panel.
 - Seed admin account cannot be deactivated.
 - Permission check queries the database on every request.
+- Admin can enable/disable/configure the global booking schedule; this drives what patients can book on `/book`.
+- Blocked dates remove availability for those specific dates regardless of schedule.
+- Admin can view all PENDING bookings and assign a doctor to confirm them.
+- Only PENDING bookings can be assigned a doctor.
+- Assigning an inactive doctor or a doctor already booked at the same time is rejected.
+- After assignment, both the patient and the doctor receive confirmation emails.

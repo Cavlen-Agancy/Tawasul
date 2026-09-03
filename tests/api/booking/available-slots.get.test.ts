@@ -1,38 +1,40 @@
 import { describe, expect, it, afterAll } from 'vitest'
 import handler from '~/modules/booking/server/api/booking/available-slots.get'
 import { createApiEvent, expectApiError } from '../helpers'
-import { createTestDoctor, deleteTestDoctor, nextDateWithDayOfWeek } from './helpers'
+import { createTestAdminSchedule, deleteTestAdminSchedule, createTestBlockedDate, deleteTestBlockedDate, nextDateWithDayOfWeek } from './helpers'
 
 describe('GET /api/booking/available-slots', () => {
-  let doctorUserId: string | null = null
-  let doctorId: string | null = null
+  const toDeleteSchedules: string[] = []
+  const toDeleteBlockedDates: string[] = []
 
   afterAll(async () => {
-    if (doctorId && doctorUserId) await deleteTestDoctor(doctorId, doctorUserId)
+    await Promise.all(toDeleteSchedules.map((id) => deleteTestAdminSchedule(id)))
+    await Promise.all(toDeleteBlockedDates.map((id) => deleteTestBlockedDate(id)))
   })
 
-  it('returns slots for a date with availability', async () => {
+  it('returns slots for a date covered by the admin schedule', async () => {
     const dateStr = nextDateWithDayOfWeek(0)
-    const fixture = await createTestDoctor({
+    const { adminScheduleId } = await createTestAdminSchedule({
       dayOfWeek: new Date(`${dateStr}T00:00:00`).getDay(),
       startTime: '09:00',
       endTime: '12:00',
       sessionDuration: 60,
     })
-    doctorId = fixture.doctor.id
-    doctorUserId = fixture.user.id
+    toDeleteSchedules.push(adminScheduleId)
 
     const event = createApiEvent({
       method: 'GET',
       url: `/api/booking/available-slots?date=${dateStr}`,
     })
 
-    const res = await handler(event) as { slots: Array<{ doctorId: string; startTime: string; endTime: string }> }
+    const res = await handler(event) as { slots: Array<{ startTime: string; endTime: string; sessionDuration: number }> }
     expect(Array.isArray(res.slots)).toBe(true)
     expect(res.slots.length).toBeGreaterThan(0)
-    expect(res.slots.some((s) => s.doctorId === fixture.doctor.id)).toBe(true)
     expect(res.slots[0]).toHaveProperty('startTime')
     expect(res.slots[0]).toHaveProperty('endTime')
+    expect(res.slots[0]).toHaveProperty('sessionDuration')
+    // No doctorId on admin slots.
+    expect(res.slots[0]).not.toHaveProperty('doctorId')
   })
 
   it('rejects an invalid date format with 400', async () => {
@@ -58,26 +60,44 @@ describe('GET /api/booking/available-slots', () => {
     expect(res.slots).toEqual([])
   })
 
-  it('returns empty slots on a public holiday even with availability (holiday blocks booking)', async () => {
-    // 2027-01-07 is Coptic Christmas (a fixed holiday) and lies in the future.
-    const holidayDate = '2027-01-07'
-    const dayOfWeek = new Date(`${holidayDate}T00:00:00`).getDay()
-    const fixture = await createTestDoctor({
-      dayOfWeek,
+  it('returns empty slots on a globally blocked date', async () => {
+    const dateStr = nextDateWithDayOfWeek(0)
+    const { adminScheduleId } = await createTestAdminSchedule({
+      dayOfWeek: new Date(`${dateStr}T00:00:00`).getDay(),
       startTime: '09:00',
       endTime: '12:00',
       sessionDuration: 60,
     })
-    try {
-      const event = createApiEvent({
-        method: 'GET',
-        url: `/api/booking/available-slots?date=${holidayDate}`,
-      })
-      const res = await handler(event) as { slots: unknown[] }
-      // Even though the doctor is available that weekday, a public holiday blocks all slots.
-      expect(res.slots).toEqual([])
-    } finally {
-      await deleteTestDoctor(fixture.doctor.id, fixture.user.id)
-    }
+    toDeleteSchedules.push(adminScheduleId)
+
+    const blockedId = await createTestBlockedDate(dateStr)
+    toDeleteBlockedDates.push(blockedId)
+
+    const event = createApiEvent({
+      method: 'GET',
+      url: `/api/booking/available-slots?date=${dateStr}`,
+    })
+    const res = await handler(event) as { slots: unknown[] }
+    expect(res.slots).toEqual([])
+  })
+
+  it('returns empty slots on a public holiday even with a schedule', async () => {
+    // 2027-01-07 is Coptic Christmas (a fixed holiday) and lies in the future.
+    const holidayDate = '2027-01-07'
+    const { adminScheduleId } = await createTestAdminSchedule({
+      dayOfWeek: new Date(`${holidayDate}T00:00:00`).getDay(),
+      startTime: '09:00',
+      endTime: '12:00',
+      sessionDuration: 60,
+    })
+    toDeleteSchedules.push(adminScheduleId)
+
+    const event = createApiEvent({
+      method: 'GET',
+      url: `/api/booking/available-slots?date=${holidayDate}`,
+    })
+    const res = await handler(event) as { slots: unknown[] }
+    // A public holiday blocks all slots regardless of the admin schedule.
+    expect(res.slots).toEqual([])
   })
 })

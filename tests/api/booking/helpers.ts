@@ -77,3 +77,54 @@ export async function deleteTestBooking(bookingId: string): Promise<void> {
   await prisma.payment.deleteMany({ where: { bookingId } }).catch(() => undefined)
   await prisma.booking.deleteMany({ where: { id: bookingId } }).catch(() => undefined)
 }
+
+export interface TestAdminScheduleFixture {
+  adminScheduleId: string
+}
+
+/**
+ * Creates an AdminSchedule record for the given weekday. The global schedule is the
+ * only source of availability after the architecture fix, so tests no longer need
+ * a Doctor. Returns its id for cleanup.
+ */
+export async function createTestAdminSchedule(opts: {
+  dayOfWeek: number
+  startTime: string
+  endTime: string
+  sessionDuration?: number
+}): Promise<TestAdminScheduleFixture> {
+  const schedule = await prisma.adminSchedule.upsert({
+    where: { dayOfWeek: opts.dayOfWeek },
+    create: {
+      dayOfWeek: opts.dayOfWeek,
+      startTime: opts.startTime,
+      endTime: opts.endTime,
+      sessionDuration: opts.sessionDuration ?? 60,
+    },
+    update: {
+      startTime: opts.startTime,
+      endTime: opts.endTime,
+      sessionDuration: opts.sessionDuration ?? 60,
+      isActive: true,
+    },
+  })
+  return { adminScheduleId: schedule.id }
+}
+
+export async function deleteTestAdminSchedule(adminScheduleId: string): Promise<void> {
+  await prisma.adminSchedule.deleteMany({ where: { id: adminScheduleId } }).catch(() => undefined)
+}
+
+export async function createTestBlockedDate(date: string): Promise<string> {
+  const [y, m, d] = date.split('-').map((p) => parseInt(p, 10))
+  const record = await prisma.globalBlockedDate.upsert({
+    where: { date: new Date(y, m - 1, d) },
+    create: { date: new Date(y, m - 1, d) },
+    update: {},
+  })
+  return record.id
+}
+
+export async function deleteTestBlockedDate(id: string): Promise<void> {
+  await prisma.globalBlockedDate.deleteMany({ where: { id } }).catch(() => undefined)
+}

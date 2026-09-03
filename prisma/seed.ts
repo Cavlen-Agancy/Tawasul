@@ -53,6 +53,25 @@ async function main() {
   })
   console.log('✓ Admin account created')
 
+  // Seed default global booking schedule (Mon-Fri, 09:00-17:00, 60 min sessions),
+  // matching the Settings default working hours. Admin can adjust via the admin panel.
+  const seedSchedules = [1, 2, 3, 4, 5].map((dayOfWeek) => ({
+    dayOfWeek,
+    startTime: '09:00',
+    endTime: '17:00',
+    sessionDuration: 60,
+    isActive: true,
+  }))
+
+  for (const schedule of seedSchedules) {
+    await prisma.adminSchedule.upsert({
+      where: { dayOfWeek: schedule.dayOfWeek },
+      create: schedule,
+      update: schedule,
+    })
+  }
+  console.log('✓ Default AdminSchedule (Mon-Fri) created')
+
   console.log('Seed complete.')
 }
 

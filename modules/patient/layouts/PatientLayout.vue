@@ -49,9 +49,9 @@ const isActive = (to: string) => route.path.startsWith(to)
 
         <div class="border-t border-border p-4">
           <div class="mb-3 flex items-center gap-3">
-            <Avatar>
+            <Avatar class="size-10 shrink-0">
               <AvatarImage :src="user?.photo" :alt="user?.name" />
-              <AvatarFallback>{{ user?.name?.slice(0, 1) }}</AvatarFallback>
+              <AvatarFallback class="text-base">{{ user?.name?.slice(0, 1).toUpperCase() }}</AvatarFallback>
             </Avatar>
             <div class="min-w-0">
               <p class="truncate text-sm font-semibold text-foreground">{{ user?.name }}</p>

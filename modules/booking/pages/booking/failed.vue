@@ -47,7 +47,7 @@ function chooseDifferentTime() {
 
         <CardContent v-if="booking" class="p-0">
           <dl class="divide-y divide-border rounded-2xl border border-border">
-            <div class="flex justify-between px-5 py-4">
+            <div v-if="booking.doctorName" class="flex justify-between px-5 py-4">
               <dt class="text-sm text-muted-foreground">Doctor</dt>
               <dd class="text-sm font-medium text-foreground">{{ booking.doctorName }}</dd>
             </div>

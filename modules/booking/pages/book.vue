@@ -174,7 +174,7 @@ onMounted(async () => {
         <div class="flex flex-wrap gap-2">
           <Button
             v-for="slot in availableSlots"
-            :key="`${slot.doctorId}-${slot.startTime}`"
+            :key="`${slot.startTime}`"
             variant="outline"
             class="justify-center"
             :data-testid="`booking-slot-${slot.startTime}`"
@@ -183,9 +183,6 @@ onMounted(async () => {
             {{ slot.startTime }}
           </Button>
         </div>
-        <p class="mt-3 text-xs text-muted-foreground">
-          {{ availableSlots[0]?.doctorName }} · {{ availableSlots[0]?.service }}
-        </p>
       </div>
     </div>
 
@@ -207,12 +204,8 @@ onMounted(async () => {
               <dd class="text-sm font-medium text-foreground">{{ formatTimeLabel(selectedSlot) }}</dd>
             </div>
             <div class="flex justify-between px-5 py-4">
-              <dt class="text-sm text-muted-foreground">Doctor</dt>
-              <dd class="text-sm font-medium text-foreground">{{ selectedSlot.doctorName }}</dd>
-            </div>
-            <div class="flex justify-between px-5 py-4">
-              <dt class="text-sm text-muted-foreground">Service</dt>
-              <dd class="text-sm font-medium text-foreground">{{ selectedSlot.service }}</dd>
+              <dt class="text-sm text-muted-foreground">Session Duration</dt>
+              <dd class="text-sm font-medium text-foreground">{{ selectedSlot.sessionDuration }} minutes</dd>
             </div>
             <div class="flex justify-between bg-muted/40 px-5 py-4">
               <dt class="text-sm font-medium text-foreground">Price</dt>

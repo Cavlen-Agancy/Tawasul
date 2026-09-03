@@ -37,7 +37,8 @@ export default defineEventHandler(async (event) => {
   return {
     id: booking.id,
     patientName: booking.user.name,
-    doctorName: booking.doctor.user.name,
+    doctorId: booking.doctorId,
+    doctorName: booking.doctor?.user?.name ?? null,
     date: formatDateISO(booking.date),
     startTime: booking.startTime,
     endTime: booking.endTime,

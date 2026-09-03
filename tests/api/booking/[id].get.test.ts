@@ -2,28 +2,20 @@ import { describe, expect, it, afterAll } from 'vitest'
 import handler from '~/modules/booking/server/api/booking/[id].get'
 import { prisma } from '~/server/utils/prisma'
 import { createApiEvent, expectApiError, createTestUser, deleteTestUser } from '../helpers'
-import { createTestDoctor, deleteTestDoctor, deleteTestBooking, nextDateWithDayOfWeek } from './helpers'
+import { deleteTestBooking, nextDateWithDayOfWeek } from './helpers'
 
 interface Fixture {
   bookingId: string
   ownerId: string
-  doctorId: string
-  doctorUserId: string
 }
 
 async function createBookingFixture(): Promise<Fixture> {
   const owner = await createTestUser({ emailVerified: true, email: `id-owner-${Date.now()}@test.com` })
   const dateStr = nextDateWithDayOfWeek(0)
-  const fixture = await createTestDoctor({
-    dayOfWeek: new Date(`${dateStr}T00:00:00`).getDay(),
-    startTime: '09:00',
-    endTime: '10:00',
-    sessionDuration: 60,
-  })
   const booking = await prisma.booking.create({
     data: {
       userId: owner.id,
-      doctorId: fixture.doctor.id,
+      doctorId: null,
       date: new Date(`${dateStr}T00:00:00`),
       startTime: '09:00',
       endTime: '10:00',
@@ -31,32 +23,28 @@ async function createBookingFixture(): Promise<Fixture> {
       status: 'PENDING',
     },
   })
-  return {
-    bookingId: booking.id,
-    ownerId: owner.id,
-    doctorId: fixture.doctor.id,
-    doctorUserId: fixture.user.id,
-  }
+  return { bookingId: booking.id, ownerId: owner.id }
 }
 
 async function cleanup(f: Fixture, userIds: string[]) {
   await deleteTestBooking(f.bookingId)
-  await deleteTestDoctor(f.doctorId, f.doctorUserId)
   await Promise.all(userIds.map((id) => deleteTestUser(id)))
 }
 
 describe('GET /api/booking/:id', () => {
-  it('fetches own booking as patient', async () => {
+  it('fetches own booking as patient (no doctor assigned yet)', async () => {
     const f = await createBookingFixture()
     const event = createApiEvent({
       method: 'GET',
       url: `/api/booking/${f.bookingId}`,
       context: { params: { id: f.bookingId }, user: { userId: f.ownerId, email: "x", accountType: "PATIENT" } },
     })
-    const res = await handler(event) as { id: string; patientName: string; status: string }
+    const res = await handler(event) as { id: string; patientName: string; status: string; doctorId: string | null; doctorName: string | null }
     expect(res.id).toBe(f.bookingId)
     expect(res.patientName).toBeTruthy()
     expect(res.status).toBe('PENDING')
+    expect(res.doctorId).toBeNull()
+    expect(res.doctorName).toBeNull()
     await cleanup(f, [f.ownerId])
   })
 

@@ -45,11 +45,11 @@ None. All booking pages use shadcn-vue and FullCalendar directly.
 
 | File | Functions Exported |
 |---|---|
-| `server/utils/availability.ts` | `getAvailableSlots(date: string): Promise<Slot[]>`, `getAvailableDates(month: number, year: number): Promise<string[]>` |
+| `server/utils/admin-availability.ts` | `getAdminAvailableSlots(date: string): Promise<AdminSlot[]>`, `getAdminAvailableDates(month: number, year: number): Promise<string[]>` |
 
 **Reused from Phase 0:**
 - `server/utils/prisma.ts` — `prisma` singleton.
-- `server/utils/email.ts` — `sendEmail`, `bookingConfirmationTemplate`, `bookingCancellationTemplate`.
+- `server/utils/email.ts` — `sendEmail`, `bookingReceivedTemplate` (booking acknowledgment), `bookingCancellationTemplate`.
 - `server/utils/auth.ts` — `requireAuth`.
 
 **Reused from Phase 1:**
@@ -63,8 +63,8 @@ None. All booking pages use shadcn-vue and FullCalendar directly.
 No schema changes in this phase. Uses existing models:
 - `Booking`
 - `Payment`
-- `Availability`
-- `BlockedSlot`
+- `AdminSchedule`
+- `GlobalBlockedDate`
 - `Settings`
 
 ---
@@ -73,9 +73,10 @@ No schema changes in this phase. Uses existing models:
 
 | Trigger Event | Recipient | Template Used | Key Variables |
 |---|---|---|---|
-| Payment success (webhook) | Patient | `bookingConfirmationTemplate` | `patientName`, `doctorName`, `date`, `time`, `service` |
-| Payment success (webhook) | Doctor | `bookingConfirmationTemplate` | `patientName`, `doctorName`, `date`, `time`, `service` |
-| Booking cancelled | Patient | `bookingCancellationTemplate` | `patientName`, `doctorName`, `date`, `time` |
+| Payment success (webhook) | Patient | `bookingReceivedTemplate` | `patientName`, `date`, `time` |
+| Booking cancelled | Patient | `bookingCancellationTemplate` | `patientName`, `date`, `time` |
+
+> **Note:** Booking confirmation emails (doctor assignment + patient confirmation) are sent by the admin in Phase 6, not in this phase.
 
 ---
 
@@ -113,11 +114,11 @@ No schema changes in this phase. Uses existing models:
   - Available dates/slots load on `/book`.
   - Slot selection and booking creation work.
   - Payment initiation redirects to gateway.
-  - Webhook updates booking status and sends emails.
+  - Webhook updates payment status and sends booking acknowledgment email.
   - Confirmation and failure pages show correct data.
 - `useBooking` composable for managing booking state.
-- `server/utils/availability.ts` for slot calculations.
+- `server/utils/admin-availability.ts` for admin-controlled slot calculations.
 - All booking and payment API endpoints.
-- Booking confirmation emails sent to patient and doctor.
+- Booking request acknowledgment email sent to patient upon payment.
 - FullCalendar integrated and configured.
 - Payment gateway (Paymob or Stripe) integrated.

@@ -5,13 +5,14 @@
 
 ## Goal
 
-Phase 3 builds the complete booking flow for the Tawasul Academy platform. After this phase, a logged-in patient can view available slots on a calendar, select a time, review a summary, pay online, and receive a confirmation email. The slot is blocked immediately after payment, and both the patient and doctor receive confirmation emails. The patient does **not** choose a doctor; the admin assigns doctors to availability slots, and the system automatically assigns the doctor who owns the selected slot.
+Phase 3 builds the complete booking flow for the Tawasul Academy platform. After this phase, a logged-in patient can view available slots on a calendar, select a time, review a summary, pay online, and receive an acknowledgment email. The booking calendar shows slots configured by the admin through a global schedule. The patient does **not** select a doctor. The booking is created without a `doctorId` and remains PENDING until the admin assigns a doctor and confirms it.
 
 ---
 
 ## Scope
 
-- **Availability Logic**: `server/utils/availability.ts` with `getAvailableSlots(date)` and `getAvailableDates(month, year)`.
+- **Admin Availability Logic**: `server/utils/admin-availability.ts` with `getAdminAvailableSlots(date)` and `getAdminAvailableDates(month, year)`.
+  - These functions read from the `AdminSchedule` model (global, admin-controlled) not from the `Availability` model (doctor-controlled).
 - **API Endpoints**: 6 endpoints for fetching available dates/slots, creating bookings, initiating payments, handling webhooks, fetching booking details, and canceling bookings.
 - **Frontend Pages**: 3 pages (`/book`, `/booking/success`, `/booking/failed`).
 - **Booking Composable**: `useBooking.ts` with state and methods for the booking flow.
@@ -34,9 +35,9 @@ Phase 3 builds the complete booking flow for the Tawasul Academy platform. After
 
 **Must exist from Phase 0:**
 - `server/utils/prisma.ts` — singleton Prisma client.
-- `server/utils/email.ts` — `sendEmail`, `bookingConfirmationTemplate`.
+- `server/utils/email.ts` — `sendEmail`, `bookingReceivedTemplate` (booking acknowledgment), `bookingCancellationTemplate`.
 - `server/utils/auth.ts` — `requireAuth`.
-- All `Booking`, `Payment`, `Availability`, `BlockedSlot`, `Settings` model fields in `schema.prisma`.
+- All `Booking`, `Payment`, `AdminSchedule`, `GlobalBlockedDate`, `Settings` model fields in `schema.prisma`.
 
 **Must exist from Phase 1:**
 - `middleware/auth.ts` — protect routes.
@@ -99,7 +100,7 @@ modules/payment/
 
 server/
 └── utils/
-    └── availability.ts         (create)
+    └── admin-availability.ts    (replaces availability.ts for booking flow)
 ```
 
 ---
@@ -109,20 +110,23 @@ server/
 - **API Routes**: Use Nitro file-based routing. Each endpoint is a separate file.
 - **Validation**: Use Zod for request body/query validation. Return 400 with `{ message: string }` on failure.
 - **Auth Protection**: Call `requireAuth(event, ['PATIENT'])` as the first line in patient-only endpoints.
-- **Availability**: Use `getAvailableSlots` and `getAvailableDates` from `server/utils/availability.ts` for all slot calculations. **Never** calculate slots inline in route handlers.
+- **Availability**: Use `getAdminAvailableSlots` and `getAdminAvailableDates` from `server/utils/admin-availability.ts` for all slot calculations. **Never** calculate slots inline in route handlers.
 - **Payment**: Use the gateway specified in `PAYMENT_GATEWAY` env var. Support both Paymob and Stripe.
 - **Webhooks**: Always return 200 to the gateway first, then process internally. Log errors separately.
 - **Error Handling**: Return user-friendly error messages. Never expose sensitive data (e.g., payment gateway errors).
 - **FullCalendar**: Use the `datesSet` callback to fetch available dates/slots. Debounce to avoid double-fetches.
+- **Booking without doctor**: The create booking endpoint does NOT require `doctorId`. It is null until admin assigns a doctor.
+- **Availability source**: All availability calculations use the `AdminSchedule` model, never the `Availability` model. The `Availability` model remains in the schema for doctor calendar display (Phase 5) but is not used in the booking flow.
+- **Booking status flow**: `PENDING` (after payment) → `CONFIRMED` (after admin assigns doctor). The `IN_REVIEW` status is reserved for future use.
 
 ---
 
 ## Notes for the AI
 
-- The `getAvailableSlots` function is the **single source of truth** for slot availability. Re-run it on the server in `POST /api/booking/create` to ensure the slot wasn't taken by another user.
+- The `getAdminAvailableSlots` function is the **single source of truth** for slot availability. Re-run it on the server in `POST /api/booking/create` to ensure the slot wasn't taken by another user.
 - For Paymob: Use the **intention API with a redirect flow** (not iframe).
 - For Stripe: Use **Stripe Checkout Sessions** (not PaymentIntents directly).
 - The booking flow is **linear**: Choose Time → Review → Pay. Use a step indicator to show progress.
-- The patient does **not** choose a doctor. The doctor is determined by the slot's `doctorId`.
-- After payment success, the webhook updates the `Booking` status to `CONFIRMED` and sends emails.
+- The patient does **not** choose a doctor. The booking is created with `doctorId: null` and remains `PENDING`.
+- After payment success, the webhook keeps the `Booking` status as `PENDING` and sends a "booking received" acknowledgment email to the patient. Confirmation emails to patient and doctor are sent later by the admin when the doctor is assigned (Phase 6).
 - Refunds for MVP are **manual** — just mark as `REFUNDED` in the DB and note this to the admin.

@@ -42,15 +42,15 @@ function formatDateLabel(date: string): string {
         <CardHeader class="items-center p-0 pb-6 text-center">
           <CheckCircle2 class="h-14 w-14 text-primary" />
           <CardTitle class="text-2xl font-semibold tracking-tight">
-            Booking Confirmed
+            Booking Request Received
           </CardTitle>
           <CardDescription class="mt-2 text-sm">
-            Your session has been confirmed. Details are below.
+            Your booking request has been received. We will review and confirm your session shortly.
           </CardDescription>
         </CardHeader>
         <CardContent class="p-0">
           <dl class="divide-y divide-border rounded-2xl border border-border">
-            <div class="flex justify-between px-5 py-4">
+            <div v-if="booking.doctorName" class="flex justify-between px-5 py-4">
               <dt class="text-sm text-muted-foreground">Doctor</dt>
               <dd class="text-sm font-medium text-foreground">{{ booking.doctorName }}</dd>
             </div>

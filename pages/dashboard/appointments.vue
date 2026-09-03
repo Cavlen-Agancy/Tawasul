@@ -8,7 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-vue-next'
-import type { DateClickArg, DatesSetArg, DayCellContentArg } from '@fullcalendar/core'
+import type { DateClickArg, DatesSetArg, DayCellContentArg, EventClickArg } from '@fullcalendar/core'
 import type { Appointment, BookingStatus } from '~/modules/patient/composables/types'
 import type { Slot } from '~/modules/booking/composables/types'
 
@@ -146,6 +146,14 @@ function goToday() {
   void loadMonth(currentMonth.value, currentYear.value, true)
 }
 
+function onEventClick(info: EventClickArg) {
+  const appt = allAppointments.value.find((a) => a.id === info.event.id)
+  // Only route to the Lobby for joinable sessions; leave cancelled ones inert.
+  if (appt && appt.status !== 'CANCELLED') {
+    navigateTo(`/meeting/${appt.id}/lobby`)
+  }
+}
+
 async function onDateClick(info: DateClickArg) {
   const dateStr = toISODate(info.date)
   if (isPastDate(info.date)) return
@@ -264,6 +272,7 @@ const calendarOptions = computed(() => ({
   events: [...appointmentEvents.value, ...holidayEvents.value],
   dayCellClassNames: dayCellClass,
   dateClick: onDateClick,
+  eventClick: onEventClick,
   datesSet: onDatesSet,
   eventContent: (arg: { event: { extendedProps: Record<string, unknown>; title: string } }) => {
     const status = arg.event.extendedProps.status as BookingStatus | undefined
@@ -327,18 +336,26 @@ onMounted(async () => {
           </template>
         </ClientOnly>
 
-        <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+        <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
           <span class="inline-flex items-center gap-1.5">
-            <span class="size-2.5 rounded-full bg-primary"></span>
-            Available
+            <span class="size-3 rounded-sm border border-border bg-white"></span>
+            Available day
           </span>
           <span class="inline-flex items-center gap-1.5">
-            <span class="size-2.5 rounded-full bg-amber-500"></span>
-            Holiday (closed)
+            <span class="size-3 rounded-sm bg-slate-100"></span>
+            Unavailable day
           </span>
           <span class="inline-flex items-center gap-1.5">
-            <span class="size-2.5 rounded-full bg-slate-300"></span>
-            Past / unavailable
+            <span class="size-2.5 rounded-full bg-green-600"></span>
+            Confirmed
+          </span>
+          <span class="inline-flex items-center gap-1.5">
+            <span class="size-2.5 rounded-full bg-red-600"></span>
+            Awaiting review
+          </span>
+          <span class="inline-flex items-center gap-1.5">
+            <span class="size-2.5 rounded-full bg-slate-400"></span>
+            Cancelled
           </span>
         </div>
       </CardContent>
@@ -437,25 +454,36 @@ onMounted(async () => {
   color: #e91e8c;
   font-weight: 600;
 }
+/* Available days keep the normal calendar background — only the day number is
+   tinted with the brand colour as the "bookable" affordance. */
 .fc-tawasul-available.fc-day .fc-daygrid-day-frame {
-  background-color: rgba(233, 30, 140, 0.06);
   cursor: pointer;
 }
-.fc-tawasul-unavailable:not(.fc-tawasul-available) {
+/* Unavailable days get a very light gray fill — subtle, not dominant. */
+.fc .fc-daygrid-day.fc-tawasul-unavailable:not(.fc-tawasul-holiday) .fc-daygrid-day-frame {
+  background-color: rgba(226, 232, 240, 0.4);
+}
+.fc-tawasul-unavailable:not(.fc-tawasul-available),
+.fc .fc-daygrid-day.fc-tawasul-unavailable:not(.fc-tawasul-available) .fc-daygrid-day-number {
   color: #c4c4c4;
-  opacity: 0.6;
+}
+.fc .fc-daygrid-day.fc-tawasul-unavailable:not(.fc-tawasul-available) {
+  opacity: 1;
+}
+.fc .fc-daygrid-day.fc-tawasul-unavailable:not(.fc-tawasul-available):not(.fc-tawasul-past) {
+  cursor: not-allowed;
 }
 .fc-tawasul-past,
 .fc .fc-daygrid-day.fc-tawasul-past {
   pointer-events: none;
 }
-.fc .fc-daygrid-day.fc-tawasul-holiday {
+.fc .fc-daygrid-day.fc-tawasul-holiday .fc-daygrid-day-frame {
   background: repeating-linear-gradient(
     -45deg,
-    rgba(245, 158, 11, 0.08),
-    rgba(245, 158, 11, 0.08) 5px,
-    rgba(245, 158, 11, 0.16) 5px,
-    rgba(245, 158, 11, 0.16) 10px
+    rgba(245, 158, 11, 0.06),
+    rgba(245, 158, 11, 0.06) 5px,
+    rgba(245, 158, 11, 0.12) 5px,
+    rgba(245, 158, 11, 0.12) 10px
   );
 }
 .fc .fc-daygrid-day.fc-tawasul-holiday .fc-daygrid-day-number {
@@ -474,13 +502,20 @@ onMounted(async () => {
   background-color: #16a34a;
   border-color: #16a34a;
 }
+/* PENDING = awaiting admin review (IN_REVIEW) → red */
 .fc-tawasul-event-pending {
-  background-color: #f59e0b;
-  border-color: #f59e0b;
+  background-color: #dc2626;
+  border-color: #dc2626;
 }
 .fc-tawasul-event-cancelled {
   background-color: #94a3b8;
   border-color: #94a3b8;
+}
+.fc .fc-daygrid-event {
+  transition: filter 0.15s ease;
+}
+.fc .fc-daygrid-event:hover {
+  filter: brightness(0.95);
 }
 .fc-tawasul-dot {
   display: inline-block;
@@ -495,7 +530,7 @@ onMounted(async () => {
   background-color: #94a3b8;
 }
 .fc-tawasul-dot-pending {
-  background-color: #f59e0b;
+  background-color: #dc2626;
 }
 .fc-tawasul-dot-confirmed {
   background-color: #16a34a;

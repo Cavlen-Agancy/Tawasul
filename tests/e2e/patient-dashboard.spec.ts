@@ -459,6 +459,23 @@ test.describe('Patient Dashboard', () => {
     await expect(page.getByRole('heading', { name: 'Your session starts soon' })).toBeVisible()
   })
 
+  test('meeting lobby shows the waiting state outside the join window', async ({ page }) => {
+    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    await spaNavigateTo(page, `/meeting/${bookingSessionId}/lobby`)
+    await expect(page.getByTestId('meeting-waiting')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('heading', { name: 'Meeting not open yet' })).toBeVisible()
+  })
+
+  test('clicking a calendar appointment navigates to its meeting lobby', async ({ page }) => {
+    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    const today = ymd(new Date())
+    const cell = page.locator(`.fc-day[data-date="${today}"]`)
+    await expect(cell.locator(`.fc-event.fc-tawasul-event-${bookingSessionId}`)).toBeVisible({ timeout: 20_000 })
+    await cell.locator(`.fc-event.fc-tawasul-event-${bookingSessionId}`).click()
+    await page.waitForURL(`**/meeting/${bookingSessionId}/lobby`, { timeout: 20_000 })
+    await expect(page.getByTestId('meeting-waiting')).toBeVisible({ timeout: 20_000 })
+  })
+
   test('sidebar navigation works and logout redirects', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
     await page.setViewportSize({ width: 1280, height: 800 })

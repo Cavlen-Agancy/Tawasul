@@ -3,61 +3,17 @@
 
 ---
 
-## Feature 1 — Availability Logic
+## Feature 1 — Admin Availability Logic
 
-**Action:** Create `server/utils/availability.ts` with slot calculation functions.
+**Action:** Create `server/utils/admin-availability.ts` with admin-controlled slot calculation functions. Do **not** modify `server/utils/availability.ts`.
 
----
-
-### `getAvailableSlots(date: string): Promise<Slot[]>`
-
-**Purpose:** Calculate all available time slots for a given date across all active doctors.
-
-**Input:**
-- `date`: String in `YYYY-MM-DD` format (e.g., `"2024-03-04"`).
-
-**Output:**
-- Array of `Slot` objects:
-  ```typescript
-  {
-    doctorId: string;
-    doctorName: string;
-    startTime: string; // "10:00"
-    endTime: string;   // "11:00"
-    service: string;   // e.g., "Marital Counseling"
-  }
-  ```
-
-**Server Logic:**
-1. Parse the `date` string into a Date object. Get the day of week (0–6, where 0 is Sunday).
-2. Fetch all `Availability` records where:
-   - The linked `Doctor` has `isActive: true`.
-   - The `dayOfWeek` matches the input date's day of week.
-3. Batch fetch all **confirmed** `Booking` records for the input date.
-4. Batch fetch all `BlockedSlot` records for the input date.
-5. For each `Availability` record:
-   a. Generate time slots by splitting the window (`startTime` to `endTime`) into chunks of `sessionDuration` minutes.
-      - Example: `startTime: "09:00"`, `endTime: "12:00"`, `sessionDuration: 60` → slots at 09:00, 10:00, 11:00.
-   b. For each generated slot, check if it overlaps with:
-      - Any **confirmed** `Booking` for the same doctor on the same date.
-      - Any `BlockedSlot` for the same doctor on the same date.
-   c. Remove overlapping slots.
-6. If the input date is **today**, remove slots where `startTime` is in the past.
-7. Sort all remaining slots by `startTime` ascending.
-8. For each slot, fetch the `doctorName` from the linked `User` record and the `service` from the `Doctor` record (or use a default service name from Settings).
-9. Return the array of `Slot` objects.
-
-**Edge Cases:**
-- No availability records for the date: Return empty array.
-- All slots are booked/blocked: Return empty array.
-- Date is in the past: Return empty array.
-- Doctor has no linked `User` record: Skip (should not happen if DB constraints are correct).
+This utility is the **single source of truth** for what dates and slots are available to patients. It reads from the `AdminSchedule` model, **not** from the doctor `Availability` model. AdminSlots do NOT carry a `doctorId` — the doctor is assigned later by the admin (Phase 6).
 
 ---
 
-### `getAvailableDates(month: number, year: number): Promise<string[]>`
+### `getAdminAvailableDates(month: number, year: number): Promise<string[]>`
 
-**Purpose:** Calculate all dates in a month that have at least one available slot.
+**Purpose:** Calculate all dates in a month that have at least one available slot based on the admin-controlled schedule.
 
 **Input:**
 - `month`: Number (1–12).
@@ -67,20 +23,61 @@
 - Array of date strings in `YYYY-MM-DD` format (e.g., `["2024-03-04", "2024-03-05"]`).
 
 **Server Logic:**
-1. Batch fetch all `Availability` records for active doctors.
-2. Batch fetch all **confirmed** `Booking` records for the given month.
-3. Batch fetch all `BlockedSlot` records for the given month.
-4. For each day in the month:
-   a. Get the day of week (0–6).
-   b. Check if any `Availability` record matches that day of week for an active doctor.
-   c. If yes, generate all possible slots for that day (using `sessionDuration`).
-   d. Remove slots that overlap with confirmed bookings or blocked slots.
-   e. If at least one slot remains, add the date to the output array.
-5. Return the array of dates with available slots.
+1. Fetch all active `AdminSchedule` records: `prisma.adminSchedule.findMany({ where: { isActive: true } })`.
+2. If no records exist, return `[]`.
+3. Fetch all `GlobalBlockedDate` records for the given month.
+4. Fetch all **confirmed** `Booking` records for the given month (to calculate which slots are fully booked on a given day).
+5. For each day in the month:
+   a. Get the `dayOfWeek` (0–6) for that date.
+   b. Find all `AdminSchedule` records matching that `dayOfWeek`.
+   c. If none found, skip this date (not available).
+   d. Check if the date is in `GlobalBlockedDate` — if yes, skip.
+   e. Generate all possible time slots by splitting each schedule window into `sessionDuration` chunks.
+   f. Count how many slots are already taken by CONFIRMED bookings on this date.
+   g. If at least one slot remains, add this date to the result array.
+6. Return the array of date strings that have at least one available slot.
 
 **Edge Cases:**
-- No availability records for the month: Return empty array.
-- All slots in the month are booked/blocked: Return empty array.
+- No `AdminSchedule` records exist: Return `[]`.
+- All dates in the month are blocked or fully booked: Return `[]`.
+
+---
+
+### `getAdminAvailableSlots(date: string): Promise<AdminSlot[]>`
+
+**Purpose:** Calculate all available time slots for a given date based on the admin-controlled schedule.
+
+An `AdminSlot` is:
+```typescript
+{
+  startTime: string;      // "10:00"
+  endTime: string;        // "11:00"
+  sessionDuration: number;
+}
+```
+
+**Note:** AdminSlots do NOT have a `doctorId`. The doctor is assigned later by the admin.
+
+**Input:**
+- `date`: String in `YYYY-MM-DD` format (e.g., `"2024-03-04"`).
+
+**Server Logic:**
+1. Parse the date, get `dayOfWeek` (0–6).
+2. If the date is in the past, return `[]`.
+3. Fetch all active `AdminSchedule` records matching `dayOfWeek`.
+4. If none found, return `[]`.
+5. Check if the date is in `GlobalBlockedDate` — if yes, return `[]`.
+6. Fetch all CONFIRMED `Booking` records for this date (to block already-taken slots).
+7. For each `AdminSchedule` record, generate time slots by splitting the window into `sessionDuration` chunks.
+8. Remove slots that overlap with any CONFIRMED booking on this date.
+9. If the date is today, remove slots where `startTime` is in the past.
+10. Return the remaining slots sorted by `startTime` ascending.
+
+**Edge Cases:**
+- No `AdminSchedule` records for the `dayOfWeek`: Return `[]`.
+- Date is in `GlobalBlockedDate`: Return `[]`.
+- All slots are booked: Return `[]`.
+- Date is in the past: Return `[]`.
 
 ---
 
@@ -119,7 +116,7 @@
 
 **Server Logic:**
 1. Validate `month` (1–12) and `year` (4 digits).
-2. Call `getAvailableDates(month, year)`.
+2. Call `getAdminAvailableDates(month, year)`.
 3. Return `{ dates }`.
 
 **Edge Cases:**
@@ -150,14 +147,14 @@
 - **Response (Success):**
   ```typescript
   {
-    slots: Slot[] // Array of { doctorId, doctorName, startTime, endTime, service }
+    slots: AdminSlot[] // Array of { startTime, endTime, sessionDuration }
   }
   ```
   - **Status:** 200
 
 **Server Logic:**
 1. Validate `date` format (YYYY-MM-DD).
-2. Call `getAvailableSlots(date)`.
+2. Call `getAdminAvailableSlots(date)`.
 3. Return `{ slots }`.
 
 **Edge Cases:**
@@ -171,7 +168,7 @@
 **User Action:** User clicks "Confirm and Pay" on the booking summary step.
 
 **Frontend Behavior:**
-- Call this endpoint with selected date, startTime, and doctorId.
+- Call this endpoint with selected date, startTime.
 - On success: Proceed to payment initiation.
 - On error: Show error message, allow retry.
 
@@ -183,10 +180,10 @@
   ```typescript
   {
     date: string,      // YYYY-MM-DD
-    startTime: string, // "10:00"
-    doctorId: string
+    startTime: string  // "10:00"
   }
   ```
+  - **Note:** No `doctorId` is required. The booking is created with `doctorId: null` and remains PENDING until an admin assigns a doctor (Phase 6).
 - **Response (Success):**
   ```typescript
   {
@@ -204,17 +201,17 @@
 
 **Server Logic:**
 1. Call `requireAuth(event, ['PATIENT'])`.
-2. Re-validate the slot is still available by calling `getAvailableSlots(date)` and checking if the `doctorId` + `startTime` combination exists in the returned slots. If not → return 400 with `{ message: "This slot is no longer available" }`.
-3. Fetch the `Doctor`'s `Availability` record for the given `date` (day of week) to calculate `endTime` based on `sessionDuration`.
+2. Re-validate the slot is still available by calling `getAdminAvailableSlots(date)` and checking if the `startTime` exists in the returned slots. If not → return 400 with `{ message: "This slot is no longer available" }`.
+3. Calculate `endTime` based on the matching `AdminSchedule`'s `sessionDuration`.
 4. Fetch `sessionPricePerHour` and `currency` from `Settings` singleton.
    - Calculate `amount` = `(sessionDuration / 60) * sessionPricePerHour`.
 5. Create a new `Booking` with:
    - `userId`: Logged-in patient's ID.
-   - `doctorId`: From request body.
+   - `doctorId`: null (doctor assigned later by admin).
    - `date`: From request body.
    - `startTime`: From request body.
    - `endTime`: Calculated from `startTime` + `sessionDuration`.
-   - `service`: From `Doctor` or default from Settings.
+   - `service`: Default from Settings.
    - `status: PENDING`.
 6. Create a linked `Payment` with:
    - `bookingId`: ID of the created booking.
@@ -225,8 +222,6 @@
 
 **Edge Cases:**
 - Slot no longer available: Return 400.
-- Doctor not found: Return 400.
-- Availability record not found: Return 400.
 - Settings record missing: Use default values (`sessionPricePerHour: 0`, `currency: "EGP"`).
 
 ---
@@ -335,11 +330,12 @@
    - Extract payment `status` (e.g., "SUCCESS", "FAILED").
 4. **If Payment SUCCESS:**
    a. Update `Payment` status to `SUCCESS`.
-   b. Update `Booking` status to `CONFIRMED`.
-   c. Fetch `Booking` and linked `User` (patient) and `Doctor` records.
-   d. Send booking confirmation email to patient using `bookingConfirmationTemplate` with:
-      - `patientName`, `doctorName`, `date`, `time`, `service`.
-   e. Send notification email to doctor using `bookingConfirmationTemplate` (same template, doctor as recipient).
+   b. Keep `Booking` status as `PENDING` (confirmation happens when the admin assigns a doctor in Phase 6).
+   c. Fetch `Booking` and linked `User` (patient) records.
+   d. Send booking acknowledgment email to patient using `bookingReceivedTemplate` with:
+      - `patientName`, `date`, `time`.
+      - Subject: "Your booking request has been received — Tawasul Academy".
+      - Content: "We have received your booking request for [date] at [time]. Our team will review and confirm your session shortly. You will receive a confirmation email with your session details once confirmed."
 5. **If Payment FAILED:**
    a. Update `Payment` status to `FAILED`.
    b. Leave `Booking` status as `PENDING`.
@@ -369,7 +365,7 @@
   {
     id: string,
     patientName: string,
-    doctorName: string,
+    doctorId: string | null,
     date: string,       // YYYY-MM-DD
     startTime: string,  // "10:00"
     endTime: string,    // "11:00"
@@ -433,7 +429,7 @@
 5. Update `Booking` status to `CANCELLED`.
 6. Update linked `Payment` status to `REFUNDED`.
 7. Send cancellation email to patient using `bookingCancellationTemplate` with:
-   - `patientName`, `doctorName`, `date`, `time`.
+   - `patientName`, `doctorName` (optional, empty if no doctor assigned yet), `date`, `time`.
 8. Return 200.
 
 **Edge Cases:**
@@ -462,21 +458,21 @@
     - Gray out unavailable dates (use `display: none` or `opacity-50` + `pointer-events-none`).
     - On month change (`datesSet` callback): Fetch available dates for new month.
     - On date click (available date only): Call `GET /api/booking/available-slots?date=DATE`.
-  - Display returned slots as shadcn-vue Button chips below the calendar.
+  - Display returned slots as shadcn-vue Button chips below the calendar. Each slot shows only the time (e.g., "10:00 AM – 11:00 AM"); no doctor name is shown.
   - On slot select: Store selected slot, advance to Step 2.
 - **Step 2 — Review:**
   - Show shadcn-vue Card with:
     - Date (formatted: "Monday, 4 March 2024").
     - Time (formatted: "10:00 AM – 11:00 AM").
-    - Doctor name.
-    - Service.
+    - Session Duration.
     - Price (from `amount` in `POST /api/booking/create` response).
+    - **No doctor name** (doctor is not assigned yet).
   - Buttons:
     - "Back" (return to Step 1).
     - "Confirm and Pay" (call `POST /api/booking/create`, then `POST /api/payment/initiate`).
 - **Step 3 — Payment:**
   - On "Confirm and Pay":
-    1. Call `POST /api/booking/create` with `date`, `startTime`, `doctorId`.
+    1. Call `POST /api/booking/create` with `date`, `startTime`.
     2. Call `POST /api/payment/initiate` with returned `bookingId`.
     3. For Paymob: Redirect to `paymentUrl`.
     4. For Stripe: Load Stripe Checkout with `clientSecret`.
@@ -502,8 +498,9 @@
   3. If 404 or 403: Show error message + link to `/book`.
   4. If success: Show success state:
      - shadcn-vue Icon (checkmark, magenta).
-     - Headline: "Booking Confirmed"
-     - Booking summary (date, time, doctor, service, price).
+     - Headline: "Booking Request Received".
+     - Booking summary (date, time, session duration, price).
+     - Note: "Your booking request has been received. We will review and confirm your session shortly."
      - "Go to My Appointments" button → `/dashboard/appointments` (links to Phase 4).
 
 **Edge Cases:**
@@ -541,9 +538,9 @@
 ```typescript
 const step = useState<number>('booking-step', () => 1)
 const selectedDate = useState<string | null>('booking-selected-date', () => null)
-const selectedSlot = useState<Slot | null>('booking-selected-slot', () => null)
+const selectedSlot = useState<AdminSlot | null>('booking-selected-slot', () => null)
 const availableDates = useState<string[]>('booking-available-dates', () => [])
-const availableSlots = useState<Slot[]>('booking-available-slots', () => [])
+const availableSlots = useState<AdminSlot[]>('booking-available-slots', () => [])
 const bookingId = useState<string | null>('booking-id', () => null)
 const isLoading = useState<boolean>('booking-loading', () => false)
 const error = useState<string | null>('booking-error', () => null)
@@ -552,8 +549,8 @@ const error = useState<string | null>('booking-error', () => null)
 **Methods:**
 - `fetchAvailableDates(month: number, year: number)`: Calls `GET /api/booking/available-dates`.
 - `fetchAvailableSlots(date: string)`: Calls `GET /api/booking/available-slots`.
-- `selectSlot(slot: Slot)`: Sets `selectedSlot`, advances to step 2.
-- `createAndPay()`: Calls `POST /api/booking/create` then `POST /api/payment/initiate`, redirects to gateway.
+- `selectSlot(slot: AdminSlot)`: Sets `selectedSlot`, advances to step 2.
+- `createAndPay()`: Calls `POST /api/booking/create` (body has `date` and `startTime` only, no `doctorId`) then `POST /api/payment/initiate`, redirects to gateway.
 - `reset()`: Resets all state to initial values.
 
 ---

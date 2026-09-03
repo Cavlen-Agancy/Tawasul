@@ -2,31 +2,16 @@ import { describe, expect, it, afterAll } from 'vitest'
 import handler from '~/modules/booking/server/api/booking/[id]/cancel.patch'
 import { prisma } from '~/server/utils/prisma'
 import { createApiEvent, expectApiError, createTestUser, deleteTestUser } from '../helpers'
-import { createTestDoctor, deleteTestDoctor, deleteTestBooking, nextDateWithDayOfWeek } from './helpers'
+import { deleteTestBooking } from './helpers'
 
 const toDeleteUsers: string[] = []
 const toDeleteBookings: string[] = []
-let doctorUserId: string | null = null
-let doctorId: string | null = null
-
-async function createDocFixture() {
-  const dateStr = nextDateWithDayOfWeek(0)
-  const fixture = await createTestDoctor({
-    dayOfWeek: new Date(`${dateStr}T00:00:00`).getDay(),
-    startTime: '09:00',
-    endTime: '18:00',
-    sessionDuration: 60,
-  })
-  doctorId = fixture.doctor.id
-  doctorUserId = fixture.user.id
-  return fixture
-}
 
 async function createBooking(ownerId: string, date: Date, startTime: string): Promise<string> {
   const booking = await prisma.booking.create({
     data: {
       userId: ownerId,
-      doctorId: doctorId as string,
+      doctorId: null,
       date,
       startTime,
       endTime: '10:00',
@@ -43,7 +28,6 @@ async function createBooking(ownerId: string, date: Date, startTime: string): Pr
 
 afterAll(async () => {
   await Promise.all(toDeleteBookings.map((id) => deleteTestBooking(id)))
-  if (doctorId && doctorUserId) await deleteTestDoctor(doctorId, doctorUserId)
   await Promise.all(toDeleteUsers.map((id) => deleteTestUser(id)))
 })
 
@@ -51,7 +35,6 @@ describe('PATCH /api/booking/:id/cancel', () => {
   it('cancels own booking 24h+ before session', async () => {
     const owner = await createTestUser({ emailVerified: true, email: `cancel-ok-${Date.now()}@test.com` })
     toDeleteUsers.push(owner.id)
-    await createDocFixture()
     const future = new Date(Date.now() + 48 * 60 * 60 * 1000)
     const bookingId = await createBooking(owner.id, future, '09:00')
 
@@ -70,7 +53,6 @@ describe('PATCH /api/booking/:id/cancel', () => {
   it('rejects cancelling own booking less than 24h before', async () => {
     const owner = await createTestUser({ emailVerified: true, email: `cancel-soon-${Date.now()}@test.com` })
     toDeleteUsers.push(owner.id)
-    await createDocFixture()
     const soon = new Date(Date.now() + 2 * 60 * 60 * 1000)
     const bookingId = await createBooking(owner.id, soon, '09:00')
 
@@ -97,7 +79,6 @@ describe('PATCH /api/booking/:id/cancel', () => {
       permissions: [{ resource: 'APPOINTMENTS', action: 'DELETE' }],
     })
     toDeleteUsers.push(staff.id)
-    await createDocFixture()
     const soon = new Date(Date.now() + 2 * 60 * 60 * 1000)
     const bookingId = await createBooking(owner.id, soon, '09:00')
 
@@ -115,7 +96,6 @@ describe('PATCH /api/booking/:id/cancel', () => {
     toDeleteUsers.push(owner.id)
     const other = await createTestUser({ emailVerified: true, email: `cancel-other-${Date.now()}@test.com` })
     toDeleteUsers.push(other.id)
-    await createDocFixture()
     const future = new Date(Date.now() + 48 * 60 * 60 * 1000)
     const bookingId = await createBooking(owner.id, future, '09:00')
 

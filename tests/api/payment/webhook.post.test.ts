@@ -3,28 +3,17 @@ import crypto from 'node:crypto'
 import handler from '~/modules/payment/server/api/payment/webhook.post'
 import { prisma } from '~/server/utils/prisma'
 import { createApiEvent, expectApiError, createTestUser, deleteTestUser } from '../helpers'
-import { createTestDoctor, deleteTestDoctor, deleteTestBooking, nextDateWithDayOfWeek } from '../booking/helpers'
+import { deleteTestBooking, nextDateWithDayOfWeek } from '../booking/helpers'
 
 const toDeleteUsers: string[] = []
 const toDeleteBookings: string[] = []
-let doctorUserId: string | null = null
-let doctorId: string | null = null
 
 async function createPendingBooking(ownerId: string) {
   const dateStr = nextDateWithDayOfWeek(0)
-  const fixture = await createTestDoctor({
-    dayOfWeek: new Date(`${dateStr}T00:00:00`).getDay(),
-    startTime: '09:00',
-    endTime: '12:00',
-    sessionDuration: 60,
-  })
-  doctorId = fixture.doctor.id
-  doctorUserId = fixture.user.id
-
   const booking = await prisma.booking.create({
     data: {
       userId: ownerId,
-      doctorId: fixture.doctor.id,
+      doctorId: null,
       date: new Date(`${dateStr}T00:00:00`),
       startTime: '09:00',
       endTime: '10:00',
@@ -49,7 +38,6 @@ function buildApiEvent(body: Record<string, unknown>, headerName: string, header
 
 afterAll(async () => {
   await Promise.all(toDeleteBookings.map((id) => deleteTestBooking(id)))
-  if (doctorId && doctorUserId) await deleteTestDoctor(doctorId, doctorUserId)
   await Promise.all(toDeleteUsers.map((id) => deleteTestUser(id)))
 })
 
@@ -66,7 +54,7 @@ function setStripeEnv(webhookSecret: string | undefined) {
 }
 
 describe('POST /api/payment/webhook', () => {
-  it('marks payment success + booking confirmed for a Paymob success webhook', async () => {
+  it('marks payment success but booking stays pending for a Paymob success webhook', async () => {
     setPaymobEnv('paymob-hmac-secret')
     const patient = await createTestUser({ emailVerified: true, email: `wh-paymob-ok-${Date.now()}@test.com` })
     toDeleteUsers.push(patient.id)
@@ -81,7 +69,7 @@ describe('POST /api/payment/webhook', () => {
 
     const booking = await prisma.booking.findUnique({ where: { id: bookingId } })
     const payment = await prisma.payment.findUnique({ where: { bookingId } })
-    expect(booking?.status).toBe('CONFIRMED')
+    expect(booking?.status).toBe('PENDING')
     expect(payment?.status).toBe('SUCCESS')
   })
 
@@ -114,7 +102,7 @@ describe('POST /api/payment/webhook', () => {
     }
   })
 
-  it('marks payment success + booking confirmed for a Stripe success webhook', async () => {
+  it('marks payment success but booking stays pending for a Stripe success webhook', async () => {
     setStripeEnv('whsec_test_secret')
     const patient = await createTestUser({ emailVerified: true, email: `wh-stripe-ok-${Date.now()}@test.com` })
     toDeleteUsers.push(patient.id)
@@ -129,7 +117,7 @@ describe('POST /api/payment/webhook', () => {
 
     const booking = await prisma.booking.findUnique({ where: { id: bookingId } })
     const payment = await prisma.payment.findUnique({ where: { bookingId } })
-    expect(booking?.status).toBe('CONFIRMED')
+    expect(booking?.status).toBe('PENDING')
     expect(payment?.status).toBe('SUCCESS')
   })
 

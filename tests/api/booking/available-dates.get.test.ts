@@ -1,25 +1,23 @@
 import { describe, expect, it, afterAll } from 'vitest'
 import handler from '~/modules/booking/server/api/booking/available-dates.get'
 import { createApiEvent, expectApiError } from '../helpers'
-import { createTestDoctor, deleteTestDoctor, nextDateWithDayOfWeek } from './helpers'
+import { createTestAdminSchedule, deleteTestAdminSchedule, nextDateWithDayOfWeek } from './helpers'
 
 describe('GET /api/booking/available-dates', () => {
-  let doctorUserId: string | null = null
-  let doctorId: string | null = null
+  const toDeleteSchedules: string[] = []
 
   afterAll(async () => {
-    if (doctorId && doctorUserId) await deleteTestDoctor(doctorId, doctorUserId)
+    await Promise.all(toDeleteSchedules.map((id) => deleteTestAdminSchedule(id)))
   })
 
-  it('returns available dates for a month with availability', async () => {
-    const fixture = await createTestDoctor({
-      dayOfWeek: nextDateWithDayOfWeek(0) ? dayOfWeekOf(nextDateWithDayOfWeek(0)) : 0,
+  it('returns available dates for a month with admin-schedule availability', async () => {
+    const { adminScheduleId } = await createTestAdminSchedule({
+      dayOfWeek: dayOfWeekOf(nextDateWithDayOfWeek(0)),
       startTime: '09:00',
       endTime: '10:00',
       sessionDuration: 60,
     })
-    doctorId = fixture.doctor.id
-    doctorUserId = fixture.user.id
+    toDeleteSchedules.push(adminScheduleId)
 
     const now = new Date()
     const event = createApiEvent({

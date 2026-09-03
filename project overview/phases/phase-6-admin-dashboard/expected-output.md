@@ -28,6 +28,15 @@
 | DELETE | `/api/admin/staff/:id` | STAFF | STAFF DELETE | Deactivate a staff member. |
 | GET | `/api/admin/settings` | STAFF | SETTINGS READ | Fetch platform settings. |
 | PATCH | `/api/admin/settings` | STAFF | SETTINGS UPDATE | Update platform settings. |
+| GET | `/api/admin/schedule` | STAFF | SETTINGS UPDATE | List all AdminSchedule records. |
+| POST | `/api/admin/schedule` | STAFF | SETTINGS UPDATE | Create an AdminSchedule record. |
+| PATCH | `/api/admin/schedule/:id` | STAFF | SETTINGS UPDATE | Update an AdminSchedule record. |
+| DELETE | `/api/admin/schedule/:id` | STAFF | SETTINGS UPDATE | Delete an AdminSchedule record. |
+| GET | `/api/admin/blocked-dates` | STAFF | SETTINGS UPDATE | List all GlobalBlockedDate records. |
+| POST | `/api/admin/blocked-dates` | STAFF | SETTINGS UPDATE | Create a GlobalBlockedDate record. |
+| DELETE | `/api/admin/blocked-dates/:id` | STAFF | SETTINGS UPDATE | Delete a GlobalBlockedDate record. |
+| GET | `/api/admin/bookings/pending` | STAFF | APPOINTMENTS READ | List all PENDING bookings. |
+| PATCH | `/api/admin/bookings/:id/assign` | STAFF | APPOINTMENTS UPDATE | Assign doctor and confirm booking. |
 
 ---
 
@@ -37,7 +46,7 @@
 |---|---|---|---|---|
 | `/admin` | None | `auth` + `staff-only` | None | Redirects to `/admin/overview`. |
 | `/admin/overview` | `AdminLayout` | `auth` + `staff-only` | None | Overview page with stats and recent bookings. |
-| `/admin/appointments` | `AdminLayout` | `auth` + `staff-only` | APPOINTMENTS READ | Master calendar with all bookings. |
+| `/admin/appointments` | `AdminLayout` | `auth` + `staff-only` | APPOINTMENTS READ | Master calendar with all bookings + Pending Bookings tab with doctor assignment. |
 | `/admin/doctors` | `AdminLayout` | `auth` + `staff-only` | DOCTORS READ | Manage doctors page with table and actions. |
 | `/admin/doctors/:id` | `AdminLayout` | `auth` + `staff-only` | DOCTORS READ | Doctor detail page with profile, calendar, and availability. |
 | `/admin/patients` | `AdminLayout` | `auth` + `staff-only` | PATIENTS READ | Manage patients page with table. |
@@ -62,7 +71,7 @@
 
 | File | State | Methods |
 |---|---|---|
-| `modules/admin/composables/useAdminDashboard.ts` | `overview`, `bookings`, `doctors`, `patients`, `payments`, `staff`, `settings`, `isLoading`, `error`, `doctorColors` | `fetchOverview()`, `fetchBookings(filters)`, `fetchDoctors()`, `fetchPatients(search)`, `fetchPayments(filters)`, `fetchStaff()`, `fetchSettings()`, `updateSettings(data)`, `getDoctorColor(doctorId)` |
+| `modules/admin/composables/useAdminDashboard.ts` | `overview`, `bookings`, `pendingBookings`, `doctors`, `patients`, `payments`, `staff`, `settings`, `schedules`, `blockedDates`, `isLoading`, `error`, `doctorColors` | `fetchOverview()`, `fetchBookings(filters)`, `fetchPendingBookings()`, `assignDoctor(bookingId, doctorId)`, `fetchSchedules()`, `createSchedule(data)`, `updateSchedule(id, data)`, `deleteSchedule(id)`, `fetchBlockedDates()`, `createBlockedDate(data)`, `deleteBlockedDate(id)`, `fetchDoctors()`, `fetchPatients(search)`, `fetchPayments(filters)`, `fetchStaff()`, `fetchSettings()`, `updateSettings(data)`, `getDoctorColor(doctorId)` |
 
 ---
 
@@ -86,7 +95,7 @@
 **Reused from Phase 0:**
 - `server/utils/prisma.ts` — `prisma` singleton.
 - `server/utils/auth.ts` — `requireAuth`.
-- `server/utils/email.ts` — `sendEmail`, `doctorWelcomeTemplate`, `bookingCancellationTemplate`.
+- `server/utils/email.ts` — `sendEmail`, `doctorWelcomeTemplate`, `bookingConfirmationTemplate`, `bookingCancellationTemplate`.
 
 ---
 
@@ -103,7 +112,29 @@ None.
 
 ## Database Changes
 
-No schema changes in this phase. Uses existing models:
+New models added in this phase:
+
+**AdminSchedule:**
+- `id`: String (cuid)
+- `dayOfWeek`: Int (0-6)
+- `startTime`: String ("09:00")
+- `endTime`: String ("17:00")
+- `sessionDuration`: Int (minutes, 30/45/60)
+- `isActive`: Boolean (default true)
+- `createdAt`: DateTime
+- `updatedAt`: DateTime
+
+**GlobalBlockedDate:**
+- `id`: String (cuid)
+- `date`: DateTime (@db.Date)
+- `reason`: String? (optional)
+- `createdAt`: DateTime
+
+**Changes to existing models:**
+- `Booking.doctorId`: Changed from required `String` to optional `String?` (nullable — assigned by admin after booking).
+- `BookingStatus` enum: Added `IN_REVIEW` (reserved for future use).
+
+**Also uses existing models:**
 - `User`
 - `Doctor`
 - `Booking`
@@ -122,6 +153,8 @@ No schema changes in this phase. Uses existing models:
 | Doctor account created | Doctor email | `doctorWelcomeTemplate` | `doctorName`, `email`, `temporaryPassword` |
 | Staff account created | Staff email | `doctorWelcomeTemplate` (reused) | `doctorName` (staff name), `email`, `temporaryPassword` |
 | Booking cancelled (by admin) | Patient email | `bookingCancellationTemplate` | `patientName`, `doctorName`, `date`, `time` |
+| Admin assigns doctor and confirms booking | Patient | `bookingConfirmationTemplate` | `patientName`, `doctorName`, `date`, `time`, `service` |
+| Admin assigns doctor and confirms booking | Doctor | `bookingConfirmationTemplate` | `patientName`, `doctorName`, `date`, `time`, `service` |
 
 ---
 
@@ -141,11 +174,12 @@ No schema changes in this phase. Uses existing models:
 - Complete admin dashboard with all pages working:
   - Overview page with accurate stats.
   - Master calendar with all bookings, color-coded by doctor.
+  - Appointments page with Pending Bookings tab and doctor assignment workflow.
   - Doctor management with add/edit/view and availability management.
   - Patient management with view details.
   - Payment management with filters and summaries.
   - Staff management with permission builder.
-  - Settings page with all platform configurations.
+  - Settings page with platform configurations, global schedule, and blocked dates.
 - `AdminLayout` with dynamic sidebar (filtered by permissions).
 - `useAdminDashboard` composable for data management.
 - Permission system fully functional:
@@ -155,4 +189,6 @@ No schema changes in this phase. Uses existing models:
 - Seed admin protected from deactivation.
 - Payment keys always masked in UI and API responses.
 - Doctor availability management from admin panel.
+- Global booking schedule and blocked dates managed by admin — drives patient booking availability.
+- Admin doctor-assignment workflow confirming PENDING bookings and emailing patient + doctor.
 - All pages responsive on mobile.

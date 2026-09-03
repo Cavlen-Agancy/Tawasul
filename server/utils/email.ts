@@ -116,6 +116,22 @@ export function bookingConfirmationTemplate(patientName: string, doctorName: str
 </td></tr>`)
 }
 
+export function bookingReceivedTemplate(patientName: string, date: string, time: string): string {
+  return wrap(`<tr><td style="padding:24px 40px 8px 40px;">
+  <h1 style="margin:0;font-size:22px;font-weight:600;color:${INK};">Hi ${patientName},</h1>
+  <p style="margin:16px 0 0 0;font-size:16px;line-height:1.6;color:#4D4D4D;">We have received your booking request for:</p>
+</td></tr>
+<tr><td style="padding:8px 40px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FAFAFA;border-radius:12px;overflow:hidden;">
+    <tr><td style="padding:16px 24px;font-size:14px;color:#888888;width:120px;">Date</td><td style="padding:16px 24px;font-size:15px;color:${INK};font-weight:500;">${date}</td></tr>
+    <tr><td style="padding:16px 24px;font-size:14px;color:#888888;width:120px;">Time</td><td style="padding:16px 24px;font-size:15px;color:${INK};font-weight:500;">${time}</td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:8px 40px 24px 40px;">
+  <p style="margin:0;font-size:14px;line-height:1.5;color:#4D4D4D;">Our team will review and confirm your session shortly. You will receive a confirmation email with your session details once confirmed.</p>
+</td></tr>`)
+}
+
 export function bookingCancellationTemplate(patientName: string, doctorName: string, date: string, time: string): string {
   return wrap(`<tr><td style="padding:24px 40px 8px 40px;">
   <h1 style="margin:0;font-size:22px;font-weight:600;color:${INK};">Hi ${patientName},</h1>

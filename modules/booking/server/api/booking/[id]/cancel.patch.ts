@@ -63,7 +63,7 @@ export default defineEventHandler(async (event) => {
       subject: 'Your Tawasul Academy session has been cancelled',
       html: bookingCancellationTemplate(
         booking.user.name,
-        booking.doctor.user.name,
+        booking.doctor?.user?.name ?? '',
         formatBookingDate(booking.date),
         `${booking.startTime} – ${booking.endTime}`,
       ),

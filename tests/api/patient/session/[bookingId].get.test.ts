@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import handler from '~/modules/patient/server/api/patient/session/[bookingId].get'
 import { createApiEvent, expectApiError } from '../../helpers'
 import { createPatient, createBookedFixture, deletePatientBookingFixture, deletePatient } from '../helpers'
@@ -16,6 +16,15 @@ function today(): Date {
   return new Date()
 }
 
+// Pin "now" to 13:00 today so in-window fixtures never straddle midnight
+// (a limitation of the start/end string + single-date booking model).
+function useFixedNow() {
+  const d = new Date()
+  const now = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 13, 0, 0, 0).getTime()
+  vi.spyOn(Date, 'now').mockReturnValue(now)
+  return now
+}
+
 interface RoomResponse {
   roomName: string
   jitsiDomain: string
@@ -23,6 +32,7 @@ interface RoomResponse {
 
 describe('GET /api/patient/session/:bookingId', () => {
   it('returns a room within the time window', async () => {
+    useFixedNow()
     const patient = await createPatient({ email: `sess-ok-${Date.now()}@test.com` })
     const start = new Date(Date.now() + 2 * 60 * 1000)
     const end = new Date(start.getTime() + 60 * 60 * 1000)
@@ -48,6 +58,7 @@ describe('GET /api/patient/session/:bookingId', () => {
       const room = await prisma.sessionRoom.findUnique({ where: { bookingId: fixture.bookingId } })
       expect(room?.roomName).toBe(`tawasul-${fixture.bookingId}`)
     } finally {
+      vi.restoreAllMocks()
       await deletePatientBookingFixture(fixture, patient)
     }
   })

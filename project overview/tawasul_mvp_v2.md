@@ -5,6 +5,31 @@
 
 ---
 
+## Architecture Updates — Booking System
+
+> This section documents the correction to the booking architecture. Apply start (Track 2) and be reflected in the phase-3 and phase-6 planning docs.
+
+**Problem:** The original design assumed doctors control their own availability (per-doctor `Availability`/`BlockedSlot`), which wrongly made a patient calendar slot unavailable unless a doctor was pre-assigned.
+
+**Correct business model:** The Admin controls the global schedule; a patient slot is available as long as it exists on the global `AdminSchedule` and is not globally blocked. A doctor is assigned only AFTER the patient books.
+
+**Changes:**
+
+1. **Add `AdminSchedule`** (global schedule, admin-controlled): `{ id, dayOfWeek (0-6), startTime, endTime, sessionDuration, isActive, createdAt, updatedAt }`.
+2. **Add `GlobalBlockedDate`** (admin-controlled date blocks): `{ id, date (@db.Date), reason?, createdAt }`.
+3. **Make `Booking.doctorId` nullable** — a booking is created without a doctor and stays `PENDING` until the admin assigns one.
+4. **Add `IN_REVIEW` to `BookingStatus` enum** (reserved for future use; current statuses `PENDING | CONFIRMED | CANCELLED`).
+
+**New flow:** Patient selects slot from global schedule → `PENDING` after payment → Admin assigns a doctor → `CONFIRMED` → patient and doctor receive confirmation emails.
+
+**Availability logic:** New `server/utils/admin-availability.ts` with `getAdminAvailableSlots(date)` and `getAdminAvailableDates(month, year)`, reading from `AdminSchedule`/`GlobalBlockedDate` — NOT from doctor `Availability`. The `Availability` model remains in the schema for doctor calendar display (Phase 5) but is not used in the booking flow.
+
+**Phase changes:**
+- Phase 3 (Booking): booking is created without `doctorId`, stays PENDING after payment, sends a "booking received" acknowledgment email (not a confirmation).
+- Phase 6 (Admin): new schedule management, blocked dates, and booking assignment workflow (view pending bookings, assign doctor, send confirmation emails).
+
+---
+
 ## What We Are Building
 
 A mental health counseling platform where patients book online sessions, pay, and join video calls with doctors. The admin manages everything from a central dashboard with a flexible permission system.

@@ -36,7 +36,6 @@ export const availableSlotsQuerySchema = z.object({
 export const createBookingSchema = z.object({
   date: z.string().regex(dateRegex, 'Invalid date format'),
   startTime: z.string().regex(timeRegex, 'Invalid time format'),
-  doctorId: z.string().min(1, 'Doctor is required'),
 })
 
 export const initiatePaymentSchema = z.object({
@@ -50,6 +49,29 @@ export const patientProfileSchema = z.object({
 
 export const patientAppointmentsQuerySchema = z.object({
   tab: z.enum(['upcoming', 'past', 'all']).optional().default('upcoming'),
+})
+
+export const scheduleSchema = z.object({
+  dayOfWeek: z.number().int().min(0).max(6),
+  startTime: z.string().regex(timeRegex, 'Invalid time format'),
+  endTime: z.string().regex(timeRegex, 'Invalid time format'),
+  sessionDuration: z.number().int().refine((n) => [30, 45, 60].includes(n), 'sessionDuration must be 30, 45, or 60'),
+})
+
+export const scheduleUpdateSchema = z.object({
+  startTime: z.string().regex(timeRegex, 'Invalid time format').optional(),
+  endTime: z.string().regex(timeRegex, 'Invalid time format').optional(),
+  sessionDuration: z.number().int().refine((n) => [30, 45, 60].includes(n), 'sessionDuration must be 30, 45, or 60').optional(),
+  isActive: z.boolean().optional(),
+})
+
+export const blockedDateSchema = z.object({
+  date: z.string().regex(dateRegex, 'Invalid date format'),
+  reason: z.string().max(255).optional().or(z.literal('')),
+})
+
+export const assignDoctorSchema = z.object({
+  doctorId: z.string().min(1, 'Doctor ID is required'),
 })
 
 /**

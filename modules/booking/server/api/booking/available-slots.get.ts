@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery, createError } from 'h3'
-import { getAvailableSlots } from '~/server/utils/availability'
+import { getAdminAvailableSlots } from '~/server/utils/admin-availability'
 import { availableSlotsQuerySchema } from '~/server/utils/validation'
 
 export default defineEventHandler(async (event) => {
@@ -9,6 +9,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Invalid date format' })
   }
 
-  const slots = await getAvailableSlots(parsed.data.date)
+  const slots = await getAdminAvailableSlots(parsed.data.date)
   return { slots }
 })

@@ -1,10 +1,7 @@
 import { defineEventHandler, getRouterParam, createError } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requireAuth } from '~/server/utils/auth'
-import { parseISODate } from '~/server/utils/availability'
-
-const OPEN_EARLY_MIN = 5
-const OPEN_LATE_MIN = 15
+import { canJoinMeetingAt, meetingWindow } from '~/server/utils/meeting'
 
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event, ['PATIENT'])
@@ -32,17 +29,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const now = Date.now()
-  const sessionStart = parseISODate(booking.date.toISOString().slice(0, 10))
-  const [sh, sm] = booking.startTime.split(':').map((p) => parseInt(p, 10))
-  const [eh, em] = booking.endTime.split(':').map((p) => parseInt(p, 10))
-  sessionStart.setHours(sh || 0, sm || 0, 0, 0)
-  const sessionEnd = new Date(sessionStart)
-  sessionEnd.setHours(eh || 0, em || 0, 0, 0)
-
-  const openAt = sessionStart.getTime() - OPEN_EARLY_MIN * 60 * 1000
-  const closeAt = sessionEnd.getTime() + OPEN_LATE_MIN * 60 * 1000
-
-  if (now < openAt || now > closeAt) {
+  if (!canJoinMeetingAt(booking, now)) {
     throw createError({ statusCode: 403, message: 'Session is not available at this time' })
   }
 
@@ -50,6 +37,7 @@ export default defineEventHandler(async (event) => {
 
   let room = booking.sessionRoom
   if (!room) {
+    const { closeAt } = meetingWindow(booking)
     const expiresAt = new Date(closeAt)
     const roomName = `tawasul-${bookingId}`
     room = await prisma.sessionRoom.upsert({
