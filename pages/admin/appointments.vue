@@ -23,7 +23,9 @@ const {
   loading,
   error,
   fetchAll,
-  updateBookingStatus,
+  fetchActiveDoctors,
+  fetchPendingBookings,
+  fetchBookings,
   assignDoctor,
 } = useAdminDashboard()
 const { toast } = useToast()
@@ -126,10 +128,11 @@ function formatDateTime(dateISO: string, time: string): string {
   return `${d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · ${formatTime(time)}`
 }
 
-function openAssign(booking: AdminBooking) {
+async function openAssign(booking: AdminBooking) {
   assignTarget.value = booking
   selectedDoctorId.value = ''
   assignDialogOpen.value = true
+  await fetchActiveDoctors()
 }
 
 async function confirmAssign() {
@@ -141,22 +144,12 @@ async function confirmAssign() {
       toast({ title: 'Doctor assigned', variant: 'success' })
       assignDialogOpen.value = false
       assignTarget.value = null
+      await Promise.all([fetchPendingBookings(), fetchBookings()])
     }
   } catch {
     toast({ title: 'Could not assign doctor', variant: 'destructive' })
   } finally {
     assigning.value = false
-  }
-}
-
-async function actionFor(booking: AdminBooking, action: 'CONFIRM' | 'CANCEL') {
-  const confirmed = action === 'CONFIRM'
-  const ok = await updateBookingStatus(booking.id, confirmed ? 'CONFIRMED' : 'CANCELLED')
-  if (ok) {
-    toast({
-      title: confirmed ? 'Booking confirmed' : 'Booking cancelled',
-      variant: confirmed ? 'success' : 'destructive',
-    })
   }
 }
 
@@ -263,8 +256,6 @@ onMounted(() => {
                     <UserCheck class="size-4" />
                     Assign Doctor
                   </Button>
-                  <Button variant="outline" size="sm" @click="actionFor(booking, 'CANCEL')">Decline</Button>
-                  <Button variant="ghost" size="sm" @click="actionFor(booking, 'CONFIRM')">Confirm</Button>
                 </div>
               </div>
             </div>
@@ -283,7 +274,11 @@ onMounted(() => {
             </DialogDescription>
           </DialogHeader>
 
-          <div v-if="activeDoctors.length === 0" class="text-sm text-muted-foreground">
+          <div v-if="assigning && activeDoctors.length === 0" class="text-sm text-muted-foreground">
+            Loading doctors…
+          </div>
+
+          <div v-else-if="activeDoctors.length === 0" class="text-sm text-muted-foreground">
             No active doctors available. Add doctors before assigning bookings.
           </div>
 

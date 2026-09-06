@@ -1,5 +1,13 @@
 import type { AdminBooking, AdminDoctor, AdminSchedule, BlockedDate, PendingBooking } from './types'
 
+function formatDateISO(d: Date | string): string {
+  const date = typeof d === 'string' ? new Date(d) : d
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export function useAdminDashboard() {
   const schedules = ref<AdminSchedule[]>([])
   const blockedDates = ref<BlockedDate[]>([])
@@ -44,16 +52,16 @@ export function useAdminDashboard() {
   }
 
   async function fetchSchedules() {
-    const data = await unwrap(() => $fetch<AdminSchedule[]>('/api/admin/schedules'))
-    if (data) schedules.value = data
+    const data = await unwrap(() => $fetch<{ schedules: AdminSchedule[] }>('/api/admin/schedule'))
+    if (data) schedules.value = data.schedules
   }
 
   async function addSchedule(input: Omit<AdminSchedule, 'id'>): Promise<boolean> {
     const data = await unwrap(() =>
-      $fetch<AdminSchedule>('/api/admin/schedules', { method: 'POST', body: input }),
+      $fetch<{ schedule: AdminSchedule }>('/api/admin/schedule', { method: 'POST', body: input }),
     )
-    if (data) {
-      schedules.value = [...schedules.value, data]
+    if (data?.schedule) {
+      schedules.value = [...schedules.value, data.schedule]
       return true
     }
     return false
@@ -61,10 +69,10 @@ export function useAdminDashboard() {
 
   async function updateSchedule(id: string, input: Partial<AdminSchedule>): Promise<boolean> {
     const data = await unwrap(() =>
-      $fetch<AdminSchedule>(`/api/admin/schedules/${id}`, { method: 'PATCH', body: input }),
+      $fetch<{ schedule: AdminSchedule }>(`/api/admin/schedule/${id}`, { method: 'PATCH', body: input }),
     )
-    if (data) {
-      schedules.value = schedules.value.map((s) => (s.id === id ? { ...s, ...data } : s))
+    if (data?.schedule) {
+      schedules.value = schedules.value.map((s) => (s.id === id ? { ...s, ...data.schedule } : s))
       return true
     }
     return false
@@ -72,9 +80,9 @@ export function useAdminDashboard() {
 
   async function deleteSchedule(id: string): Promise<boolean> {
     const data = await unwrap(() =>
-      $fetch<{ ok: true }>(`/api/admin/schedules/${id}`, { method: 'DELETE' }),
+      $fetch<{ ok: true }>(`/api/admin/schedule/${id}`, { method: 'DELETE' }),
     )
-    if (data) {
+    if (data?.ok) {
       schedules.value = schedules.value.filter((s) => s.id !== id)
       return true
     }
@@ -82,16 +90,32 @@ export function useAdminDashboard() {
   }
 
   async function fetchBlockedDates() {
-    const data = await unwrap(() => $fetch<BlockedDate[]>('/api/admin/blocked-dates'))
-    if (data) blockedDates.value = data
+    const data = await unwrap(() => $fetch<{ blockedDates: Array<{ id: string; date: Date | string; reason: string | null }> }>('/api/admin/blocked-dates'))
+    if (data) {
+      blockedDates.value = data.blockedDates.map((b) => ({
+        id: b.id,
+        date: formatDateISO(b.date),
+        reason: b.reason,
+      }))
+    }
   }
 
   async function blockDate(input: { date: string; reason?: string | null }): Promise<boolean> {
     const data = await unwrap(() =>
-      $fetch<BlockedDate>('/api/admin/blocked-dates', { method: 'POST', body: input }),
+      $fetch<{ blockedDate: { id: string; date: Date | string; reason: string | null } }>('/api/admin/blocked-dates', {
+        method: 'POST',
+        body: input,
+      }),
     )
-    if (data) {
-      blockedDates.value = [...blockedDates.value, data]
+    if (data?.blockedDate) {
+      blockedDates.value = [
+        ...blockedDates.value,
+        {
+          id: data.blockedDate.id,
+          date: formatDateISO(data.blockedDate.date),
+          reason: data.blockedDate.reason,
+        },
+      ]
       return true
     }
     return false
@@ -101,7 +125,7 @@ export function useAdminDashboard() {
     const data = await unwrap(() =>
       $fetch<{ ok: true }>(`/api/admin/blocked-dates/${id}`, { method: 'DELETE' }),
     )
-    if (data) {
+    if (data?.ok) {
       blockedDates.value = blockedDates.value.filter((b) => b.id !== id)
       return true
     }
@@ -110,22 +134,25 @@ export function useAdminDashboard() {
 
   async function fetchPendingBookings() {
     const data = await unwrap(() =>
-      $fetch<PendingBooking[]>('/api/admin/pending-bookings', { query: { status: 'PENDING' } }),
+      $fetch<{ bookings: PendingBooking[] }>('/api/admin/bookings/pending'),
     )
-    if (data) pendingBookings.value = data
+    if (data) pendingBookings.value = data.bookings ?? []
   }
 
   async function fetchBookings() {
-    const data = await unwrap(() => $fetch<AdminBooking[]>('/api/admin/bookings'))
-    if (data) bookings.value = data
+    const data = await unwrap(() => $fetch<{ bookings: AdminBooking[] }>('/api/admin/bookings'))
+    if (data) bookings.value = data.bookings ?? []
   }
 
-  async function updateBookingStatus(id: string, status: string): Promise<boolean> {
+  async function updateBookingStatus(id: string, status: 'CONFIRMED' | 'CANCELLED'): Promise<boolean> {
     const data = await unwrap(() =>
-      $fetch<{ ok: true }>(`/api/admin/bookings/${id}/status`, { method: 'PATCH', body: { status } }),
+      $fetch<{ booking: AdminBooking }>(`/api/admin/bookings/${id}/status`, {
+        method: 'PATCH',
+        body: { status },
+      }),
     )
-    if (data) {
-      bookings.value = bookings.value.map((b) => (b.id === id ? { ...b, status } : b))
+    if (data?.booking) {
+      bookings.value = bookings.value.map((b) => (b.id === id ? { ...b, ...data.booking } : b))
       pendingBookings.value = pendingBookings.value.filter((b) => b.id !== id)
       return true
     }
@@ -134,21 +161,24 @@ export function useAdminDashboard() {
 
   async function assignDoctor(bookingId: string, doctorId: string): Promise<boolean> {
     const data = await unwrap(() =>
-      $fetch<{ ok: true }>(`/api/admin/bookings/${bookingId}/assign`, {
-        method: 'POST',
-        body: { doctorId },
-      }),
+      $fetch<{ booking: { id: string; doctorId: string | null; status: string } }>(
+        `/api/admin/bookings/${bookingId}/assign`,
+        { method: 'PATCH', body: { doctorId } },
+      ),
     )
-    if (data) {
+    if (data?.booking) {
       pendingBookings.value = pendingBookings.value.filter((b) => b.id !== bookingId)
+      bookings.value = bookings.value.map((b) =>
+        b.id === bookingId ? { ...b, doctorId: data.booking.doctorId, status: data.booking.status } : b,
+      )
       return true
     }
     return false
   }
 
   async function fetchActiveDoctors() {
-    const data = await unwrap(() => $fetch<AdminDoctor[]>('/api/admin/doctors?active=true'))
-    if (data) activeDoctors.value = data
+    const data = await unwrap(() => $fetch<{ doctors: AdminDoctor[] }>('/api/admin/doctors?active=true'))
+    if (data) activeDoctors.value = data.doctors ?? []
   }
 
   return {

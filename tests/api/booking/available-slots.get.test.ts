@@ -51,7 +51,10 @@ describe('GET /api/booking/available-slots', () => {
   })
 
   it('returns empty slots for a date with no availability', async () => {
-    const farDate = '2099-01-01'
+    // Saturday far in the future — the seeded Mon-Fri admin schedule does not
+    // cover it, so there is genuinely no availability. Using a weekday here
+    // would be affected by any pre-seeded global schedule rows.
+    const farDate = '2099-01-03'
     const event = createApiEvent({
       method: 'GET',
       url: `/api/booking/available-slots?date=${farDate}`,
@@ -82,8 +85,10 @@ describe('GET /api/booking/available-slots', () => {
   })
 
   it('returns empty slots on a public holiday even with a schedule', async () => {
-    // 2027-01-07 is Coptic Christmas (a fixed holiday) and lies in the future.
-    const holidayDate = '2027-01-07'
+    // 2027-06-05 is Islamic New Year (a fixed holiday) on a Saturday. It lies in
+    // the future and falls OUTSIDE the seeded Mon-Fri admin schedule, so this test
+    // creates its own weekend schedule row without clobbering seed weekdays.
+    const holidayDate = '2027-06-05'
     const { adminScheduleId } = await createTestAdminSchedule({
       dayOfWeek: new Date(`${holidayDate}T00:00:00`).getDay(),
       startTime: '09:00',

@@ -9,7 +9,7 @@ import { createTestAdminSchedule, deleteTestAdminSchedule } from '../booking/hel
 
 const toDeleteUsers: string[] = []
 const toDeleteBookings: string[] = []
-const toDeleteDoctors: Array<{ doctorId: string; userId: string }> = []
+const toDeleteDoctors: Array<{ user: { id: string }; doctor: { id: string } }> = []
 const toDeleteSchedules: string[] = []
 
 function staffContext(userId: string) {
@@ -42,7 +42,7 @@ async function createPendingBooking(): Promise<{ bookingId: string; ownerId: str
 
 afterAll(async () => {
   await Promise.all(toDeleteBookings.map((id) => deleteTestBooking(id)))
-  await Promise.all(toDeleteDoctors.map((d) => deleteTestAdminDoctor(d.doctorId, d.userId)))
+  await Promise.all(toDeleteDoctors.map((d) => deleteTestAdminDoctor(d.doctor.id, d.user.id)))
   await Promise.all(toDeleteSchedules.map((id) => deleteTestAdminSchedule(id)))
   await Promise.all(toDeleteUsers.map((id) => deleteTestUser(id)))
 })

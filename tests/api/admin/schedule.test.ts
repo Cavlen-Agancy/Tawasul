@@ -28,8 +28,9 @@ describe('GET /api/admin/schedule', () => {
     })
     toDeleteStaff.push(staff.id)
 
+    await prisma.adminSchedule.deleteMany({ where: { dayOfWeek: 6 } })
     const schedule = await prisma.adminSchedule.create({
-      data: { dayOfWeek: 1, startTime: '09:00', endTime: '17:00', sessionDuration: 60 },
+      data: { dayOfWeek: 6, startTime: '09:00', endTime: '17:00', sessionDuration: 60 },
     })
     toDeleteSchedules.push(schedule.id)
 
@@ -66,14 +67,15 @@ describe('POST /api/admin/schedule', () => {
     })
     toDeleteStaff.push(staff.id)
 
+    await prisma.adminSchedule.deleteMany({ where: { dayOfWeek: 0 } })
     const event = createApiEvent({
       method: 'POST',
       url: '/api/admin/schedule',
       context: staffContext(staff.id),
-      body: { dayOfWeek: 2, startTime: '09:00', endTime: '17:00', sessionDuration: 30 },
+      body: { dayOfWeek: 0, startTime: '09:00', endTime: '17:00', sessionDuration: 30 },
     })
     const res = await postHandler(event) as { schedule: { id: string; dayOfWeek: number; sessionDuration: number } }
-    expect(res.schedule.dayOfWeek).toBe(2)
+    expect(res.schedule.dayOfWeek).toBe(0)
     expect(res.schedule.sessionDuration).toBe(30)
     toDeleteSchedules.push(res.schedule.id)
   })
@@ -171,8 +173,9 @@ describe('PATCH /api/admin/schedule/:id', () => {
       permissions: [{ resource: 'SETTINGS', action: 'UPDATE' }],
     })
     toDeleteStaff.push(staff.id)
+    await prisma.adminSchedule.deleteMany({ where: { dayOfWeek: 6 } })
     const schedule = await prisma.adminSchedule.create({
-      data: { dayOfWeek: 4, startTime: '09:00', endTime: '17:00', sessionDuration: 60 },
+      data: { dayOfWeek: 6, startTime: '09:00', endTime: '17:00', sessionDuration: 60 },
     })
     toDeleteSchedules.push(schedule.id)
 
@@ -197,8 +200,9 @@ describe('DELETE /api/admin/schedule/:id', () => {
       permissions: [{ resource: 'SETTINGS', action: 'UPDATE' }],
     })
     toDeleteStaff.push(staff.id)
+    await prisma.adminSchedule.deleteMany({ where: { dayOfWeek: 0 } })
     const schedule = await prisma.adminSchedule.create({
-      data: { dayOfWeek: 5, startTime: '09:00', endTime: '17:00', sessionDuration: 45 },
+      data: { dayOfWeek: 0, startTime: '09:00', endTime: '17:00', sessionDuration: 45 },
     })
 
     const event = createApiEvent({

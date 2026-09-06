@@ -45,11 +45,13 @@ describe('POST /api/booking/create', () => {
     const patient = await createTestUser({ emailVerified: true, email: `create-unavail-${Date.now()}@test.com` })
     toDeleteUsers.push(patient.id)
 
+    // 2099-01-03 is a Saturday, outside the seeded Mon-Fri admin schedule, so no
+    // slot ever exists for it and the handler rejects the booking as unavailable.
     const event = createApiEvent({
       method: 'POST',
       url: '/api/booking/create',
       context: { user: { userId: patient.id, email: patient.email, accountType: 'PATIENT' } },
-      body: { date: '2099-01-01', startTime: '09:00' },
+      body: { date: '2099-01-03', startTime: '09:00' },
     })
 
     try {

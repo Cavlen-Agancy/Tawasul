@@ -28,7 +28,12 @@ export interface PendingBooking {
 export interface AdminDoctor {
   id: string
   name: string
+  email?: string
+  phone?: string
+  photo?: string
+  specializations?: string[]
   isActive: boolean
+  slug?: string
 }
 
 export interface AdminBooking {

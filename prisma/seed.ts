@@ -53,6 +53,36 @@ async function main() {
   })
   console.log('✓ Admin account created')
 
+  // Grant the full permission set to the admin so every admin API is authorized.
+  const adminUser = await prisma.user.findUnique({ where: { email } })
+  const adminPermissions = [
+    'APPOINTMENTS:READ',
+    'APPOINTMENTS:UPDATE',
+    'APPOINTMENTS:DELETE',
+    'PATIENTS:READ',
+    'DOCTORS:CREATE',
+    'DOCTORS:READ',
+    'DOCTORS:UPDATE',
+    'PAYMENTS:READ',
+    'SETTINGS:READ',
+    'SETTINGS:UPDATE',
+    'STAFF:CREATE',
+    'STAFF:READ',
+    'STAFF:UPDATE',
+    'STAFF:DELETE',
+  ]
+  if (adminUser) {
+    for (const perm of adminPermissions) {
+      const [resource, action] = perm.split(':')
+      await prisma.permission.upsert({
+        where: { userId_resource_action: { userId: adminUser.id, resource, action } },
+        create: { userId: adminUser.id, resource, action },
+        update: {},
+      })
+    }
+    console.log(`✓ Admin permissions granted (${adminPermissions.length})`)
+  }
+
   // Seed default global booking schedule (Mon-Fri, 09:00-17:00, 60 min sessions),
   // matching the Settings default working hours. Admin can adjust via the admin panel.
   const seedSchedules = [1, 2, 3, 4, 5].map((dayOfWeek) => ({
