@@ -27,8 +27,13 @@ const {
   fetchPendingBookings,
   fetchBookings,
   assignDoctor,
+  cancelBooking,
 } = useAdminDashboard()
 const { toast } = useToast()
+const { hasPermission } = useAuth()
+
+const canAssign = computed(() => hasPermission('APPOINTMENTS', 'UPDATE'))
+const canDelete = computed(() => hasPermission('APPOINTMENTS', 'DELETE'))
 
 const activeTab = ref('calendar')
 const calendarKey = ref(0)
@@ -39,6 +44,10 @@ const assignTarget = ref<AdminBooking | null>(null)
 const assignDialogOpen = ref(false)
 const selectedDoctorId = ref<string>('')
 const assigning = ref(false)
+
+const detailTarget = ref<AdminBooking | null>(null)
+const detailOpen = ref(false)
+const cancelling = ref(false)
 
 function toISODate(date: Date): string {
   const y = date.getFullYear()
@@ -92,7 +101,7 @@ const calendarOptions = computed(() => ({
   events: bookingEvents.value,
   eventClick: (info: { event: { id: string } }) => {
     const booking = eventIndex.value[info.event.id]
-    if (booking) openAssign(booking)
+    if (booking) void openDetail(booking)
   },
 }))
 
@@ -135,6 +144,33 @@ async function openAssign(booking: AdminBooking) {
   await fetchActiveDoctors()
 }
 
+async function openDetail(booking: AdminBooking) {
+  detailTarget.value = booking
+  selectedDoctorId.value = ''
+  detailOpen.value = true
+  if (booking.status === 'PENDING' && canAssign.value) {
+    await fetchActiveDoctors()
+  }
+}
+
+async function confirmCancel() {
+  if (!detailTarget.value) return
+  cancelling.value = true
+  try {
+    const ok = await cancelBooking(detailTarget.value.id)
+    if (ok) {
+      toast({ title: 'Booking cancelled', variant: 'success' })
+      detailOpen.value = false
+      detailTarget.value = null
+      await Promise.all([fetchPendingBookings(), fetchBookings()])
+    }
+  } catch {
+    toast({ title: 'Could not cancel booking', variant: 'destructive' })
+  } finally {
+    cancelling.value = false
+  }
+}
+
 async function confirmAssign() {
   if (!assignTarget.value || !selectedDoctorId.value) return
   assigning.value = true
@@ -151,6 +187,14 @@ async function confirmAssign() {
   } finally {
     assigning.value = false
   }
+}
+
+async function confirmDetailAssign() {
+  if (!detailTarget.value || !selectedDoctorId.value) return
+  assignTarget.value = detailTarget.value
+  await confirmAssign()
+  detailOpen.value = false
+  detailTarget.value = null
 }
 
 onMounted(() => {
@@ -303,6 +347,77 @@ onMounted(() => {
             <Button variant="outline" @click="assignDialogOpen = false">Cancel</Button>
             <Button :disabled="!selectedDoctorId || assigning" data-testid="assign-confirm" @click="confirmAssign">
               {{ assigning ? 'Assigning…' : 'Assign' }}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Teleport>
+
+    <Teleport to="body">
+      <Dialog v-model:open="detailOpen">
+        <DialogContent class="max-w-md" data-testid="booking-detail-dialog">
+          <DialogHeader>
+            <DialogTitle>Booking details</DialogTitle>
+            <DialogDescription v-if="detailTarget">
+              {{ detailTarget.patientName }} · {{ formatDateTime(detailTarget.date, detailTarget.startTime) }}
+            </DialogDescription>
+          </DialogHeader>
+
+          <dl v-if="detailTarget" class="grid gap-2 text-sm">
+            <div class="flex justify-between gap-4">
+              <dt class="text-muted-foreground">Patient</dt>
+              <dd class="font-medium text-foreground">{{ detailTarget.patientName }} ({{ detailTarget.patientEmail }})</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-muted-foreground">Doctor</dt>
+              <dd class="font-medium text-foreground">{{ detailTarget.doctorName || 'Unassigned' }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-muted-foreground">Service</dt>
+              <dd class="font-medium text-foreground">{{ detailTarget.service }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-muted-foreground">Status</dt>
+              <dd><Badge>{{ detailTarget.status }}</Badge></dd>
+            </div>
+          </dl>
+
+          <div v-if="detailTarget?.status === 'PENDING' && canAssign">
+            <label class="mb-1.5 block text-sm font-medium text-foreground" for="detail-doctor-select">
+              Assign a doctor
+            </label>
+            <div class="flex gap-2">
+              <select
+                id="detail-doctor-select"
+                v-model="selectedDoctorId"
+                class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                data-testid="detail-assign-doctor-select"
+              >
+                <option value="" disabled>Select a doctor…</option>
+                <option v-for="doctor in activeDoctors" :key="doctor.id" :value="doctor.id">
+                  {{ doctor.name }}
+                </option>
+              </select>
+              <Button
+                :disabled="!selectedDoctorId || assigning"
+                data-testid="detail-assign-confirm"
+                @click="confirmDetailAssign"
+              >
+                {{ assigning ? 'Assigning…' : 'Assign' }}
+              </Button>
+            </div>
+          </div>
+
+          <DialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" @click="detailOpen = false">Close</Button>
+            <Button
+              v-if="detailTarget && detailTarget.status !== 'CANCELLED' && canDelete"
+              variant="destructive"
+              :disabled="cancelling"
+              data-testid="cancel-booking"
+              @click="confirmCancel"
+            >
+              {{ cancelling ? 'Cancelling…' : 'Cancel Booking' }}
             </Button>
           </DialogFooter>
         </DialogContent>

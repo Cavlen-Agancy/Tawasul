@@ -1,11 +1,19 @@
 <script setup lang="ts">
-import { CalendarDays, LayoutDashboard, LogOut, Menu as MenuIcon, Settings } from 'lucide-vue-next'
+import { CalendarDays, CreditCard, LayoutDashboard, LogOut, Menu as MenuIcon, Settings, Stethoscope, Users, UserCog } from 'lucide-vue-next'
 
-const { logout, user } = useAuth()
+const { logout, user, hasPermission } = useAuth()
 const route = useRoute()
 const mobileNavOpen = ref(false)
 
-const navItems = [
+interface NavItem {
+  label: string
+  to: string
+  icon: unknown
+  dataTestId: string
+  resource?: string
+}
+
+const navItems: NavItem[] = [
   {
     label: 'Overview',
     to: '/admin',
@@ -13,18 +21,52 @@ const navItems = [
     dataTestId: 'nav-admin-overview',
   },
   {
-    label: 'Appointments',
+    label: 'All Appointments',
     to: '/admin/appointments',
     icon: CalendarDays,
     dataTestId: 'nav-admin-appointments',
+    resource: 'APPOINTMENTS',
+  },
+  {
+    label: 'Manage Doctors',
+    to: '/admin/doctors',
+    icon: Stethoscope,
+    dataTestId: 'nav-admin-doctors',
+    resource: 'DOCTORS',
+  },
+  {
+    label: 'Manage Patients',
+    to: '/admin/patients',
+    icon: Users,
+    dataTestId: 'nav-admin-patients',
+    resource: 'PATIENTS',
+  },
+  {
+    label: 'Manage Payments',
+    to: '/admin/payments',
+    icon: CreditCard,
+    dataTestId: 'nav-admin-payments',
+    resource: 'PAYMENTS',
+  },
+  {
+    label: 'Manage Staff',
+    to: '/admin/staff',
+    icon: UserCog,
+    dataTestId: 'nav-admin-staff',
+    resource: 'STAFF',
   },
   {
     label: 'Settings',
     to: '/admin/settings',
     icon: Settings,
     dataTestId: 'nav-admin-settings',
+    resource: 'SETTINGS',
   },
 ]
+
+const visibleNavItems = computed(() =>
+  navItems.filter((item) => !item.resource || hasPermission(item.resource, 'READ')),
+)
 
 const isActive = (to: string) => route.path.startsWith(to)
 </script>
@@ -41,7 +83,7 @@ const isActive = (to: string) => route.path.startsWith(to)
 
         <nav class="flex-1 space-y-1 p-4" aria-label="Admin dashboard">
           <NuxtLink
-            v-for="item in navItems"
+            v-for="item in visibleNavItems"
             :key="item.to"
             :to="item.to"
             :data-testid="item.dataTestId"
@@ -97,7 +139,7 @@ const isActive = (to: string) => route.path.startsWith(to)
 
       <nav v-if="mobileNavOpen" class="flex flex-col gap-1 border-b border-border bg-white px-4 py-4 lg:hidden">
         <NuxtLink
-          v-for="item in navItems"
+          v-for="item in visibleNavItems"
           :key="item.to"
           :to="item.to"
           :data-testid="`mobile-${item.dataTestId}`"
@@ -125,7 +167,7 @@ const isActive = (to: string) => route.path.startsWith(to)
 
       <nav class="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-white py-2 lg:hidden">
         <NuxtLink
-          v-for="item in navItems"
+          v-for="item in visibleNavItems"
           :key="item.to"
           :to="item.to"
           :data-testid="`mobile-${item.dataTestId}`"

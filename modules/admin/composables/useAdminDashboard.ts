@@ -1,4 +1,4 @@
-import type { AdminBooking, AdminDoctor, AdminSchedule, BlockedDate, PendingBooking } from './types'
+import type { AdminBooking, AdminDoctor, AdminDoctorDetail, AvailabilitySlot, BlockedSlot, AdminPayment, PaymentsSummary, AdminStaffMember, AdminPatient, AdminPatientDetail, AdminSettings, AdminOverview, AdminSchedule, BlockedDate, PendingBooking } from './types'
 
 function formatDateISO(d: Date | string): string {
   const date = typeof d === 'string' ? new Date(d) : d
@@ -14,6 +14,17 @@ export function useAdminDashboard() {
   const pendingBookings = ref<PendingBooking[]>([])
   const activeDoctors = ref<AdminDoctor[]>([])
   const bookings = ref<AdminBooking[]>([])
+  const doctors = ref<AdminDoctor[]>([])
+  const currentDoctor = ref<AdminDoctorDetail | null>(null)
+  const doctorAvailability = ref<AvailabilitySlot[]>([])
+  const doctorBlockedSlots = ref<BlockedSlot[]>([])
+  const payments = ref<AdminPayment[]>([])
+  const paymentsSummary = ref<PaymentsSummary>({ totalRevenue: 0, totalRevenueThisMonth: 0, totalRefunded: 0 })
+  const staff = ref<AdminStaffMember[]>([])
+  const patients = ref<AdminPatient[]>([])
+  const currentPatient = ref<AdminPatientDetail | null>(null)
+  const settings = ref<AdminSettings | null>(null)
+  const overview = ref<AdminOverview | null>(null)
 
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -139,20 +150,21 @@ export function useAdminDashboard() {
     if (data) pendingBookings.value = data.bookings ?? []
   }
 
-  async function fetchBookings() {
-    const data = await unwrap(() => $fetch<{ bookings: AdminBooking[] }>('/api/admin/bookings'))
+  async function fetchBookings(filters: Record<string, string> = {}) {
+    const data = await unwrap(() =>
+      $fetch<{ bookings: AdminBooking[] }>('/api/admin/bookings', { query: filters }),
+    )
     if (data) bookings.value = data.bookings ?? []
   }
 
-  async function updateBookingStatus(id: string, status: 'CONFIRMED' | 'CANCELLED'): Promise<boolean> {
+  async function cancelBooking(id: string): Promise<boolean> {
     const data = await unwrap(() =>
-      $fetch<{ booking: AdminBooking }>(`/api/admin/bookings/${id}/status`, {
+      $fetch<{ message: string }>(`/api/admin/bookings/${id}/cancel`, {
         method: 'PATCH',
-        body: { status },
       }),
     )
-    if (data?.booking) {
-      bookings.value = bookings.value.map((b) => (b.id === id ? { ...b, ...data.booking } : b))
+    if (data) {
+      bookings.value = bookings.value.map((b) => (b.id === id ? { ...b, status: 'CANCELLED' } : b))
       pendingBookings.value = pendingBookings.value.filter((b) => b.id !== id)
       return true
     }
@@ -181,6 +193,198 @@ export function useAdminDashboard() {
     if (data) activeDoctors.value = data.doctors ?? []
   }
 
+  async function fetchDoctors() {
+    const data = await unwrap(() => $fetch<{ doctors: AdminDoctor[] }>('/api/admin/doctors'))
+    if (data) doctors.value = data.doctors ?? []
+  }
+
+  async function fetchDoctor(id: string): Promise<AdminDoctorDetail | null> {
+    const data = await unwrap(() => $fetch<AdminDoctorDetail>(`/api/admin/doctors/${id}`))
+    if (data) {
+      currentDoctor.value = data
+      doctorAvailability.value = data.availability ?? []
+      doctorBlockedSlots.value = data.blockedSlots ?? []
+      return data
+    }
+    return null
+  }
+
+  async function createDoctor(input: { name: string; email: string; phone?: string; bio?: string; specializations?: string[] }): Promise<boolean> {
+    const data = await unwrap(() =>
+      $fetch<{ id: string }>('/api/admin/doctors', { method: 'POST', body: input }),
+    )
+    if (data) {
+      await fetchDoctors()
+      return true
+    }
+    return false
+  }
+
+  async function updateDoctor(id: string, input: Record<string, unknown>): Promise<boolean> {
+    const data = await unwrap(() =>
+      $fetch<AdminDoctorDetail>(`/api/admin/doctors/${id}`, { method: 'PATCH', body: input }),
+    )
+    if (data) {
+      doctors.value = doctors.value.map((d) => (d.id === id ? { ...d, ...data } : d))
+      if (currentDoctor.value?.id === id) {
+        currentDoctor.value = { ...currentDoctor.value, ...data }
+      }
+      return true
+    }
+    return false
+  }
+
+  async function fetchAvailability(id: string) {
+    const data = await unwrap(() =>
+      $fetch<{ availability: AvailabilitySlot[]; blockedSlots: BlockedSlot[] }>(
+        `/api/admin/doctors/${id}/availability`,
+      ),
+    )
+    if (data) {
+      doctorAvailability.value = data.availability ?? []
+      doctorBlockedSlots.value = data.blockedSlots ?? []
+    }
+  }
+
+  async function updateAvailability(id: string, availability: Array<{ dayOfWeek: number; startTime: string; endTime: string; sessionDuration: number }>): Promise<boolean> {
+    const data = await unwrap(() =>
+      $fetch<{ success: boolean; availability: AvailabilitySlot[] }>(
+        `/api/admin/doctors/${id}/availability`,
+        { method: 'POST', body: { availability } },
+      ),
+    )
+    if (data?.success) {
+      doctorAvailability.value = data.availability ?? []
+      return true
+    }
+    return false
+  }
+
+  async function blockSlot(id: string, input: { date: string; startTime: string; endTime: string }): Promise<boolean> {
+    const data = await unwrap(() =>
+      $fetch(`/api/admin/doctors/${id}/availability/block`, { method: 'POST', body: input }),
+    )
+    if (data) {
+      await fetchAvailability(id)
+      return true
+    }
+    return false
+  }
+
+  async function unblockSlot(id: string, blockId: string): Promise<boolean> {    const data = await unwrap(() =>
+      $fetch<{ success: boolean }>(`/api/admin/doctors/${id}/availability/block/${blockId}`, {
+        method: 'DELETE',
+      }),
+    )
+    if (data?.success) {
+      doctorBlockedSlots.value = doctorBlockedSlots.value.filter((b) => b.id !== blockId)
+      return true
+    }
+    return false
+  }
+
+  async function fetchPayments(filters: Record<string, string> = {}) {
+    const data = await unwrap(() =>
+      $fetch<{ payments: AdminPayment[]; summary: PaymentsSummary }>('/api/admin/payments', {
+        query: filters,
+      }),
+    )
+    if (data) {
+      payments.value = data.payments ?? []
+      paymentsSummary.value = data.summary ?? { totalRevenue: 0, totalRevenueThisMonth: 0, totalRefunded: 0 }
+    }
+  }
+
+  async function fetchStaff() {
+    const data = await unwrap(() => $fetch<{ staff: AdminStaffMember[] }>('/api/admin/staff'))
+    if (data) staff.value = data.staff ?? []
+  }
+
+  async function createStaff(input: { name: string; email: string; phone?: string; permissions?: Array<{ resource: string; action: string }> }): Promise<boolean> {
+    const data = await unwrap(() =>
+      $fetch<{ id: string }>('/api/admin/staff', { method: 'POST', body: input }),
+    )
+    if (data) {
+      await fetchStaff()
+      return true
+    }
+    return false
+  }
+
+  async function updateStaff(id: string, input: Record<string, unknown>): Promise<boolean> {
+    const data = await unwrap(() =>
+      $fetch<AdminStaffMember>(`/api/admin/staff/${id}`, { method: 'PATCH', body: input }),
+    )
+    if (data) {
+      staff.value = staff.value.map((s) => (s.id === id ? { ...s, ...data } : s))
+      return true
+    }
+    return false
+  }
+
+  async function deactivateStaff(id: string): Promise<boolean> {
+    const data = await unwrap(() =>
+      $fetch<{ success: boolean }>(`/api/admin/staff/${id}`, { method: 'DELETE' }),
+    )
+    if (data?.success) {
+      staff.value = staff.value.map((s) => (s.id === id ? { ...s, isActive: false } : s))
+      return true
+    }
+    return false
+  }
+
+  async function fetchPatients(search = '') {
+    const data = await unwrap(() =>
+      $fetch<{ patients: AdminPatient[] }>('/api/admin/patients', {
+        query: search ? { search } : {},
+      }),
+    )
+    if (data) patients.value = data.patients ?? []
+  }
+
+  async function fetchPatient(id: string): Promise<AdminPatientDetail | null> {
+    const data = await unwrap(() => $fetch<AdminPatientDetail>(`/api/admin/patients/${id}`))
+    if (data) {
+      currentPatient.value = data
+      return data
+    }
+    return null
+  }
+
+  async function fetchSettings(): Promise<AdminSettings | null> {
+    const data = await unwrap(() => $fetch<AdminSettings>('/api/admin/settings'))
+    if (data) {
+      settings.value = data
+      return data
+    }
+    return null
+  }
+
+  async function updateSettings(input: Record<string, unknown>): Promise<AdminSettings | null> {
+    const data = await unwrap(() =>
+      $fetch<AdminSettings>('/api/admin/settings', { method: 'PATCH', body: input }),
+    )
+    if (data) {
+      settings.value = data
+      return data
+    }
+    return null
+  }
+
+  async function fetchOverview(): Promise<AdminOverview | null> {
+    const data = await unwrap(() => $fetch<AdminOverview>('/api/admin/overview'))
+    if (data) {
+      overview.value = data
+      return data
+    }
+    return null
+  }
+
+  async function fetchBooking(id: string): Promise<AdminBooking | null> {
+    const data = await unwrap(() => $fetch<AdminBooking>(`/api/admin/bookings/${id}`))
+    return data
+  }
+
   return {
     schedules,
     activeSchedules,
@@ -189,6 +393,10 @@ export function useAdminDashboard() {
     pendingBookings,
     activeDoctors,
     bookings,
+    doctors,
+    currentDoctor,
+    doctorAvailability,
+    doctorBlockedSlots,
     loading,
     error,
     fetchAll,
@@ -201,8 +409,34 @@ export function useAdminDashboard() {
     unblockDate,
     fetchPendingBookings,
     fetchBookings,
-    updateBookingStatus,
+    cancelBooking,
     assignDoctor,
     fetchActiveDoctors,
+    fetchDoctors,
+    fetchDoctor,
+    createDoctor,
+    updateDoctor,
+    fetchAvailability,
+    updateAvailability,
+    blockSlot,
+    unblockSlot,
+    payments,
+    paymentsSummary,
+    fetchPayments,
+    staff,
+    fetchStaff,
+    createStaff,
+    updateStaff,
+    deactivateStaff,
+    patients,
+    currentPatient,
+    fetchPatients,
+    fetchPatient,
+    settings,
+    fetchSettings,
+    updateSettings,
+    overview,
+    fetchOverview,
+    fetchBooking,
   }
 }

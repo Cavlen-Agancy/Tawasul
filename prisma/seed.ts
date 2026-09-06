@@ -7,8 +7,8 @@ async function main() {
   const settingsDefaults = {
     id: 'singleton',
     platformName: 'Tawasul Academy',
-    contactEmail: '',
-    contactPhone: '',
+    contactEmail: 'admin@tawasul.com',
+    contactPhone: '+201234567890',
     whatsappNumber: '',
     paymentGateway: 'paymob' as const,
     paymentGatewayKey: '',

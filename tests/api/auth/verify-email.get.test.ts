@@ -34,7 +34,7 @@ describe('GET /api/auth/verify-email', () => {
     expect(updated?.emailVerificationExpiry).toBeNull()
   })
 
-  it('rejects an invalid/unknown token with 400', async () => {
+  it('rejects an invalid/unknown token with 404', async () => {
     const event = createApiEvent({
       method: 'GET',
       url: `/api/auth/verify-email?token=INVALID_TOKEN`,
@@ -44,7 +44,7 @@ describe('GET /api/auth/verify-email', () => {
       await handler(event)
       throw new Error('expected an error')
     } catch (e) {
-      expectApiError(e, 400, 'Invalid or expired link')
+      expectApiError(e, 404, 'Invalid or expired link')
     }
   })
 

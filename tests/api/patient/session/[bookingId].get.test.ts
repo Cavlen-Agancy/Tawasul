@@ -32,13 +32,16 @@ interface RoomResponse {
 
 describe('GET /api/patient/session/:bookingId', () => {
   it('returns a room within the time window', async () => {
-    useFixedNow()
+    const mockedNow = useFixedNow()
     const patient = await createPatient({ email: `sess-ok-${Date.now()}@test.com` })
-    const start = new Date(Date.now() + 2 * 60 * 1000)
+    const start = new Date(mockedNow + 2 * 60 * 1000)
     const end = new Date(start.getTime() + 60 * 60 * 1000)
+    // Local noon truncates to the intended calendar day in any DB session
+    // timezone (a 00:xx local datetime can land on the previous UTC date).
+    const noon = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 12, 0, 0, 0)
     const fixture = await createBookedFixture(patient, {
       status: 'CONFIRMED',
-      date: today(),
+      date: noon,
       startTime: fmt(start),
       endTime: fmt(end),
     })

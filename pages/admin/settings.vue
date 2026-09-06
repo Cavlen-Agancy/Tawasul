@@ -16,10 +16,62 @@ const {
   deleteSchedule,
   blockDate,
   unblockDate,
+  settings,
+  fetchSettings,
+  updateSettings,
 } = useAdminDashboard()
 const { toast } = useToast()
 
 const activeTab = ref('schedule')
+
+const platformForm = ref({ platformName: '', contactEmail: '', contactPhone: '', whatsappNumber: '' })
+const pricingForm = ref({ sessionPricePerHour: 0, defaultSessionDuration: 60 })
+const hoursForm = ref({ defaultWorkingStart: '09:00', defaultWorkingEnd: '17:00' })
+const gatewayForm = ref({ paymentGateway: 'paymob', paymentGatewayKey: '', paymentGatewaySecret: '' })
+const updateKeys = ref(false)
+const savingSection = ref<string | null>(null)
+
+function fillSettingsForms() {
+  if (!settings.value) return
+  platformForm.value = {
+    platformName: settings.value.platformName ?? '',
+    contactEmail: settings.value.contactEmail ?? '',
+    contactPhone: settings.value.contactPhone ?? '',
+    whatsappNumber: settings.value.whatsappNumber ?? '',
+  }
+  pricingForm.value = {
+    sessionPricePerHour: Number(settings.value.sessionPricePerHour ?? 0),
+    defaultSessionDuration: settings.value.defaultSessionDuration ?? 60,
+  }
+  hoursForm.value = {
+    defaultWorkingStart: settings.value.defaultWorkingStart ?? '09:00',
+    defaultWorkingEnd: settings.value.defaultWorkingEnd ?? '17:00',
+  }
+  gatewayForm.value = {
+    paymentGateway: settings.value.paymentGateway ?? 'paymob',
+    paymentGatewayKey: settings.value.paymentGatewayKey ?? '',
+    paymentGatewaySecret: settings.value.paymentGatewaySecret ?? '',
+  }
+}
+
+async function saveSection(name: string, payload: Record<string, unknown>) {
+  savingSection.value = name
+  try {
+    const updated = await updateSettings(payload)
+    if (updated) {
+      fillSettingsForms()
+      updateKeys.value = false
+      toast({ title: 'Settings saved', variant: 'success' })
+    }
+  } catch (e) {
+    toast({
+      title: (e as { data?: { message?: string } }).data?.message || 'Could not save settings',
+      variant: 'destructive',
+    })
+  } finally {
+    savingSection.value = null
+  }
+}
 
 interface ScheduleForm {
   dayOfWeek: string
@@ -149,6 +201,7 @@ function formatDateLabel(dateISO: string): string {
 
 onMounted(() => {
   void fetchAll()
+  void fetchSettings().then(() => fillSettingsForms())
 })
 </script>
 
@@ -167,6 +220,10 @@ onMounted(() => {
       <TabsList>
         <TabsTrigger value="schedule" data-testid="tab-schedule">Schedule</TabsTrigger>
         <TabsTrigger value="blocked" data-testid="tab-blocked">Blocked Dates</TabsTrigger>
+        <TabsTrigger value="platform" data-testid="tab-platform">Platform Info</TabsTrigger>
+        <TabsTrigger value="pricing" data-testid="tab-pricing">Pricing</TabsTrigger>
+        <TabsTrigger value="hours" data-testid="tab-hours">Working Hours</TabsTrigger>
+        <TabsTrigger value="gateway" data-testid="tab-gateway">Gateway</TabsTrigger>
       </TabsList>
 
       <TabsContent value="schedule" class="mt-4">
@@ -406,6 +463,133 @@ onMounted(() => {
             </CardContent>
           </Card>
         </div>
+      </TabsContent>
+
+      <TabsContent value="platform" class="mt-4">
+        <Card class="max-w-xl">
+          <CardHeader>
+            <CardTitle>Platform Info</CardTitle>
+            <CardDescription>Shown across the site and in emails.</CardDescription>
+          </CardHeader>
+          <CardContent class="grid gap-3">
+            <div>
+              <label class="mb-1.5 block text-sm font-medium" for="platform-name">Platform name</label>
+              <Input id="platform-name" v-model="platformForm.platformName" data-testid="platform-name" />
+            </div>
+            <div>
+              <label class="mb-1.5 block text-sm font-medium" for="contact-email">Contact email</label>
+              <Input id="contact-email" v-model="platformForm.contactEmail" type="email" data-testid="contact-email" />
+            </div>
+            <div>
+              <label class="mb-1.5 block text-sm font-medium" for="contact-phone">Contact phone</label>
+              <Input id="contact-phone" v-model="platformForm.contactPhone" data-testid="contact-phone" />
+            </div>
+            <div>
+              <label class="mb-1.5 block text-sm font-medium" for="whatsapp">WhatsApp number</label>
+              <Input id="whatsapp" v-model="platformForm.whatsappNumber" data-testid="whatsapp-number" />
+            </div>
+            <div>
+              <Button data-testid="save-platform" :disabled="savingSection === 'platform'" @click="saveSection('platform', { ...platformForm })">
+                {{ savingSection === 'platform' ? 'Saving…' : 'Save' }}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="pricing" class="mt-4">
+        <Card class="max-w-xl">
+          <CardHeader>
+            <CardTitle>Session Pricing</CardTitle>
+          </CardHeader>
+          <CardContent class="grid gap-3">
+            <div>
+              <label class="mb-1.5 block text-sm font-medium" for="price-per-hour">Price per hour (EGP)</label>
+              <Input id="price-per-hour" v-model.number="pricingForm.sessionPricePerHour" type="number" min="0" data-testid="price-per-hour" />
+            </div>
+            <div>
+              <label class="mb-1.5 block text-sm font-medium" for="session-duration">Default session duration</label>
+              <select id="session-duration" v-model.number="pricingForm.defaultSessionDuration" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" data-testid="session-duration">
+                <option :value="30">30 minutes</option>
+                <option :value="45">45 minutes</option>
+                <option :value="60">60 minutes</option>
+              </select>
+            </div>
+            <div>
+              <Button data-testid="save-pricing" :disabled="savingSection === 'pricing'" @click="saveSection('pricing', { ...pricingForm })">
+                {{ savingSection === 'pricing' ? 'Saving…' : 'Save' }}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="hours" class="mt-4">
+        <Card class="max-w-xl">
+          <CardHeader>
+            <CardTitle>Default Working Hours</CardTitle>
+            <CardDescription>Defaults only — the weekly schedule above drives patient booking.</CardDescription>
+          </CardHeader>
+          <CardContent class="grid gap-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="mb-1.5 block text-sm font-medium" for="working-start">Start</label>
+                <input id="working-start" v-model="hoursForm.defaultWorkingStart" type="time" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" data-testid="working-start" />
+              </div>
+              <div>
+                <label class="mb-1.5 block text-sm font-medium" for="working-end">End</label>
+                <input id="working-end" v-model="hoursForm.defaultWorkingEnd" type="time" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" data-testid="working-end" />
+              </div>
+            </div>
+            <div>
+              <Button data-testid="save-hours" :disabled="savingSection === 'hours'" @click="saveSection('hours', { ...hoursForm })">
+                {{ savingSection === 'hours' ? 'Saving…' : 'Save' }}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="gateway" class="mt-4">
+        <Card class="max-w-xl">
+          <CardHeader>
+            <CardTitle>Payment Gateway</CardTitle>
+          </CardHeader>
+          <CardContent class="grid gap-3">
+            <div>
+              <label class="mb-1.5 block text-sm font-medium" for="gateway-select">Gateway</label>
+              <select id="gateway-select" v-model="gatewayForm.paymentGateway" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" data-testid="gateway-select">
+                <option value="paymob">Paymob</option>
+                <option value="stripe">Stripe</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <Button variant="outline" size="sm" data-testid="update-keys-toggle" @click="updateKeys = !updateKeys">
+                {{ updateKeys ? 'Cancel key update' : 'Update Keys' }}
+              </Button>
+              <span v-if="!updateKeys" class="text-xs text-muted-foreground">Keys are masked. Toggle to change them.</span>
+            </div>
+            <div v-if="updateKeys" class="grid gap-3">
+              <div>
+                <label class="mb-1.5 block text-sm font-medium" for="gateway-key">Gateway key</label>
+                <Input id="gateway-key" v-model="gatewayForm.paymentGatewayKey" data-testid="gateway-key" />
+              </div>
+              <div>
+                <label class="mb-1.5 block text-sm font-medium" for="gateway-secret">Gateway secret</label>
+                <Input id="gateway-secret" v-model="gatewayForm.paymentGatewaySecret" data-testid="gateway-secret" />
+              </div>
+            </div>
+            <div>
+              <Button
+                data-testid="save-gateway"
+                :disabled="savingSection === 'gateway'"
+                @click="saveSection('gateway', updateKeys ? { ...gatewayForm } : { paymentGateway: gatewayForm.paymentGateway })"
+              >
+                {{ savingSection === 'gateway' ? 'Saving…' : 'Save' }}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </TabsContent>
     </Tabs>
 

@@ -74,6 +74,83 @@ export const assignDoctorSchema = z.object({
   doctorId: z.string().min(1, 'Doctor ID is required'),
 })
 
+export const doctorProfilePatchSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  phone: z.string().max(30).optional().or(z.literal('')),
+  bio: z.string().max(2000).optional().or(z.literal('')),
+  specializations: z.array(z.string().min(1).max(100)).max(20).optional(),
+})
+
+export const doctorBookingsQuerySchema = z.object({
+  start: z.string().regex(dateRegex, 'Invalid date format'),
+  end: z.string().regex(dateRegex, 'Invalid date format'),
+})
+
+export const adminDoctorCreateSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  email: z.string().email('Invalid email format').max(255),
+  phone: z.string().max(30).optional().or(z.literal('')),
+  bio: z.string().max(2000).optional().or(z.literal('')),
+  specializations: z.array(z.string().min(1).max(100)).max(20).optional(),
+})
+
+export const adminDoctorPatchSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100).optional(),
+  phone: z.string().max(30).optional().or(z.literal('')),
+  bio: z.string().max(2000).optional().or(z.literal('')),
+  specializations: z.array(z.string().min(1).max(100)).max(20).optional(),
+  isActive: z.boolean().optional(),
+})
+
+export const availabilityReplaceSchema = z.object({
+  availability: z.array(z.object({
+    dayOfWeek: z.number().int().min(0).max(6),
+    startTime: z.string().regex(timeRegex, 'Invalid time format'),
+    endTime: z.string().regex(timeRegex, 'Invalid time format'),
+    sessionDuration: z.number().int().refine((n) => [30, 45, 60].includes(n), 'sessionDuration must be 30, 45, or 60'),
+  })).max(7),
+})
+
+export const blockSlotSchema = z.object({
+  date: z.string().regex(dateRegex, 'Invalid date format'),
+  startTime: z.string().regex(timeRegex, 'Invalid time format'),
+  endTime: z.string().regex(timeRegex, 'Invalid time format'),
+})
+
+const permissionItemSchema = z.object({
+  resource: z.string().min(1),
+  action: z.string().min(1),
+})
+
+export const staffCreateSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  email: z.string().email('Invalid email format').max(255),
+  phone: z.string().max(30).optional().or(z.literal('')),
+  permissions: z.array(permissionItemSchema).max(24).optional(),
+})
+
+export const staffPatchSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100).optional(),
+  phone: z.string().max(30).optional().or(z.literal('')),
+  permissions: z.array(permissionItemSchema).max(24).optional(),
+  isActive: z.boolean().optional(),
+})
+
+export const settingsPatchSchema = z.object({
+  platformName: z.string().max(100).optional(),
+  contactEmail: z.string().max(255).optional().or(z.literal('')),
+  contactPhone: z.string().max(30).optional().or(z.literal('')),
+  whatsappNumber: z.string().max(30).optional().or(z.literal('')),
+  paymentGateway: z.string().max(30).optional(),
+  paymentGatewayKey: z.string().max(500).optional(),
+  paymentGatewaySecret: z.string().max(500).optional(),
+  sessionPricePerHour: z.number().min(0).max(1000000).optional(),
+  defaultSessionDuration: z.number().int().refine((n) => [30, 45, 60].includes(n), 'defaultSessionDuration must be 30, 45, or 60').optional(),
+  defaultWorkingStart: z.string().regex(timeRegex, 'Invalid time format').optional(),
+  defaultWorkingEnd: z.string().regex(timeRegex, 'Invalid time format').optional(),
+  jitsiDomain: z.string().max(255).optional(),
+}).passthrough()
+
 /**
  * Extracts a single human-readable message from a ZodError.
  * Falls back to the first issue message, then a generic message.

@@ -82,13 +82,20 @@ export default defineNuxtConfig({
   // ─────────────────────────────────────────
   // Modules
   // ─────────────────────────────────────────
-  // UI library: shadcn-vue (Tailwind-based, no external UI module needed).
+  // UI library: shadcn-vue components in ./components/ui, auto-imported via shadcn-nuxt.
   // NOTE: original plan referenced @heroui/nuxt which does not exist for Vue — see phase-0/notes.md
+  // NOTE: 'shadcn-vue/nuxt' does not exist in shadcn-vue v2 (CLI-only package);
+  // the official Nuxt module is the separate 'shadcn-nuxt' package.
   modules: [
     '@nuxtjs/tailwindcss',
     '@vueuse/nuxt',
     '@nuxt/image',
+    'shadcn-nuxt',
   ],
+  shadcn: {
+    prefix: '',
+    componentDir: './components/ui',
+  },
 
   // ─────────────────────────────────────────
   // Tailwind CSS

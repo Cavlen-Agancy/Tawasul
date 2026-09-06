@@ -11,6 +11,8 @@ const navLinks = [
   { label: 'Our Experts', to: '/experts' },
   { label: 'Contact', to: '/contact' },
 ]
+
+const { data: settings } = useFetch('/api/public/settings')
 </script>
 
 <template>
@@ -101,8 +103,8 @@ const navLinks = [
     <footer class="border-t border-border bg-white">
       <div class="mx-auto flex w-full max-w-[1200px] flex-col items-center gap-2 px-4 py-8 text-center lg:px-12">
         <p class="text-sm text-muted-foreground">© 2024 Tawasul Academy</p>
-        <p class="text-sm text-muted-foreground">
-          contact@tawasul.com · +20 100 000 0000
+        <p v-if="settings?.contactEmail || settings?.contactPhone" class="text-sm text-muted-foreground">
+          {{ settings?.contactEmail }}<span v-if="settings?.contactEmail && settings?.contactPhone"> · </span>{{ settings?.contactPhone }}
         </p>
       </div>
     </footer>

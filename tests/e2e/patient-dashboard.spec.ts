@@ -273,11 +273,11 @@ test.describe('Patient Dashboard', () => {
     await page.waitForURL('**/login', { timeout: 20_000 })
   })
 
-  test('non-patient (doctor) is redirected to /doctor', async ({ page }) => {
-    await loginAs(page, doctor.email, doctor.password, '/doctor')
+  test('non-patient (doctor) is redirected to /doctor/calendar', async ({ page }) => {
+    await loginAs(page, doctor.email, doctor.password, '/doctor/calendar')
     await spaNavigateTo(page, '/dashboard/appointments')
-    await page.waitForURL('**/doctor', { timeout: 20_000 })
-    await expect(page.getByRole('heading', { name: 'Doctor Dashboard' })).toBeVisible()
+    await page.waitForURL('**/doctor/calendar', { timeout: 20_000 })
+    await expect(page.getByTestId('page-title')).toHaveText('My Calendar')
   })
 
   test('dashboard redirects to /dashboard/appointments', async ({ page }) => {
@@ -287,137 +287,64 @@ test.describe('Patient Dashboard', () => {
     await expect(page.getByTestId('page-title')).toHaveText('My Appointments')
   })
 
-  // A) Calendar loads
-  test('calendar loads with month view', async ({ page }) => {
+  // A) Upcoming tab shows appointment cards
+  test('upcoming tab shows appointment cards', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
     await expect(page.getByTestId('page-title')).toHaveText('My Appointments', { timeout: 20_000 })
-    await expect(page.locator('.fc-daygrid-body')).toBeVisible({ timeout: 20_000 })
-    await expect(page.locator('.fc-day[data-date]').first()).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByTestId('calendar-month')).not.toHaveText('')
+    await expect(page.getByTestId(`appointment-${bookingFutureId}`)).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId(`appointment-${bookingFutureId}`)).toContainText('Dr. Patient Dashboard')
   })
 
-  // B) Existing appointments appear as calendar events
-  test('existing appointments appear as calendar events', async ({ page }) => {
+  // B) Future appointment Join is disabled with a tooltip, Cancel is visible
+  test('future appointment has disabled Join and visible Cancel', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    const today = ymd(new Date())
-    const cell = page.locator(`.fc-day[data-date="${today}"]`)
-    await expect(cell).toBeVisible({ timeout: 20_000 })
-    await expect(cell.locator(`.fc-event.fc-tawasul-event-${bookingNowId}`)).toBeVisible({ timeout: 20_000 })
-    await expect(cell.locator(`.fc-event.fc-tawasul-event-${bookingSessionId}`)).toBeVisible()
+    const join = page.getByTestId(`join-${bookingFutureId}`)
+    await expect(join).toBeVisible({ timeout: 20_000 })
+    await expect(join).toBeDisabled()
+    await expect(join).toHaveAttribute('title', 'Available 5 minutes before your session')
+    await expect(page.getByTestId(`cancel-${bookingFutureId}`)).toBeVisible()
   })
 
-  // C) Past appointments visible inside the calendar (no separate section)
-  test('past appointments are visible inside the calendar', async ({ page }) => {
+  // C) Past tab shows completed and cancelled chips
+  test('past tab shows completed and cancelled appointments', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    const pastDate = ymd(daysFromNow(-8))
-    const [py, pm] = pastDate.split('-').map((v) => parseInt(v, 10))
-    await gotoMonth(page, py, pm)
-    const cell = page.locator(`.fc-day[data-date="${pastDate}"]`)
-    await expect(cell.locator(`.fc-event.fc-tawasul-event-${pastConfirmedId}`)).toBeVisible({ timeout: 20_000 })
+    await page.getByTestId('tab-past').click()
+    await expect(page.getByTestId(`past-appointment-${pastConfirmedId}`)).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId(`past-appointment-${pastConfirmedId}`)).toContainText('Completed')
+    await expect(page.getByTestId(`past-appointment-${pastCancelledId}`)).toContainText('Cancelled')
   })
 
-  // D) No "No past appointments" empty-state section
-  test('there is no separate "No past appointments" section', async ({ page }) => {
+  // D) No empty states when the patient has bookings
+  test('no empty states are shown when bookings exist', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    await expect(page.getByText('No past appointments')).toHaveCount(0)
-    await expect(page.getByText('No upcoming appointments. Book your first session.')).toHaveCount(0)
+    await expect(page.getByTestId(`appointment-${bookingFutureId}`)).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId('no-upcoming')).toHaveCount(0)
+    await page.getByTestId('tab-past').click()
+    await expect(page.getByTestId('no-past')).toHaveCount(0)
   })
 
-  // E) Clicking an available future day opens the booking dialog
-  test('clicking an available future day opens the booking dialog', async ({ page }) => {
+  // E) Join button is active within the window and opens the session page
+  test('join button is active near session time and opens the session page', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    const { date } = futureTargetDate()
-    const [ty, tm] = date.split('-').map((v) => parseInt(v, 10))
-    await gotoMonth(page, ty, tm)
-    const cell = page.locator(`.fc-day[data-date="${date}"]`)
-    await expect(cell).toHaveClass(/fc-tawasul-available/, { timeout: 20_000 })
-    await cell.locator('.fc-daygrid-day-frame').click()
-    await expect(page.getByTestId('booking-dialog')).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByTestId('booking-dialog-date')).toContainText(/20/)
+    const join = page.getByTestId(`join-${bookingNowId}`)
+    await expect(join).toBeVisible({ timeout: 20_000 })
+    await expect(join).toBeEnabled({ timeout: 20_000 })
+    await join.click()
+    await page.waitForURL(`**/dashboard/session/${bookingNowId}`, { timeout: 20_000 })
   })
 
-  // F) Available slots are displayed in the dialog
-  test('available slots are displayed in the dialog', async ({ page }) => {
+  // F) Cancel moves the card to the past tab without a reload
+  test('cancelling an appointment moves it to the past tab', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    const { date } = futureTargetDate()
-    const [ty, tm] = date.split('-').map((v) => parseInt(v, 10))
-    await gotoMonth(page, ty, tm)
-    const cell = page.locator(`.fc-day[data-date="${date}"]`)
-    await cell.locator('.fc-daygrid-day-frame').click()
-    await expect(page.getByTestId('booking-dialog')).toBeVisible({ timeout: 20_000 })
-    const slots = page.getByTestId('booking-dialog').locator('[data-slot-time]')
-    await expect(slots.first()).toBeVisible({ timeout: 20_000 })
-    expect(await slots.count()).toBeGreaterThan(0)
-  })
-
-  // G) Past time slots are not offered (server excludes them) and the dialog slots are enabled
-  test('past time slots are not offered; offered slots are enabled', async ({ page }) => {
-    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    const { date } = futureTargetDate()
-    const [ty, tm] = date.split('-').map((v) => parseInt(v, 10))
-    await gotoMonth(page, ty, tm)
-    const cell = page.locator(`.fc-day[data-date="${date}"]`)
-    await cell.locator('.fc-daygrid-day-frame').click()
-    await expect(page.getByTestId('booking-dialog')).toBeVisible({ timeout: 20_000 })
-    // None of the offered slots may be disabled (the server never returns past times).
-    await expect(page.getByTestId('booking-dialog').locator('[data-slot-time][disabled]')).toHaveCount(0)
-  })
-
-  // H + I) Past dates and unavailable dates cannot be booked
-  test('past dates and unavailable dates cannot be booked', async ({ page }) => {
-    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-
-    // Past date -> no dialog opens.
-    const pastDate = ymd(daysFromNow(-2))
-    const [py, pm] = pastDate.split('-').map((v) => parseInt(v, 10))
-    await gotoMonth(page, py, pm)
-    const pastCell = page.locator(`.fc-day[data-date="${pastDate}"]`)
-    await pastCell.locator('.fc-daygrid-day-frame').click({ force: true })
-    await expect(page.getByTestId('booking-dialog')).toHaveCount(0)
-
-    // Unavailable future date (blocked) -> no dialog opens.
-    const [ty, tm] = blockedDate.split('-').map((v) => parseInt(v, 10))
-    await gotoMonth(page, ty, tm)
-    const blockedCell = page.locator(`.fc-day[data-date="${blockedDate}"]`)
-    await expect(blockedCell).toHaveClass(/fc-tawasul-unavailable/, { timeout: 20_000 })
-    await blockedCell.locator('.fc-daygrid-day-frame').click({ force: true })
-    await expect(page.getByTestId('booking-dialog')).toHaveCount(0)
-  })
-
-  // J + K) Selecting a slot enables the button and booking continues into the existing flow
-  test('selecting a slot enables booking and continues to the existing review flow', async ({ page }) => {
-    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    const { date } = futureTargetDate()
-    const [ty, tm] = date.split('-').map((v) => parseInt(v, 10))
-    await gotoMonth(page, ty, tm)
-    const cell = page.locator(`.fc-day[data-date="${date}"]`)
-    await cell.locator('.fc-daygrid-day-frame').click()
-    const dialog = page.getByTestId('booking-dialog')
-    await expect(dialog).toBeVisible({ timeout: 20_000 })
-
-    const bookBtn = page.getByTestId('book-appointment')
-    await expect(bookBtn).toBeDisabled()
-
-    const slot = dialog.locator('[data-slot-time]').first()
-    await slot.click()
-    await expect(bookBtn).toBeEnabled()
-
-    await bookBtn.click()
-    // Continues into the existing Phase 3 booking flow at the Review step.
-    await expect(page.getByRole('heading', { name: 'Review your booking' })).toBeVisible({ timeout: 20_000 })
-    await expect(page).toHaveURL(/\/book/)
-  })
-
-  // L) Egyptian holiday is displayed and blocks booking
-  test('Egyptian holiday is displayed and blocks booking', async ({ page }) => {
-    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    // Coptic Christmas 2027-01-07 is a fixed holiday in the future.
-    const holiday = '2027-01-07'
-    await gotoMonth(page, 2027, 1)
-    const cell = page.locator(`.fc-day[data-date="${holiday}"]`)
-    await expect(cell).toHaveClass(/fc-tawasul-holiday/, { timeout: 20_000 })
-    await cell.locator('.fc-daygrid-day-frame').click({ force: true })
-    await expect(page.getByTestId('booking-dialog')).toHaveCount(0)
+    await expect(page.getByTestId(`appointment-${bookingFutureId}`)).toBeVisible({ timeout: 20_000 })
+    await page.getByTestId(`cancel-${bookingFutureId}`).click()
+    await expect(page.getByTestId('cancel-dialog-confirm')).toBeVisible({ timeout: 20_000 })
+    await page.getByTestId('cancel-dialog-confirm').click()
+    await expect(page.getByTestId(`appointment-${bookingFutureId}`)).toHaveCount(0, { timeout: 20_000 })
+    await page.getByTestId('tab-past').click()
+    const pastCard = page.getByTestId(`past-appointment-${bookingFutureId}`)
+    await expect(pastCard).toBeVisible({ timeout: 20_000 })
+    await expect(pastCard).toContainText('Cancelled')
   })
 
   test('payments page loads with payment history', async ({ page }) => {
@@ -466,14 +393,11 @@ test.describe('Patient Dashboard', () => {
     await expect(page.getByRole('heading', { name: 'Meeting not open yet' })).toBeVisible()
   })
 
-  test('clicking a calendar appointment navigates to its meeting lobby', async ({ page }) => {
+  test('join button stays disabled outside the join window', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    const today = ymd(new Date())
-    const cell = page.locator(`.fc-day[data-date="${today}"]`)
-    await expect(cell.locator(`.fc-event.fc-tawasul-event-${bookingSessionId}`)).toBeVisible({ timeout: 20_000 })
-    await cell.locator(`.fc-event.fc-tawasul-event-${bookingSessionId}`).click()
-    await page.waitForURL(`**/meeting/${bookingSessionId}/lobby`, { timeout: 20_000 })
-    await expect(page.getByTestId('meeting-waiting')).toBeVisible({ timeout: 20_000 })
+    const join = page.getByTestId(`join-${bookingSessionId}`)
+    await expect(join).toBeVisible({ timeout: 20_000 })
+    await expect(join).toBeDisabled()
   })
 
   test('sidebar navigation works and logout redirects', async ({ page }) => {
@@ -500,52 +424,12 @@ test.describe('Patient Dashboard', () => {
     await expect(page.getByTestId('page-title')).toHaveText('My Appointments', { timeout: 20_000 })
   })
 
-  // M) Mobile calendar does not overlap or overflow horizontally
-  test('mobile calendar does not overflow horizontally', async ({ page }) => {
+  // M) Mobile appointments page does not overlap or overflow horizontally
+  test('mobile appointments page does not overflow horizontally', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 700 })
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    await expect(page.locator('.fc-daygrid-body')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId('appointments-tabs')).toBeVisible({ timeout: 20_000 })
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
     expect(overflow).toBe(false)
-  })
-
-  // N) Booking dialog works on mobile (fits viewport, slots usable)
-  test('booking dialog works on mobile', async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 700 })
-    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    const { date } = futureTargetDate()
-    const [ty, tm] = date.split('-').map((v) => parseInt(v, 10))
-    await gotoMonth(page, ty, tm)
-    const cell = page.locator(`.fc-day[data-date="${date}"]`)
-    await cell.locator('.fc-daygrid-day-frame').click()
-    const dialog = page.getByTestId('booking-dialog')
-    await expect(dialog).toBeVisible({ timeout: 20_000 })
-    const box = await dialog.boundingBox()
-    expect(box).toBeTruthy()
-    expect(box!.width).toBeLessThanOrEqual(410)
-    expect(box!.x).toBeGreaterThanOrEqual(0)
-    const slot = dialog.locator('[data-slot-time]').first()
-    await slot.click()
-    await expect(page.getByTestId('book-appointment')).toBeEnabled()
-  })
-
-  // O) RTL Arabic layout works
-  test('RTL Arabic layout renders the calendar and dialog', async ({ page }) => {
-    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    await page.evaluate(() => {
-      document.documentElement.setAttribute('dir', 'rtl')
-      document.documentElement.setAttribute('lang', 'ar')
-    })
-    await expect(page.locator('.fc-daygrid-body')).toBeVisible({ timeout: 20_000 })
-    const { date } = futureTargetDate()
-    const [ty, tm] = date.split('-').map((v) => parseInt(v, 10))
-    await gotoMonth(page, ty, tm)
-    const cell = page.locator(`.fc-day[data-date="${date}"]`)
-    await cell.locator('.fc-daygrid-day-frame').click()
-    await expect(page.getByTestId('booking-dialog')).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByTestId('booking-dialog').locator('[data-slot-time]').first()).toBeVisible()
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
-    expect(overflow).toBe(false)
-    await page.evaluate(() => document.documentElement.setAttribute('dir', 'ltr'))
   })
 })

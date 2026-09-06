@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
 
   const user = await prisma.user.findFirst({ where: { emailVerificationToken: token } })
   if (!user) {
-    throw createError({ statusCode: 400, message: 'Invalid or expired link' })
+    throw createError({ statusCode: 404, message: 'Invalid or expired link' })
   }
 
   if (user.emailVerificationExpiry && user.emailVerificationExpiry.getTime() < Date.now()) {

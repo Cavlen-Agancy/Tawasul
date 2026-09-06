@@ -7,7 +7,6 @@ function safeUser(user: {
   id: string
   name: string
   email: string
-  phone: string | null
   photo: string | null
   accountType: string
 }) {
@@ -15,7 +14,6 @@ function safeUser(user: {
     id: user.id,
     name: user.name,
     email: user.email,
-    phone: user.phone ?? undefined,
     photo: user.photo ?? undefined,
     accountType: user.accountType,
   }
@@ -34,17 +32,17 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, message: 'Invalid credentials' })
   }
 
+  const valid = await comparePassword(password, user.password)
+  if (!valid) {
+    throw createError({ statusCode: 401, message: 'Invalid credentials' })
+  }
+
   if (!user.emailVerified) {
     throw createError({ statusCode: 403, message: 'Please verify your email before logging in' })
   }
 
   if (!user.isActive) {
     throw createError({ statusCode: 403, message: 'Your account has been deactivated' })
-  }
-
-  const valid = await comparePassword(password, user.password)
-  if (!valid) {
-    throw createError({ statusCode: 401, message: 'Invalid credentials' })
   }
 
   const token = generateJWT({

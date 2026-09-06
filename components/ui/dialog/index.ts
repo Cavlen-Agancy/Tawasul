@@ -1,0 +1,7 @@
+export { default as Dialog } from './dialog.vue'
+export { default as DialogClose } from './dialog-close.vue'
+export { default as DialogContent } from './dialog-content.vue'
+export { default as DialogDescription } from './dialog-description.vue'
+export { default as DialogFooter } from './dialog-footer.vue'
+export { default as DialogHeader } from './dialog-header.vue'
+export { default as DialogTitle } from './dialog-title.vue'

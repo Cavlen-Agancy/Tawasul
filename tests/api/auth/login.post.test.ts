@@ -32,6 +32,7 @@ describe('POST /api/auth/login', () => {
     expect(res.email).toBe(user.email)
     expect(res.accountType).toBe('PATIENT')
     expect(res).not.toHaveProperty('password')
+    expect(res).not.toHaveProperty('phone')
 
     const cookie = getAuthCookie(event)
     expect(cookie).toBeTruthy()

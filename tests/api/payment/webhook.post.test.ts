@@ -109,7 +109,9 @@ describe('POST /api/payment/webhook', () => {
     const bookingId = await createPendingBooking(patient.id)
 
     const body = { type: 'checkout.session.completed', metadata: { bookingId } }
-    const signature = crypto.createHmac('sha256', 'whsec_test_secret').update(JSON.stringify(body)).digest('hex')
+    const raw = JSON.stringify(body)
+    const t = Math.floor(Date.now() / 1000)
+    const signature = `t=${t},v1=${crypto.createHmac('sha256', 'whsec_test_secret').update(`${t}.${raw}`).digest('hex')}`
     const event = buildApiEvent(body, 'stripe-signature', signature)
 
     const res = await handler(event) as { message: string }
@@ -123,12 +125,53 @@ describe('POST /api/payment/webhook', () => {
 
   it('rejects a Stripe webhook with an invalid signature with 400', async () => {
     setStripeEnv('whsec_test_secret')
-    const event = buildApiEvent({ type: 'checkout.session.completed', metadata: {} }, 'stripe-signature', 'invalid')
+    const event = buildApiEvent({ type: 'checkout.session.completed', metadata: {} }, 'stripe-signature', 't=123,v1=invalid')
     try {
       await handler(event)
       expect.unreachable('should have thrown')
     } catch (e) {
       expectApiError(e, 400, 'Invalid signature')
     }
+  })
+
+  it('rejects a Paymob webhook with 400 when the HMAC secret is missing', async () => {
+    setPaymobEnv(undefined)
+    const body = { success: 'true', metadata: {} }
+    const event = buildApiEvent(body, 'x-hmac', 'anything')
+    try {
+      await handler(event)
+      expect.unreachable('should have thrown')
+    } catch (e) {
+      expectApiError(e, 400, 'Invalid signature')
+    }
+  })
+
+  it('rejects a Stripe webhook with 400 when the webhook secret is missing', async () => {
+    setStripeEnv(undefined)
+    const body = { type: 'checkout.session.completed', metadata: {} }
+    const event = buildApiEvent(body, 'stripe-signature', 't=123,v1=anything')
+    try {
+      await handler(event)
+      expect.unreachable('should have thrown')
+    } catch (e) {
+      expectApiError(e, 400, 'Invalid signature')
+    }
+  })
+
+  it('accepts a Paymob webhook signed in the x-hmac header', async () => {
+    setPaymobEnv('paymob-hmac-secret')
+    const patient = await createTestUser({ emailVerified: true, email: `wh-paymob-xhmac-${Date.now()}@test.com` })
+    toDeleteUsers.push(patient.id)
+    const bookingId = await createPendingBooking(patient.id)
+
+    const body = { success: 'true', message: 'Approved', metadata: { bookingId } }
+    const signature = crypto.createHmac('sha512', 'paymob-hmac-secret').update(JSON.stringify(body)).digest('hex')
+    const event = buildApiEvent(body, 'x-hmac', signature)
+
+    const res = await handler(event) as { message: string }
+    expect(res.message).toBe('Webhook received')
+
+    const payment = await prisma.payment.findUnique({ where: { bookingId } })
+    expect(payment?.status).toBe('SUCCESS')
   })
 })
