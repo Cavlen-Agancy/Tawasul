@@ -2,7 +2,7 @@ import { defineEventHandler, getRouterParam, createError } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requirePermission } from '~/server/utils/permissions'
 import { sendEmail, bookingCancellationTemplate } from '~/server/utils/email'
-import { formatDateISO } from '~/server/utils/admin-availability'
+import { formatDateUTC } from '~/server/utils/availability'
 
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'APPOINTMENTS', 'DELETE')
@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
       html: bookingCancellationTemplate(
         booking.user.name,
         booking.doctor?.user?.name ?? '',
-        formatDateISO(booking.date),
+        formatDateUTC(booking.date),
         `${booking.startTime} – ${booking.endTime}`,
       ),
     })

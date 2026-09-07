@@ -1,7 +1,7 @@
 import { defineEventHandler, createError } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requireAuth } from '~/server/utils/auth'
-import { formatDateISO } from '~/server/utils/availability'
+import { formatDateUTC } from '~/server/utils/availability'
 
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event, ['PATIENT'])
@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
       createdAt: p.createdAt.toISOString(),
       booking: {
         doctorName: p.booking?.doctor?.user?.name ?? 'Unknown Doctor',
-        date: p.booking ? formatDateISO(p.booking.date) : '',
+        date: p.booking ? formatDateUTC(p.booking.date) : '',
         service: p.booking?.service ?? '',
       },
     })),

@@ -52,6 +52,33 @@ export function parseISODate(date: string): Date {
 }
 
 /**
+ * Calendar-day helpers for Prisma `@db.Date` columns.
+ *
+ * `@db.Date` stores a bare calendar day (no time). Prisma materialises it as
+ * a Date at UTC midnight, and the pg driver serialises a Date to its UTC
+ * calendar day when writing to a `date` column (verified: a local-midnight
+ * write from a UTC+X server stored the PREVIOUS day, e.g. Africa/Cairo).
+ *
+ * Contract — use ONLY these two at `@db.Date` read/write/query boundaries:
+ * - write/query with `parseDateUTC('YYYY-MM-DD')`
+ * - render readbacks with `formatDateUTC(date)`
+ * Never use the local-time `parseISODate`/`formatDateISO` there: they shift
+ * the day whenever the server offset is not UTC.
+ */
+export function parseDateUTC(date: string): Date {
+  const [y, m, d] = date.split('-').map((p) => parseInt(p, 10))
+  return new Date(Date.UTC(y, (m || 1) - 1, d || 1))
+}
+
+/**
+ * Formats a `@db.Date` readback as "YYYY-MM-DD" using UTC components, so the
+ * stored calendar day round-trips exactly in every server timezone.
+ */
+export function formatDateUTC(d: Date): string {
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`
+}
+
+/**
  * Checks whether a slot [slotStart, slotEnd) overlaps a blocked window [blockStart, blockEnd).
  * Overlap is true when the slot start is before the block end AND the slot end is after the block start.
  */
@@ -68,8 +95,8 @@ function serviceFor(doctor: { specializations?: string[] }): string {
  * Single source of truth for slot availability across all active doctors on a given date.
  */
 export async function getAvailableSlots(date: string): Promise<Slot[]> {
-  const target = parseISODate(date)
-  const dayOfWeek = target.getDay()
+  const target = parseDateUTC(date)
+  const dayOfWeek = target.getUTCDay()
 
   // Public holidays are non-working days (see holidays.ts business rule):
   // no slots are offered regardless of standing doctor availability.
@@ -167,8 +194,8 @@ export async function getAvailableDates(month: number, year: number): Promise<st
   const firstDay = new Date(year, month - 1, 1)
   const lastDay = new Date(year, month, 0)
 
-  const monthStart = new Date(year, month - 1, 1)
-  const monthEnd = new Date(year, month, 0, 23, 59, 59, 999)
+  const monthStart = new Date(Date.UTC(year, month - 1, 1))
+  const monthEnd = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
 
   const bookings = await prisma.booking.findMany({
     where: {
@@ -212,8 +239,8 @@ export async function getAvailableDates(month: number, year: number): Promise<st
 
       if (duration <= 0 || end <= start) continue
 
-      const doctorBookings = bookings.filter((b) => b.doctorId === doctor.id && formatDateISO(b.date) === dateISO)
-      const doctorBlocked = blocked.filter((b) => b.doctorId === doctor.id && formatDateISO(b.date) === dateISO)
+      const doctorBookings = bookings.filter((b) => b.doctorId === doctor.id && formatDateUTC(b.date) === dateISO)
+      const doctorBlocked = blocked.filter((b) => b.doctorId === doctor.id && formatDateUTC(b.date) === dateISO)
 
       const nowMinutes = timeToMinutes(`${pad2(today.getHours())}:${pad2(today.getMinutes())}`)
 

@@ -12,11 +12,12 @@ interface Fixture {
 async function createBookingFixture(): Promise<Fixture> {
   const owner = await createTestUser({ emailVerified: true, email: `id-owner-${Date.now()}@test.com` })
   const dateStr = nextDateWithDayOfWeek(0)
+  const [gy, gm, gd] = dateStr.split('-').map((p) => parseInt(p, 10))
   const booking = await prisma.booking.create({
     data: {
       userId: owner.id,
       doctorId: null,
-      date: new Date(`${dateStr}T00:00:00`),
+      date: new Date(Date.UTC(gy, gm - 1, gd)),
       startTime: '09:00',
       endTime: '10:00',
       service: 'Marital Counseling',

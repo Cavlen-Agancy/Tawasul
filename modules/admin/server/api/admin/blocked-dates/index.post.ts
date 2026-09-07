@@ -2,7 +2,8 @@ import { defineEventHandler, readBody, createError, setResponseStatus } from 'h3
 import { prisma } from '~/server/utils/prisma'
 import { requirePermission } from '~/server/utils/permissions'
 import { blockedDateSchema } from '~/server/utils/validation'
-import { parseISODate, formatDateISO } from '~/server/utils/admin-availability'
+import { formatDateISO } from '~/server/utils/admin-availability'
+import { parseDateUTC } from '~/server/utils/availability'
 
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'SETTINGS', 'UPDATE')
@@ -19,14 +20,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Date must be in the future' })
   }
 
-  const existing = await prisma.globalBlockedDate.findUnique({ where: { date: parseISODate(date) } })
+  const existing = await prisma.globalBlockedDate.findUnique({ where: { date: parseDateUTC(date) } })
   if (existing) {
     throw createError({ statusCode: 409, message: 'This date is already blocked' })
   }
 
   const blockedDate = await prisma.globalBlockedDate.create({
     data: {
-      date: parseISODate(date),
+      date: parseDateUTC(date),
       reason: reason || null,
     },
   })

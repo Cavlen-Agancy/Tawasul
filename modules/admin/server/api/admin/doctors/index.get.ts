@@ -25,8 +25,8 @@ export default defineEventHandler(async (event) => {
 
   const doctorIds = doctors.map((d) => d.id)
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+  const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1))
+  const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999))
 
   const [monthCounts, allCounts] = await Promise.all([
     prisma.booking.groupBy({

@@ -1,10 +1,18 @@
 import type { AdminBooking, AdminDoctor, AdminDoctorDetail, AvailabilitySlot, BlockedSlot, AdminPayment, PaymentsSummary, AdminStaffMember, AdminPatient, AdminPatientDetail, AdminSettings, AdminOverview, AdminSchedule, BlockedDate, PendingBooking } from './types'
 
 function formatDateISO(d: Date | string): string {
+  // Calendar-day display: never construct a Date from a date-only string
+  // (`new Date('YYYY-MM-DD')` is UTC midnight, so local getters flip the day
+  // on UTC-X browsers). Date-only strings pass through; full ISO instants
+  // from `@db.Date` readbacks (always UTC midnight) contribute their UTC day.
+  if (typeof d === 'string') {
+    const plain = d.match(/^(\d{4}-\d{2}-\d{2})/)
+    if (plain) return plain[1] as string
+  }
   const date = typeof d === 'string' ? new Date(d) : d
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+  const y = date.getUTCFullYear()
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
 

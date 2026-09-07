@@ -1,5 +1,6 @@
 import { prisma } from '~/server/utils/prisma'
 import { isHoliday } from '~/server/utils/holidays'
+import { parseDateUTC, formatDateUTC } from '~/server/utils/availability'
 
 export interface AdminSlot {
   startTime: string
@@ -50,7 +51,7 @@ function overlaps(aStart: number, aEnd: number, slotStart: number, slotEnd: numb
  * Slots carry NO doctorId — a doctor is assigned later by the admin.
  */
 export async function getAdminAvailableSlots(date: string): Promise<AdminSlot[]> {
-  const target = parseISODate(date)
+  const target = parseDateUTC(date)
   const today = new Date()
   const todayISO = formatDateISO(today)
 
@@ -69,7 +70,7 @@ export async function getAdminAvailableSlots(date: string): Promise<AdminSlot[]>
   // Public holidays are non-working days regardless of the schedule.
   if (isHoliday(date)) return []
 
-  const dayOfWeek = target.getDay()
+  const dayOfWeek = target.getUTCDay()
 
   const schedules = await prisma.adminSchedule.findMany({
     where: { dayOfWeek, isActive: true },
@@ -126,14 +127,14 @@ export async function getAdminAvailableDates(month: number, year: number): Promi
   })
   if (schedules.length === 0) return []
 
-  const monthStart = new Date(year, month - 1, 1)
-  const monthEnd = new Date(year, month, 0, 23, 59, 59, 999)
+  const monthStart = new Date(Date.UTC(year, month - 1, 1))
+  const monthEnd = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
 
   const blockedDates = await prisma.globalBlockedDate.findMany({
     where: { date: { gte: monthStart, lte: monthEnd } },
     select: { date: true },
   })
-  const blockedSet = new Set(blockedDates.map((b) => formatDateISO(b.date)))
+  const blockedSet = new Set(blockedDates.map((b) => formatDateUTC(b.date)))
 
   const bookings = await prisma.booking.findMany({
     where: {
@@ -157,7 +158,7 @@ export async function getAdminAvailableDates(month: number, year: number): Promi
     const daySchedules = schedules.filter((s) => s.dayOfWeek === dayOfWeek)
     if (daySchedules.length === 0) continue
 
-    const dayBookings = bookings.filter((b) => formatDateISO(b.date) === dateISO)
+    const dayBookings = bookings.filter((b) => formatDateUTC(b.date) === dateISO)
 
     let hasSlot = false
     for (const schedule of daySchedules) {

@@ -34,6 +34,15 @@ function daysFromNow(days: number): Date {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000)
 }
 
+/**
+ * `@db.Date` stores UTC-midnight calendar days (see prod `create.post.ts`).
+ * Fixtures wrap intended local days the same way so the calendar shows them
+ * on the intended day in every timezone.
+ */
+function utcDay(d: Date): Date {
+  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+}
+
 /** A deterministic future day in the NEXT month (guaranteed available: doctor works all days). */
 function futureTargetDate(): { date: string } {
   const base = new Date()
@@ -44,6 +53,14 @@ function futureTargetDate(): { date: string } {
 
 function monthLabel(year: number, month: number): string {
   return new Date(year, month - 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+}
+
+/** Formats an "HH:MM" string the same way the page does, e.g. "11:00 AM". */
+function formatTime(time: string): string {
+  const [h, m] = time.split(':').map((v) => parseInt(v, 10))
+  const period = (h || 0) >= 12 ? 'PM' : 'AM'
+  const hour = (h || 0) % 12 === 0 ? 12 : (h || 0) % 12
+  return `${hour}:${String(m).padStart(2, '0')} ${period}`
 }
 
 async function gotoReady(page: Page, path: string) {
@@ -164,7 +181,7 @@ test.beforeAll(async () => {
     data: {
       userId: patientUser.id,
       doctorId: doc.id,
-      date: new Date(),
+      date: utcDay(new Date()),
       startTime: hhmm(startNow),
       endTime: hhmm(new Date(startNow.getTime() + 60 * 60 * 1000)),
       service: 'Marital Counseling',
@@ -178,7 +195,7 @@ test.beforeAll(async () => {
     data: {
       userId: patientUser.id,
       doctorId: doc.id,
-      date: daysFromNow(7),
+      date: utcDay(daysFromNow(7)),
       startTime: '10:00',
       endTime: '11:00',
       service: 'Marital Counseling',
@@ -193,7 +210,7 @@ test.beforeAll(async () => {
     data: {
       userId: patientUser.id,
       doctorId: doc.id,
-      date: new Date(),
+      date: utcDay(new Date()),
       startTime: hhmm(sessionStart),
       endTime: hhmm(new Date(sessionStart.getTime() + 60 * 60 * 1000)),
       service: 'Marital Counseling',
@@ -206,7 +223,7 @@ test.beforeAll(async () => {
     data: {
       userId: patientUser.id,
       doctorId: doc.id,
-      date: daysFromNow(-8),
+      date: utcDay(daysFromNow(-8)),
       startTime: '10:00',
       endTime: '11:00',
       service: 'Marital Counseling',
@@ -219,7 +236,7 @@ test.beforeAll(async () => {
     data: {
       userId: patientUser.id,
       doctorId: doc.id,
-      date: daysFromNow(-7),
+      date: utcDay(daysFromNow(-7)),
       startTime: '10:00',
       endTime: '11:00',
       service: 'Marital Counseling',
@@ -232,7 +249,7 @@ test.beforeAll(async () => {
     data: {
       userId: patientUser.id,
       doctorId: null,
-      date: daysFromNow(10),
+      date: utcDay(daysFromNow(10)),
       startTime: '10:00',
       endTime: '11:00',
       service: 'Marital Counseling',
@@ -353,20 +370,208 @@ test.describe('Patient Dashboard', () => {
     await expect(page.getByTestId(`cancel-${bookingFutureId}`)).toBeVisible()
   })
 
-  // E) Pending booking shows Unknown Doctor and Under review with no buttons
-  test('pending booking shows Unknown Doctor and no action buttons', async ({ page }) => {
+  // E) Pending booking shows Unknown Doctor, Under review, and Edit/Cancel buttons
+  test('pending booking shows Unknown Doctor, Under review, and Edit/Cancel buttons', async ({ page }) => {
+    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    const date = ymd(daysFromNow(10))
+    const [ty, tm] = date.split('-').map((v) => parseInt(v, 10))
+    await gotoMonth(page, ty, tm)
+    const cell = page.locator(`.fc-day[data-date="${date}"]`)
+    await expect(cell).toHaveClass(/fc-dot-pending/, { timeout: 20_000 })
+    await cell.locator('.fc-daygrid-day-frame').click()
+    const card = page.getByTestId(`booking-${bookingPendingId}`)
+    await expect(card).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId(`doctor-name-${bookingPendingId}`)).toContainText('Unknown Doctor')
+    await expect(page.getByTestId(`status-${bookingPendingId}`)).toContainText('Under review')
+    await expect(page.getByTestId(`pending-note-${bookingPendingId}`)).toContainText('Waiting for admin confirmation')
+    await expect(page.getByTestId(`join-${bookingPendingId}`)).toHaveCount(0)
+    await expect(page.getByTestId(`edit-${bookingPendingId}`)).toBeVisible()
+    await expect(page.getByTestId(`cancel-${bookingPendingId}`)).toBeVisible()
+  })
+
+  // E1) Pending booking within 24h still shows Cancel (no 24h restriction on pending)
+  test('pending booking within 24h shows Cancel button', async ({ page }) => {
+    const patientUser = await prisma.user.findUniqueOrThrow({ where: { email: patient.email } })
+    const sessionStart = new Date(Date.now() + 2 * 60 * 60 * 1000)
+    const soonPending = await prisma.booking.create({
+      data: {
+        userId: patientUser.id,
+        doctorId: null,
+        date: utcDay(sessionStart),
+        startTime: hhmm(sessionStart),
+        endTime: hhmm(new Date(sessionStart.getTime() + 60 * 60 * 1000)),
+        service: 'Marital Counseling',
+        status: 'PENDING',
+      },
+    })
+    try {
+      await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+      const date = ymd(sessionStart)
+      const [ty, tm] = date.split('-').map((v) => parseInt(v, 10))
+      await gotoMonth(page, ty, tm)
+      const cell = page.locator(`.fc-day[data-date="${date}"]`)
+      await cell.locator('.fc-daygrid-day-frame').click()
+      const card = page.getByTestId(`booking-${soonPending.id}`)
+      await expect(card).toBeVisible({ timeout: 20_000 })
+      await expect(page.getByTestId(`status-${soonPending.id}`)).toContainText('Under review')
+      await expect(page.getByTestId(`cancel-${soonPending.id}`)).toBeVisible()
+    } finally {
+      await prisma.booking.deleteMany({ where: { id: soonPending.id } }).catch(() => undefined)
+    }
+  })
+
+  // E4) Editing a pending booking opens the modal, picks a slot, and updates the time
+  test('edit opens modal, reschedules pending booking, and refreshes', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
     const date = ymd(daysFromNow(10))
     const [ty, tm] = date.split('-').map((v) => parseInt(v, 10))
     await gotoMonth(page, ty, tm)
     const cell = page.locator(`.fc-day[data-date="${date}"]`)
     await cell.locator('.fc-daygrid-day-frame').click()
-    const card = page.getByTestId(`booking-${bookingPendingId}`)
-    await expect(card).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByTestId(`doctor-name-${bookingPendingId}`)).toContainText('Unknown Doctor')
-    await expect(page.getByTestId(`status-${bookingPendingId}`)).toContainText('Under review')
-    await expect(page.getByTestId(`join-${bookingPendingId}`)).toHaveCount(0)
-    await expect(page.getByTestId(`cancel-${bookingPendingId}`)).toHaveCount(0)
+    await expect(page.getByTestId(`booking-${bookingPendingId}`)).toBeVisible({ timeout: 20_000 })
+
+    await page.getByTestId(`edit-${bookingPendingId}`).click()
+    await expect(page.getByRole('heading', { name: 'Reschedule appointment' })).toBeVisible({ timeout: 20_000 })
+    // Current slot ('10:00') is present together with at least one other slot.
+    const current = page.getByTestId('edit-slot-10:00')
+    await expect(current).toBeVisible({ timeout: 20_000 })
+    await expect(current).toContainText('(current)')
+
+    // Pick a different slot than the current one ('10:00').
+    const slotButtons = page.locator('[data-testid^="edit-slot-"]')
+    const slotCount = await slotButtons.count()
+    let chosen = ''
+    for (let i = 0; i < slotCount; i++) {
+      const id = (await slotButtons.nth(i).getAttribute('data-testid')) ?? ''
+      const time = id.replace('edit-slot-', '')
+      if (time !== '10:00') {
+        chosen = time
+        await slotButtons.nth(i).click()
+        break
+      }
+    }
+    expect(chosen).not.toBe('')
+    await expect(page.getByTestId('edit-confirm')).toBeEnabled()
+    await page.getByTestId('edit-confirm').click()
+
+    await expect(page.getByTestId('toast-success')).toBeVisible({ timeout: 20_000 })
+    // The panel refreshes with the new time.
+    await expect(page.getByTestId(`booking-${bookingPendingId}`)).toContainText(formatTime(chosen), { timeout: 20_000 })
+  })
+
+  // E2) Legend prioritises the patient's booking states
+  test('legend order prioritises booking states', async ({ page }) => {
+    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    const legend = page.getByTestId('calendar-legend')
+    await expect(legend).toBeVisible({ timeout: 20_000 })
+    const text = (await legend.textContent()) ?? ''
+    const order = ['Confirmed', 'Under review', 'Available day', 'Holiday']
+    let lastIndex = -1
+    for (const label of order) {
+      const i = text.indexOf(label)
+      expect(i).toBeGreaterThan(lastIndex)
+      lastIndex = i
+    }
+  })
+
+  // E3) Outside-month dates are dimmed and not clickable
+  test('outside-month dates are dimmed and not clickable', async ({ page }) => {
+    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    const other = page.locator('.fc-day.fc-day-other').first()
+    await expect(other).toBeVisible({ timeout: 20_000 })
+    await other.locator('.fc-daygrid-day-frame').click({ force: true })
+    await expect(page.getByTestId('day-panel')).toContainText('Select a date above')
+  })
+
+  // E4) Clicking a weekend day shows the clinic-closed message (no Book Now)
+  test('weekend day shows the clinic-closed message', async ({ page }) => {
+    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    // Next Saturday strictly after today: no seed schedule on weekends.
+    // Skip forward while the cell is a holiday (not clickable).
+    let sat = ''
+    for (let i = 0; i < 4; i++) {
+      sat = await page.evaluate((weeks: number) => {
+        const now = new Date()
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        const d = new Date(today)
+        do { d.setDate(d.getDate() + 1) } while (d.getDay() !== 6 || d <= today)
+        d.setDate(d.getDate() + weeks * 7)
+        const p = (n: number) => String(n).padStart(2, '0')
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+      }, i)
+      const [sy, sm] = sat.split('-').map((v) => parseInt(v, 10))
+      await gotoMonth(page, sy, sm)
+      const cls = await page.locator(`.fc-day[data-date="${sat}"]`).getAttribute('class')
+      if (cls && !cls.includes('fc-holiday')) break
+    }
+    const [sy, sm] = sat.split('-').map((v) => parseInt(v, 10))
+    await gotoMonth(page, sy, sm)
+    const cell = page.locator(`.fc-day[data-date="${sat}"]`)
+    await expect(cell).toBeVisible({ timeout: 20_000 })
+    await cell.locator('.fc-daygrid-day-frame').click()
+    await expect(page.getByTestId('day-weekend')).toContainText('The clinic is closed on weekends.', { timeout: 20_000 })
+    await expect(page.getByTestId('book-now-empty')).toHaveCount(0)
+    await expect(page.getByTestId('day-empty')).toHaveCount(0)
+  })
+
+  // E5) Available days render a magenta dot (not a bold magenta number)
+  test('available days show a magenta dot and legend matches', async ({ page }) => {
+    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    const cell = page.locator('.fc-day.fc-available').first()
+    await expect(cell).toBeVisible({ timeout: 20_000 })
+    const number = cell.locator('.fc-daygrid-day-number')
+    const dotColor = await number.evaluate((el) => window.getComputedStyle(el, '::after').backgroundColor)
+    expect(dotColor).toBe('rgb(233, 30, 140)')
+    const numberColor = await number.evaluate((el) => window.getComputedStyle(el).color)
+    expect(numberColor).not.toBe('rgb(233, 30, 140)')
+    await expect(page.getByTestId('legend-available-dot')).toBeVisible()
+  })
+
+  // E6) A booked day also lists remaining free slots below the bookings
+  test('booked day shows bookings plus remaining slots', async ({ page }) => {
+    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    const date = ymd(daysFromNow(10))
+    const [ty, tm] = date.split('-').map((v) => parseInt(v, 10))
+    await gotoMonth(page, ty, tm)
+    const cell = page.locator(`.fc-day[data-date="${date}"]`)
+    await cell.locator('.fc-daygrid-day-frame').click()
+    await expect(page.getByTestId(`booking-${bookingPendingId}`)).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId('day-panel')).toContainText('Other available times on this day:')
+    await expect(page.locator('[data-testid^="slot-"]').first()).toBeVisible({ timeout: 20_000 })
+  })
+
+  // E7) Slots fetch failure shows an error card and Retry recovers
+  test('slots fetch failure shows error card and Retry recovers', async ({ page }) => {
+    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    await page.route('**/api/booking/available-slots*', (route) => route.abort())
+    // Next Wednesday strictly after today: no fixture bookings land on Wednesdays.
+    // Skip forward while the cell is a holiday (not clickable).
+    let wed = ''
+    for (let i = 0; i < 4; i++) {
+      wed = await page.evaluate((weeks: number) => {
+        const now = new Date()
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        const d = new Date(today)
+        do { d.setDate(d.getDate() + 1) } while (d.getDay() !== 3 || d <= today)
+        d.setDate(d.getDate() + weeks * 7)
+        const p = (n: number) => String(n).padStart(2, '0')
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+      }, i)
+      const [wy, wm] = wed.split('-').map((v) => parseInt(v, 10))
+      await gotoMonth(page, wy, wm)
+      const cls = await page.locator(`.fc-day[data-date="${wed}"]`).getAttribute('class')
+      if (cls && !cls.includes('fc-holiday')) break
+    }
+    const [wy, wm] = wed.split('-').map((v) => parseInt(v, 10))
+    await gotoMonth(page, wy, wm)
+    const cell = page.locator(`.fc-day[data-date="${wed}"]`)
+    await cell.locator('.fc-daygrid-day-frame').click()
+    await expect(page.getByTestId('day-error')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId('day-retry')).toBeVisible()
+    await page.unrouteAll({ behavior: 'wait' })
+    await page.getByTestId('day-retry').click()
+    await expect(page.locator('[data-testid^="slot-"]').first()).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId('day-error')).toHaveCount(0)
   })
 
   // F) Join button is active near session time and opens the session page
@@ -422,7 +627,8 @@ test.describe('Patient Dashboard', () => {
     await page.getByTestId('cancel-dialog-confirm').click()
     await expect(page.getByTestId(`status-${bookingFutureId}`)).toContainText('Cancelled', { timeout: 20_000 })
     await expect(page.getByTestId(`cancel-${bookingFutureId}`)).toHaveCount(0)
-    await expect(cell).toHaveClass(/fc-dot-cancelled/, { timeout: 20_000 })
+    await expect(page.getByTestId(`join-${bookingFutureId}`)).toHaveCount(0)
+    await expect(page.getByTestId(`edit-${bookingFutureId}`)).toHaveCount(0)
   })
 
   test('payments page loads with payment history', async ({ page }) => {

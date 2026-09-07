@@ -98,7 +98,8 @@ describe('getAvailableSlots', () => {
       }),
     ])
     mockedBookings.mockResolvedValue([
-      { doctorId: 'doc-1', date: new Date(`${dateStr}T00:00:00`), startTime: '10:00', endTime: '11:00', status: 'CONFIRMED' },
+      // Mocked `@db.Date` readbacks are UTC-midnight Dates, like the real Prisma client returns.
+      { doctorId: 'doc-1', date: new Date(`${dateStr}T00:00:00Z`), startTime: '10:00', endTime: '11:00', status: 'CONFIRMED' },
     ] as never)
     mockedBlocked.mockResolvedValue([])
 
@@ -120,7 +121,7 @@ describe('getAvailableSlots', () => {
     ])
     mockedBookings.mockResolvedValue([])
     mockedBlocked.mockResolvedValue([
-      { doctorId: 'doc-1', date: new Date(`${dateStr}T00:00:00`), startTime: '11:00', endTime: '12:00' },
+      { doctorId: 'doc-1', date: new Date(`${dateStr}T00:00:00Z`), startTime: '11:00', endTime: '12:00' },
     ] as never)
 
     const slots = await getAvailableSlots(dateStr)
@@ -196,7 +197,7 @@ describe('getAvailableDates', () => {
     const bookings: Array<{ doctorId: string; date: Date; startTime: string; endTime: string; status: string }> = []
     for (let d = new Date(monthStart); d <= monthEnd; d = new Date(d.getTime() + 86400000)) {
       if (d.getDay() === 0) {
-        bookings.push({ doctorId: 'doc-1', date: new Date(d), startTime: '09:00', endTime: '10:00', status: 'CONFIRMED' })
+        bookings.push({ doctorId: 'doc-1', date: new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())), startTime: '09:00', endTime: '10:00', status: 'CONFIRMED' })
       }
     }
     mockedBookings.mockResolvedValue(bookings as never)

@@ -12,6 +12,7 @@ export interface AvailableSlot {
   startTime: string
   endTime: string
   sessionDuration: number
+  current?: boolean
 }
 
 export function usePatientDashboard() {
@@ -25,6 +26,18 @@ export function usePatientDashboard() {
   const availableDates = useState<string[]>('patient-available-dates', () => [])
   const availableSlots = useState<AvailableSlot[]>('patient-available-slots', () => [])
   const selectedDate = useState<string | null>('patient-selected-date', () => null)
+  const fetchError = useState<string | null>('patient-fetch-error', () => null)
+
+  function clearFetchError(): void {
+    fetchError.value = null
+  }
+
+  function isWeekend(dateString: string): boolean {
+    const [y, m, d] = dateString.split('-').map((v) => parseInt(v, 10))
+    if (!y || !m || !d) return false
+    const day = new Date(y, (m || 1) - 1, d).getDay()
+    return day === 0 || day === 6
+  }
 
   async function fetchProfile(): Promise<PatientProfile | null> {
     isLoading.value = true
@@ -128,6 +141,21 @@ export function usePatientDashboard() {
     }
   }
 
+  async function updateBookingTime(bookingId: string, startTime: string): Promise<Appointment> {
+    error.value = null
+    try {
+      const updated = await $fetch<Appointment>(`/api/booking/${bookingId}`, {
+        method: 'PATCH',
+        body: { startTime },
+      })
+      allBookings.value = allBookings.value.map((a) => (a.id === bookingId ? updated : a))
+      return updated
+    } catch (e) {
+      error.value = getApiMessage(e)
+      throw e
+    }
+  }
+
   async function fetchAllBookings(): Promise<Appointment[]> {
     isLoading.value = true
     error.value = null
@@ -144,6 +172,7 @@ export function usePatientDashboard() {
   }
 
   async function fetchAvailableDates(month: number, year: number): Promise<string[]> {
+    fetchError.value = null
     try {
       const data = await $fetch<{ dates: string[] }>('/api/booking/available-dates', {
         query: { month, year },
@@ -152,11 +181,13 @@ export function usePatientDashboard() {
       return data.dates
     } catch (e) {
       error.value = getApiMessage(e)
+      fetchError.value = getApiMessage(e) || 'Failed to load availability. Please try again.'
       return []
     }
   }
 
   async function fetchAvailableSlots(date: string): Promise<AvailableSlot[]> {
+    fetchError.value = null
     try {
       const data = await $fetch<{ slots: AvailableSlot[] }>('/api/booking/available-slots', {
         query: { date },
@@ -165,6 +196,7 @@ export function usePatientDashboard() {
       return data.slots
     } catch (e) {
       error.value = getApiMessage(e)
+      fetchError.value = getApiMessage(e) || 'Failed to load availability. Please try again.'
       return []
     }
   }
@@ -177,9 +209,8 @@ export function usePatientDashboard() {
     selectedDate.value = date
     availableSlots.value = []
     const bookings = fetchBookingsForDate(date)
-    if (bookings.length === 0) {
-      await fetchAvailableSlots(date)
-    }
+    // Always fetch slots so booked days can still offer remaining free times.
+    await fetchAvailableSlots(date)
     return bookings
   }
 
@@ -227,6 +258,9 @@ export function usePatientDashboard() {
     availableDates,
     availableSlots,
     selectedDate,
+    fetchError,
+    clearFetchError,
+    isWeekend,
     fetchProfile,
     updateProfile,
     uploadPhoto,
@@ -234,6 +268,7 @@ export function usePatientDashboard() {
     fetchAllAppointments,
     cancelAppointment,
     fetchAllBookings,
+    updateBookingTime,
     fetchAvailableDates,
     fetchAvailableSlots,
     fetchBookingsForDate,

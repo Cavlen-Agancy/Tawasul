@@ -1,7 +1,7 @@
 import { defineEventHandler, getRouterParam, createError } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requireAuth } from '~/server/utils/auth'
-import { formatDateISO } from '~/server/utils/admin-availability'
+import { formatDateUTC } from '~/server/utils/availability'
 
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event, ['DOCTOR'])
@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
     id: booking.id,
     patientName: booking.user.name,
     patientEmail: booking.user.email,
-    date: formatDateISO(booking.date),
+    date: formatDateUTC(booking.date),
     startTime: booking.startTime,
     endTime: booking.endTime,
     service: booking.service,

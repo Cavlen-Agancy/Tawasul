@@ -2,9 +2,10 @@
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { Calendar as CalendarIcon, CalendarX2, ChevronLeft, ChevronRight, Video } from 'lucide-vue-next'
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Video } from 'lucide-vue-next'
 import type { DateClickArg, DatesSetArg, DayCellContentArg } from '@fullcalendar/core'
 import type { Appointment } from '~/modules/patient/composables/types'
+import type { AvailableSlot } from '~/modules/patient/composables/usePatientDashboard'
 
 definePageMeta({
   layout: 'patient-layout',
@@ -23,6 +24,11 @@ const {
   fetchBookingsForDate,
   selectDate,
   cancelAppointment,
+  updateBookingTime,
+  fetchAvailableSlots,
+  fetchError,
+  clearFetchError,
+  isWeekend,
 } = usePatientDashboard()
 const { isHoliday } = useHolidays()
 const { toast } = useToast()
@@ -39,6 +45,14 @@ const panelLoading = ref(false)
 const cancelTarget = ref<Appointment | null>(null)
 const cancelDialogOpen = ref(false)
 const cancelling = ref(false)
+
+const editTarget = ref<Appointment | null>(null)
+const editDialogOpen = ref(false)
+const editSlots = ref<AvailableSlot[]>([])
+const editSlotLoading = ref(false)
+const selectedEditTime = ref<string | null>(null)
+const editing = ref(false)
+const editError = ref<string | null>(null)
 
 function toISODate(date: Date): string {
   const y = date.getFullYear()
@@ -81,11 +95,10 @@ function canCancel(appt: Appointment): boolean {
   return now.value < sessionStart(appt).getTime() - 24 * 60 * 60 * 1000
 }
 
-function statusForDate(dateStr: string): 'confirmed' | 'pending' | 'cancelled' | null {
+function statusForDate(dateStr: string): 'confirmed' | 'pending' | null {
   const day = allBookings.value.filter((a) => a.date === dateStr).map((a) => a.status)
   if (day.includes('CONFIRMED')) return 'confirmed'
   if (day.includes('PENDING')) return 'pending'
-  if (day.includes('CANCELLED')) return 'cancelled'
   return null
 }
 
@@ -97,8 +110,7 @@ function dayCellClass(info: DayCellContentArg): string[] {
   const st = statusForDate(dateStr)
   if (st === 'confirmed') classes.push('fc-dot-confirmed')
   else if (st === 'pending') classes.push('fc-dot-pending')
-  else if (st === 'cancelled') classes.push('fc-dot-cancelled')
-  if (availableDates.value.includes(dateStr)) classes.push('fc-available')
+  else if (availableDates.value.includes(dateStr)) classes.push('fc-available')
   return classes
 }
 
@@ -131,15 +143,32 @@ async function onDatesSet(info: DatesSetArg) {
 
 async function onDateClick(info: DateClickArg) {
   const dateStr = toISODate(info.date)
+  if (info.date.getMonth() + 1 !== currentMonth.value) return
   if (isPastStr(dateStr)) return
   if (isHoliday(dateStr)) {
     toast({ title: 'Clinic closed for a public holiday', variant: 'info' })
     return
   }
+  // Weekends stay clickable on purpose: the panel explains the clinic is closed.
   panelLoading.value = true
   try {
     await selectDate(dateStr)
     selectedBookings.value = fetchBookingsForDate(dateStr)
+  } finally {
+    panelLoading.value = false
+  }
+}
+
+async function retryLoad() {
+  clearFetchError()
+  panelLoading.value = true
+  try {
+    await loadMonth(currentMonth.value, currentYear.value)
+    if (selectedDate.value) {
+      await selectDate(selectedDate.value)
+      selectedBookings.value = fetchBookingsForDate(selectedDate.value)
+    }
+    calendarKey.value += 1
   } finally {
     panelLoading.value = false
   }
@@ -225,6 +254,74 @@ async function confirmCancel() {
   }
 }
 
+function canEdit(appt: Appointment): boolean {
+  return appt.status === 'PENDING' && now.value < sessionStart(appt).getTime()
+}
+
+async function openEditModal(appt: Appointment) {
+  editTarget.value = appt
+  editError.value = null
+  editSlots.value = []
+  selectedEditTime.value = null
+  editDialogOpen.value = true
+  editSlotLoading.value = true
+  try {
+    const slots = await fetchAvailableSlots(appt.date)
+    // The patient's own (pending) slot is not counted as taken by the API, so it
+    // is already present; ensure we don't offer past times on today's sessions.
+    const currentHHMM = appt.startTime
+    const isToday = appt.date === todayStr()
+    const currentMinutes = isToday
+      ? new Date(now.value).getHours() * 60 + new Date(now.value).getMinutes()
+      : -1
+    const list = slots
+      .filter((s) => !(isToday && timeToMinutesNum(s.startTime) <= currentMinutes))
+      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+    const flagCurrent = (s: AvailableSlot) => (s.startTime === currentHHMM ? { ...s, current: true } : s)
+    editSlots.value = list.map(flagCurrent)
+    if (!list.some((s) => s.startTime === currentHHMM)) {
+      editSlots.value.push({ startTime: currentHHMM, endTime: appt.endTime, sessionDuration: 60, current: true })
+    }
+    selectedEditTime.value = currentHHMM
+  } catch (e) {
+    editError.value = (e as { data?: { message?: string } }).data?.message || 'Could not load available slots'
+  } finally {
+    editSlotLoading.value = false
+  }
+}
+
+function timeToMinutesNum(time: string): number {
+  const [h, m] = time.split(':').map((v) => parseInt(v, 10))
+  return (h || 0) * 60 + (m || 0)
+}
+
+function selectEditSlot(startTime: string) {
+  selectedEditTime.value = startTime
+  editError.value = null
+}
+
+async function confirmEdit() {
+  if (!editTarget.value || !selectedEditTime.value) return
+  editing.value = true
+  editError.value = null
+  try {
+    await updateBookingTime(editTarget.value.id, selectedEditTime.value)
+    toast({ title: 'Appointment updated', variant: 'success' })
+    editDialogOpen.value = false
+    editTarget.value = null
+    await fetchAllBookings()
+    await loadMonth(currentMonth.value, currentYear.value)
+    if (selectedDate.value) {
+      selectedBookings.value = fetchBookingsForDate(selectedDate.value)
+    }
+    calendarKey.value += 1
+  } catch (e) {
+    editError.value = (e as { data?: { message?: string } }).data?.message || 'Could not update appointment'
+  } finally {
+    editing.value = false
+  }
+}
+
 const calendarOptions = computed(() => ({
   plugins: [dayGridPlugin, interactionPlugin],
   initialView: 'dayGridMonth',
@@ -251,7 +348,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-[1100px]">
+  <div class="mx-auto w-full max-w-[1100px]" :data-testid="'available-dates-count-' + availableDates.length">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="min-w-0">
         <h1 class="text-2xl font-semibold tracking-tight text-foreground" data-testid="page-title">
@@ -259,10 +356,6 @@ onMounted(async () => {
         </h1>
         <p class="mt-1 text-sm text-muted-foreground">Select a day to see your bookings or free times.</p>
       </div>
-      <Button as="a" href="/book" data-testid="book-session-button" class="shrink-0">
-        <CalendarX2 class="size-4" />
-        Book a Session
-      </Button>
     </div>
 
     <p v-if="error" class="mt-4 text-sm text-destructive">{{ error }}</p>
@@ -294,11 +387,7 @@ onMounted(async () => {
           </template>
         </ClientOnly>
 
-        <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
-          <span class="inline-flex items-center gap-1.5">
-            <span class="size-3 rounded-sm border border-primary"></span>
-            Available day
-          </span>
+        <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground" data-testid="calendar-legend">
           <span class="inline-flex items-center gap-1.5">
             <span class="size-2.5 rounded-full bg-green-600"></span>
             Confirmed
@@ -308,8 +397,8 @@ onMounted(async () => {
             Under review
           </span>
           <span class="inline-flex items-center gap-1.5">
-            <span class="size-2.5 rounded-full bg-slate-400"></span>
-            Cancelled
+            <span class="size-2.5 rounded-full bg-[#e91e8c]" data-testid="legend-available-dot"></span>
+            Available day
           </span>
           <span class="inline-flex items-center gap-1.5">
             <span class="size-3 rounded-sm bg-slate-200"></span>
@@ -320,12 +409,18 @@ onMounted(async () => {
     </Card>
 
     <div class="mt-6" data-testid="day-panel">
-      <div v-if="isLoading && allBookings.length === 0" class="grid gap-3">
-        <Skeleton v-for="i in 2" :key="i" class="h-28 w-full" />
+      <div v-if="fetchError" class="rounded-2xl border border-destructive/40 bg-white p-6 text-center" data-testid="day-error">
+        <p class="text-sm font-medium text-destructive">{{ fetchError }}</p>
+        <Button variant="outline" class="mt-4" data-testid="day-retry" @click="retryLoad">Retry</Button>
       </div>
 
-      <div v-else-if="!selectedDate" class="rounded-2xl border border-border bg-white px-4 py-8 text-center text-sm text-muted-foreground">
-        Select a date above to see your bookings or free times.
+      <div v-else-if="!selectedDate">
+        <div v-if="isLoading || availableDates.length === 0" class="grid gap-3">
+          <Skeleton v-for="i in 2" :key="i" class="h-28 w-full" />
+        </div>
+        <div v-else class="rounded-2xl border border-border bg-white px-4 py-8 text-center text-sm text-muted-foreground">
+          Select a date above to see your bookings or free times.
+        </div>
       </div>
 
       <div v-else>
@@ -337,7 +432,13 @@ onMounted(async () => {
           <Skeleton v-for="i in 2" :key="i" class="h-24 w-full" />
         </div>
 
-        <div v-else-if="selectedBookings.length > 0" class="grid gap-4">
+        <div v-else-if="selectedDate && isWeekend(selectedDate)" class="rounded-2xl border border-border bg-white p-10 text-center" data-testid="day-weekend">
+          <p class="font-medium text-foreground">The clinic is closed on weekends.</p>
+          <p class="mt-1 text-sm text-muted-foreground">Please choose a weekday to see bookings or free times.</p>
+        </div>
+
+        <div v-else>
+          <div v-if="selectedBookings.length > 0" class="grid gap-4">
           <Card
             v-for="appt in selectedBookings"
             :key="appt.id"
@@ -355,6 +456,13 @@ onMounted(async () => {
                 </p>
                 <p class="text-sm text-muted-foreground">{{ formatTime(appt.startTime) }} – {{ formatTime(appt.endTime) }}</p>
                 <p class="mt-1 text-sm text-muted-foreground">{{ appt.service }}</p>
+                <p
+                  v-if="appt.status === 'PENDING' && !appt.doctorId"
+                  class="mt-1 text-xs text-muted-foreground"
+                  :data-testid="`pending-note-${appt.id}`"
+                >
+                  Waiting for admin confirmation — you'll receive an email once confirmed.
+                </p>
               </div>
               <div class="flex shrink-0 flex-col gap-2 sm:items-end">
                 <Badge
@@ -374,22 +482,32 @@ onMounted(async () => {
                   >
                     Join Session
                   </Button>
+                </template>
+                <template v-if="appt.status === 'PENDING'">
                   <Button
-                    v-if="canCancel(appt)"
+                    v-if="canEdit(appt)"
                     variant="outline"
-                    :data-testid="`cancel-${appt.id}`"
-                    @click="openCancelDialog(appt)"
+                    :data-testid="`edit-${appt.id}`"
+                    @click="openEditModal(appt)"
                   >
-                    Cancel
+                    Edit
                   </Button>
                 </template>
+                <Button
+                  v-if="appt.status === 'PENDING' || (appt.status === 'CONFIRMED' && canCancel(appt))"
+                  variant="outline"
+                  :data-testid="`cancel-${appt.id}`"
+                  @click="openCancelDialog(appt)"
+                >
+                  Cancel
+                </Button>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <div v-else-if="availableSlots.length > 0" class="rounded-2xl border border-border bg-white p-5">
-          <p class="mb-3 text-sm font-medium text-foreground">Free times on this day</p>
+        <div v-if="availableSlots.length > 0" class="rounded-2xl border border-border bg-white p-5" :class="{ 'mt-4': selectedBookings.length > 0 }">
+          <p class="mb-3 text-sm font-medium text-foreground">Other available times on this day:</p>
           <div class="flex flex-wrap gap-2">
             <Button
               v-for="slot in availableSlots"
@@ -403,10 +521,11 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div v-else class="flex flex-col items-center rounded-2xl border border-border bg-white p-10 text-center" data-testid="day-empty">
+        <div v-if="selectedBookings.length === 0 && availableSlots.length === 0" class="flex flex-col items-center rounded-2xl border border-border bg-white p-10 text-center" data-testid="day-empty">
           <Video class="size-10 text-muted-foreground" />
-          <p class="mt-3 font-medium text-foreground">No appointments on this day. Select another date or book a new session.</p>
+          <p class="mt-3 font-medium text-foreground">No appointments or available slots on this day. Select another date or book a new session.</p>
           <Button as="a" href="/book" class="mt-4" data-testid="book-now-empty">Book Now</Button>
+        </div>
         </div>
       </div>
     </div>
@@ -430,11 +549,67 @@ onMounted(async () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog v-model:open="editDialogOpen">
+        <DialogContent class="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reschedule appointment</DialogTitle>
+            <DialogDescription v-if="editTarget">
+              {{ formatDateLabel(editTarget.date) }} — currently {{ formatTime(editTarget.startTime) }} – {{ formatTime(editTarget.endTime) }}.
+              Choose a new time below.
+            </DialogDescription>
+          </DialogHeader>
+
+          <p v-if="editError" class="text-sm text-destructive" data-testid="edit-error">{{ editError }}</p>
+
+          <div v-if="editSlotLoading" class="grid gap-2 py-2">
+            <Skeleton v-for="i in 3" :key="i" class="h-10 w-full" />
+          </div>
+
+          <div v-else-if="editSlots.length > 0" class="flex flex-wrap gap-2 py-2">
+            <Button
+              v-for="slot in editSlots"
+              :key="slot.startTime"
+              :variant="selectedEditTime === slot.startTime ? 'default' : 'outline'"
+              :data-testid="`edit-slot-${slot.startTime}`"
+              :aria-pressed="selectedEditTime === slot.startTime"
+              @click="selectEditSlot(slot.startTime)"
+            >
+              {{ formatTime(slot.startTime) }}
+              <span v-if="slot.current" class="ml-1 text-xs opacity-80">(current)</span>
+            </Button>
+          </div>
+
+          <div v-else class="rounded-lg border border-border bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground" data-testid="edit-empty">
+            No other slots available on this day. You can keep your current time or cancel the booking.
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" @click="editDialogOpen = false">
+              Cancel
+            </Button>
+            <Button
+              data-testid="edit-confirm"
+              :disabled="editing || !selectedEditTime || selectedEditTime === editTarget?.startTime"
+              @click="confirmEdit"
+            >
+              {{ editing ? 'Saving…' : 'Confirm' }}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Teleport>
   </div>
 </template>
 
 <style>
+.fc-day-other .fc-daygrid-day-frame {
+  cursor: not-allowed;
+}
+.fc-day-other .fc-daygrid-day-number {
+  color: #cbd5e1;
+  opacity: 0.7;
+}
 .fc-holiday .fc-daygrid-day-frame {
   background-color: #f1f5f9;
   cursor: not-allowed;
@@ -453,13 +628,9 @@ onMounted(async () => {
 .fc-available .fc-daygrid-day-frame {
   cursor: pointer;
 }
-.fc-available .fc-daygrid-day-number {
-  color: #e91e8c;
-  font-weight: 600;
-}
 .fc-dot-confirmed .fc-daygrid-day-number::after,
 .fc-dot-pending .fc-daygrid-day-number::after,
-.fc-dot-cancelled .fc-daygrid-day-number::after {
+.fc-available .fc-daygrid-day-number::after {
   content: '';
   display: block;
   width: 0.5rem;
@@ -473,8 +644,8 @@ onMounted(async () => {
 .fc-dot-pending .fc-daygrid-day-number::after {
   background-color: #eab308;
 }
-.fc-dot-cancelled .fc-daygrid-day-number::after {
-  background-color: #94a3b8;
+.fc-available .fc-daygrid-day-number::after {
+  background-color: #e91e8c;
 }
 @media (max-width: 640px) {
   .fc .fc-daygrid-day-number {

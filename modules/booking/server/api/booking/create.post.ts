@@ -67,5 +67,8 @@ export default defineEventHandler(async (event) => {
 
 function parseDateValue(date: string): Date {
   const [y, m, d] = date.split('-').map((p) => parseInt(p, 10))
-  return new Date(y, m - 1, d)
+  // Booking.date is `@db.Date` (bare calendar day). Store at UTC midnight so
+  // the intended day round-trips exactly in every server timezone. A local
+  // `new Date(y, m - 1, d)` stored the PREVIOUS day on UTC+X servers.
+  return new Date(Date.UTC(y, (m || 1) - 1, d || 1))
 }

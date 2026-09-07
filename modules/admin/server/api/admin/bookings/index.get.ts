@@ -1,7 +1,7 @@
 import { defineEventHandler, getQuery } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requirePermission } from '~/server/utils/permissions'
-import { formatDateISO } from '~/server/utils/admin-availability'
+import { formatDateUTC, parseDateUTC } from '~/server/utils/availability'
 
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'APPOINTMENTS', 'READ')
@@ -15,8 +15,8 @@ export default defineEventHandler(async (event) => {
 
   if (query.start && query.end) {
     where.date = {
-      gte: new Date(String(query.start)),
-      lte: new Date(String(query.end)),
+      gte: parseDateUTC(String(query.start)),
+      lte: parseDateUTC(String(query.end)),
     }
   }
   if (query.doctorId) where.doctorId = String(query.doctorId)
@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
       patientPhone: b.user.phone ?? '',
       doctorId: b.doctorId,
       doctorName: b.doctor?.user.name ?? null,
-      date: formatDateISO(b.date),
+      date: formatDateUTC(b.date),
       startTime: b.startTime,
       endTime: b.endTime,
       service: b.service,

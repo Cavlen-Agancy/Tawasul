@@ -2,7 +2,8 @@ import { defineEventHandler, readBody, getRouterParam, createError, setResponseS
 import { prisma } from '~/server/utils/prisma'
 import { requirePermission } from '~/server/utils/permissions'
 import { blockSlotSchema, validationMessage } from '~/server/utils/validation'
-import { parseISODate, formatDateISO } from '~/server/utils/admin-availability'
+import { formatDateISO } from '~/server/utils/admin-availability'
+import { parseDateUTC } from '~/server/utils/availability'
 import { timeToMinutes } from '~/server/utils/availability'
 
 function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
@@ -39,7 +40,7 @@ export default defineEventHandler(async (event) => {
 
   const dayStart = timeToMinutes(startTime)
   const dayEnd = timeToMinutes(endTime)
-  const target = parseISODate(date)
+  const target = parseDateUTC(date)
 
   const existingBlocks = await prisma.blockedSlot.findMany({
     where: { doctorId: id, date: target },

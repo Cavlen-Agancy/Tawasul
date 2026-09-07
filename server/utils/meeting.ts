@@ -1,4 +1,4 @@
-import { parseISODate, formatDateISO } from '~/server/utils/availability'
+import { parseISODate, formatDateUTC } from '~/server/utils/availability'
 
 export const MEETING_OPEN_EARLY_MIN = 5
 export const MEETING_CLOSE_LATE_MIN = 15
@@ -12,13 +12,14 @@ export type MeetingWindow = {
  * Shared meeting window rule: a meeting may be joined from OPEN_EARLY_MIN
  * minutes before its start time until CLOSE_LATE_MIN minutes after its end time.
  *
- * Booking.date is stored as Prisma `@db.Date` (a local-midnight Date). We derive
- * the intended calendar day with `formatDateISO` (local time) and rebuild the
- * start/end instants in the server's local timezone. This avoids the off-by-one
- * that `date.toISOString().slice(0, 10)` introduced (UTC day vs local day).
+ * Booking.date is stored as Prisma `@db.Date` (a bare calendar day, materialised
+ * at UTC midnight). We derive the stored calendar day with `formatDateUTC` and
+ * rebuild the start/end instants in the server's local timezone. Using the
+ * local-time formatter here flipped the day on servers whose UTC offset is
+ * negative (and `toISOString().slice(0, 10)` had the same problem in reverse).
  */
 export function meetingWindow(booking: { date: Date; startTime: string; endTime: string }): MeetingWindow {
-  const dateISO = formatDateISO(booking.date)
+  const dateISO = formatDateUTC(booking.date)
   const sessionStart = parseISODate(dateISO)
   const [sh, sm] = booking.startTime.split(':').map((p) => parseInt(p, 10))
   const [eh, em] = booking.endTime.split(':').map((p) => parseInt(p, 10))

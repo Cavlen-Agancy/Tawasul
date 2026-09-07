@@ -7,7 +7,7 @@ import { deleteTestBooking } from './helpers'
 const toDeleteUsers: string[] = []
 const toDeleteBookings: string[] = []
 
-async function createBooking(ownerId: string, date: Date, startTime: string): Promise<string> {
+async function createBooking(ownerId: string, date: Date, startTime: string, status: 'PENDING' | 'CONFIRMED' = 'PENDING'): Promise<string> {
   const booking = await prisma.booking.create({
     data: {
       userId: ownerId,
@@ -16,7 +16,7 @@ async function createBooking(ownerId: string, date: Date, startTime: string): Pr
       startTime,
       endTime: '10:00',
       service: 'Marital Counseling',
-      status: 'PENDING',
+      status,
     },
   })
   await prisma.payment.create({
@@ -50,11 +50,11 @@ describe('PATCH /api/booking/:id/cancel', () => {
     expect(updated?.status).toBe('CANCELLED')
   })
 
-  it('rejects cancelling own booking less than 24h before', async () => {
+  it('rejects cancelling a CONFIRMED booking less than 24h before', async () => {
     const owner = await createTestUser({ emailVerified: true, email: `cancel-soon-${Date.now()}@test.com` })
     toDeleteUsers.push(owner.id)
     const soon = new Date(Date.now() + 2 * 60 * 60 * 1000)
-    const bookingId = await createBooking(owner.id, soon, '09:00')
+    const bookingId = await createBooking(owner.id, soon, '09:00', 'CONFIRMED')
 
     const event = createApiEvent({
       method: 'PATCH',
@@ -67,6 +67,24 @@ describe('PATCH /api/booking/:id/cancel', () => {
     } catch (e) {
       expectApiError(e, 400, 'Cannot cancel booking less than 24 hours before session')
     }
+  })
+
+  it('allows cancelling a PENDING booking less than 24h before (no restriction)', async () => {
+    const owner = await createTestUser({ emailVerified: true, email: `cancel-pendingsoon-${Date.now()}@test.com` })
+    toDeleteUsers.push(owner.id)
+    const soon = new Date(Date.now() + 2 * 60 * 60 * 1000)
+    const bookingId = await createBooking(owner.id, soon, '09:00', 'PENDING')
+
+    const event = createApiEvent({
+      method: 'PATCH',
+      url: `/api/booking/${bookingId}/cancel`,
+      context: { params: { id: bookingId }, user: { userId: owner.id, email: 'x', accountType: 'PATIENT' } },
+    })
+    const res = await handler(event) as { message: string }
+    expect(res.message).toBe('Booking cancelled successfully')
+
+    const updated = await prisma.booking.findUnique({ where: { id: bookingId } })
+    expect(updated?.status).toBe('CANCELLED')
   })
 
   it('allows STAFF to cancel with APPOINTMENTS DELETE permission', async () => {

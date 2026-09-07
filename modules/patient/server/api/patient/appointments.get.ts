@@ -2,7 +2,7 @@ import { defineEventHandler, getQuery, createError } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requireAuth } from '~/server/utils/auth'
 import { patientAppointmentsQuerySchema } from '~/server/utils/validation'
-import { formatDateISO } from '~/server/utils/availability'
+import { formatDateUTC } from '~/server/utils/availability'
 
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event, ['PATIENT'])
@@ -14,8 +14,10 @@ export default defineEventHandler(async (event) => {
   }
   const tab = parsed.data.tab
 
-  const todayISO = formatDateISO(new Date())
-  const today = new Date(`${todayISO}T00:00:00`)
+  const now = new Date()
+  // `@db.Date` partition boundary: start of the caller's local today, expressed
+  // at UTC midnight so it matches stored rows in every server timezone.
+  const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
 
   let where: Record<string, unknown> = { userId: auth.userId }
   if (tab === 'upcoming') {
@@ -41,7 +43,7 @@ export default defineEventHandler(async (event) => {
     doctorId: b.doctorId,
     doctorName: b.doctor?.user?.name ?? 'Unknown Doctor',
     doctorPhoto: b.doctor?.user?.photo ?? undefined,
-    date: formatDateISO(b.date),
+    date: formatDateUTC(b.date),
     startTime: b.startTime,
     endTime: b.endTime,
     service: b.service,

@@ -1,7 +1,7 @@
 import { defineEventHandler, getRouterParam, createError } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requirePermission } from '~/server/utils/permissions'
-import { formatDateISO } from '~/server/utils/admin-availability'
+import { formatDateUTC } from '~/server/utils/availability'
 
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'APPOINTMENTS', 'READ')
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
     doctorId: booking.doctorId,
     doctorName: booking.doctor?.user.name ?? null,
     doctorEmail: booking.doctor?.user.email ?? null,
-    date: formatDateISO(booking.date),
+    date: formatDateUTC(booking.date),
     startTime: booking.startTime,
     endTime: booking.endTime,
     service: booking.service,

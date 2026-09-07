@@ -2,7 +2,7 @@ import { defineEventHandler, getQuery } from 'h3'
 import type { PaymentStatus, Prisma } from '@prisma/client'
 import { prisma } from '~/server/utils/prisma'
 import { requirePermission } from '~/server/utils/permissions'
-import { formatDateISO } from '~/server/utils/admin-availability'
+import { formatDateUTC } from '~/server/utils/availability'
 
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'PAYMENTS', 'READ')
@@ -63,7 +63,7 @@ export default defineEventHandler(async (event) => {
       patientName: p.booking.user.name,
       doctorName: p.booking.doctor?.user.name ?? null,
       service: p.booking.service,
-      bookingDate: formatDateISO(p.booking.date),
+      bookingDate: formatDateUTC(p.booking.date),
     })),
     summary: {
       totalRevenue: Number(successSum._sum.amount ?? 0),

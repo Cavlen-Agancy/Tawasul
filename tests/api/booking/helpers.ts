@@ -117,9 +117,12 @@ export async function deleteTestAdminSchedule(adminScheduleId: string): Promise<
 
 export async function createTestBlockedDate(date: string): Promise<string> {
   const [y, m, d] = date.split('-').map((p) => parseInt(p, 10))
+  // `@db.Date` contract: store at UTC midnight so the intended calendar day
+  // round-trips exactly (a local-midnight write stores the previous day).
+  const atUTC = new Date(Date.UTC(y, (m || 1) - 1, d || 1))
   const record = await prisma.globalBlockedDate.upsert({
-    where: { date: new Date(y, m - 1, d) },
-    create: { date: new Date(y, m - 1, d) },
+    where: { date: atUTC },
+    create: { date: atUTC },
     update: {},
   })
   return record.id

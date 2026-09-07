@@ -2,7 +2,7 @@ import { defineEventHandler, getQuery, createError } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requireAuth } from '~/server/utils/auth'
 import { doctorBookingsQuerySchema, validationMessage } from '~/server/utils/validation'
-import { parseISODate, formatDateISO } from '~/server/utils/admin-availability'
+import { parseDateUTC, formatDateUTC } from '~/server/utils/availability'
 
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event, ['DOCTOR'])
@@ -22,8 +22,8 @@ export default defineEventHandler(async (event) => {
     where: {
       doctorId: doctor.id,
       date: {
-        gte: parseISODate(start),
-        lte: parseISODate(end),
+        gte: parseDateUTC(start),
+        lte: parseDateUTC(end),
       },
     },
     include: {
@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => {
       id: b.id,
       patientName: b.user.name,
       patientPhoto: b.user.photo,
-      date: formatDateISO(b.date),
+      date: formatDateUTC(b.date),
       startTime: b.startTime,
       endTime: b.endTime,
       service: b.service,

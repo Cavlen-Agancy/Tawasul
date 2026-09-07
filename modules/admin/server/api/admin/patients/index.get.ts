@@ -1,7 +1,7 @@
 import { defineEventHandler, getQuery } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requirePermission } from '~/server/utils/permissions'
-import { formatDateISO } from '~/server/utils/admin-availability'
+import { formatDateUTC } from '~/server/utils/availability'
 
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'PATIENTS', 'READ')
@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
       phone: p.phone,
       photo: p.photo,
       totalSessions: countMap.get(p.id) ?? 0,
-      lastSessionDate: lastMap.get(p.id) ? formatDateISO(lastMap.get(p.id) as Date) : null,
+      lastSessionDate: lastMap.get(p.id) ? formatDateUTC(lastMap.get(p.id) as Date) : null,
       createdAt: p.createdAt,
     })),
   }

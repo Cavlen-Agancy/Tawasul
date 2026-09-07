@@ -39,7 +39,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Booking is already cancelled' })
   }
 
-  if (!isStaff) {
+  if (!isStaff && booking.status === 'CONFIRMED') {
+    // PENDING bookings have no doctor assigned yet and can be cancelled
+    // immediately; the 24-hour rule protects confirmed doctor schedules only.
     const sessionStart = parseISODate(formatBookingDate(booking.date))
     const [h, m] = booking.startTime.split(':').map((p) => parseInt(p, 10))
     sessionStart.setHours(h || 0, m || 0, 0, 0)
@@ -76,8 +78,10 @@ export default defineEventHandler(async (event) => {
 })
 
 function formatBookingDate(date: Date): string {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
+  // `@db.Date` readback: use UTC components so the stored calendar day is
+  // exact in every server timezone.
+  const y = date.getUTCFullYear()
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(date.getUTCDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }

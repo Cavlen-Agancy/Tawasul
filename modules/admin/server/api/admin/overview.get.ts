@@ -1,7 +1,7 @@
 import { defineEventHandler } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requireAuth } from '~/server/utils/auth'
-import { formatDateISO } from '~/server/utils/admin-availability'
+import { formatDateUTC } from '~/server/utils/availability'
 
 export default defineEventHandler(async (event) => {
   requireAuth(event, ['STAFF'])
@@ -55,7 +55,7 @@ export default defineEventHandler(async (event) => {
       id: b.id,
       patientName: b.user.name,
       doctorName: b.doctor?.user.name ?? null,
-      date: formatDateISO(b.date),
+      date: formatDateUTC(b.date),
       service: b.service,
       status: b.status,
     })),
