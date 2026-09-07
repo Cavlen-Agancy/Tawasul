@@ -83,9 +83,11 @@ async function main() {
     console.log(`✓ Admin permissions granted (${adminPermissions.length})`)
   }
 
-  // Seed default global booking schedule (Mon-Fri, 09:00-17:00, 60 min sessions),
-  // matching the Settings default working hours. Admin can adjust via the admin panel.
-  const seedSchedules = [1, 2, 3, 4, 5].map((dayOfWeek) => ({
+  // Seed default global booking schedule (all 7 days, 09:00-17:00, 60 min sessions),
+  // matching the Settings default working hours. Friday is the weekly closure
+  // day enforced by the UI; Saturday and Sunday are bookable.
+  // Admin can adjust via the admin panel.
+  const seedSchedules = [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
     dayOfWeek,
     startTime: '09:00',
     endTime: '17:00',
@@ -100,7 +102,7 @@ async function main() {
       update: schedule,
     })
   }
-  console.log('✓ Default AdminSchedule (Mon-Fri) created')
+  console.log('✓ Default AdminSchedule (all week) created')
 
   console.log('Seed complete.')
 }

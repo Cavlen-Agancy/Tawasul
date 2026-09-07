@@ -483,11 +483,43 @@ test.describe('Patient Dashboard', () => {
     await expect(page.getByTestId('day-panel')).toContainText('Select a date above')
   })
 
-  // E4) Clicking a weekend day shows the clinic-closed message (no Book Now)
-  test('weekend day shows the clinic-closed message', async ({ page }) => {
+  // E4) Clicking a Friday shows the clinic-closed message (no Book Now)
+  test('friday shows the clinic-closed message', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    // Next Saturday strictly after today: no seed schedule on weekends.
-    // Skip forward while the cell is a holiday (not clickable).
+    // Next Friday strictly after today. Skip forward while the cell is a
+    // holiday (not clickable).
+    let fri = ''
+    for (let i = 0; i < 4; i++) {
+      fri = await page.evaluate((weeks: number) => {
+        const now = new Date()
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        const d = new Date(today)
+        do { d.setDate(d.getDate() + 1) } while (d.getDay() !== 5 || d <= today)
+        d.setDate(d.getDate() + weeks * 7)
+        const p = (n: number) => String(n).padStart(2, '0')
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+      }, i)
+      const [fy, fm] = fri.split('-').map((v) => parseInt(v, 10))
+      await gotoMonth(page, fy, fm)
+      const cls = await page.locator(`.fc-day[data-date="${fri}"]`).getAttribute('class')
+      if (cls && !cls.includes('fc-holiday')) break
+    }
+    const [fy, fm] = fri.split('-').map((v) => parseInt(v, 10))
+    await gotoMonth(page, fy, fm)
+    const cell = page.locator(`.fc-day[data-date="${fri}"]`)
+    await expect(cell).toBeVisible({ timeout: 20_000 })
+    await cell.locator('.fc-daygrid-day-frame').click()
+    await expect(page.getByTestId('day-closed')).toContainText('The clinic is closed on Fridays.', { timeout: 20_000 })
+    await expect(page.getByTestId('book-now-empty')).toHaveCount(0)
+    await expect(page.getByTestId('day-empty')).toHaveCount(0)
+  })
+
+  // E4b) Saturday behaves like a normal weekday (no closed message, slots shown)
+  test('saturday behaves like a normal weekday', async ({ page }) => {
+    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    // Next Saturday strictly after today. The seed schedule covers Saturdays,
+    // so free slots are expected — but never the closed message. Skip forward
+    // while the cell is a holiday (not clickable).
     let sat = ''
     for (let i = 0; i < 4; i++) {
       sat = await page.evaluate((weeks: number) => {
@@ -509,8 +541,9 @@ test.describe('Patient Dashboard', () => {
     const cell = page.locator(`.fc-day[data-date="${sat}"]`)
     await expect(cell).toBeVisible({ timeout: 20_000 })
     await cell.locator('.fc-daygrid-day-frame').click()
-    await expect(page.getByTestId('day-weekend')).toContainText('The clinic is closed on weekends.', { timeout: 20_000 })
-    await expect(page.getByTestId('book-now-empty')).toHaveCount(0)
+    await expect(page.getByTestId('day-closed')).toHaveCount(0)
+    await expect(page.getByTestId('day-panel')).toContainText('Other available times on this day:')
+    await expect(page.locator('[data-testid^="slot-"]').first()).toBeVisible({ timeout: 20_000 })
     await expect(page.getByTestId('day-empty')).toHaveCount(0)
   })
 

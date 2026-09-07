@@ -32,11 +32,15 @@ export function usePatientDashboard() {
     fetchError.value = null
   }
 
-  function isWeekend(dateString: string): boolean {
+  function isClosedDay(dateString: string): boolean {
     const [y, m, d] = dateString.split('-').map((v) => parseInt(v, 10))
     if (!y || !m || !d) return false
-    const day = new Date(y, (m || 1) - 1, d).getDay()
-    return day === 0 || day === 6
+    // Friday only is the weekly closure day (Sunday = 0 .. Saturday = 6).
+    return new Date(y, (m || 1) - 1, d).getDay() === 5
+  }
+
+  function getClosedDayMessage(): string {
+    return 'The clinic is closed on Fridays.'
   }
 
   async function fetchProfile(): Promise<PatientProfile | null> {
@@ -260,7 +264,8 @@ export function usePatientDashboard() {
     selectedDate,
     fetchError,
     clearFetchError,
-    isWeekend,
+    isClosedDay,
+    getClosedDayMessage,
     fetchProfile,
     updateProfile,
     uploadPhoto,

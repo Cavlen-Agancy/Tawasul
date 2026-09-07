@@ -28,7 +28,8 @@ const {
   fetchAvailableSlots,
   fetchError,
   clearFetchError,
-  isWeekend,
+  isClosedDay,
+  getClosedDayMessage,
 } = usePatientDashboard()
 const { isHoliday } = useHolidays()
 const { toast } = useToast()
@@ -149,7 +150,7 @@ async function onDateClick(info: DateClickArg) {
     toast({ title: 'Clinic closed for a public holiday', variant: 'info' })
     return
   }
-  // Weekends stay clickable on purpose: the panel explains the clinic is closed.
+  // Fridays stay clickable on purpose: the panel explains the clinic is closed.
   panelLoading.value = true
   try {
     await selectDate(dateStr)
@@ -432,9 +433,9 @@ onMounted(async () => {
           <Skeleton v-for="i in 2" :key="i" class="h-24 w-full" />
         </div>
 
-        <div v-else-if="selectedDate && isWeekend(selectedDate)" class="rounded-2xl border border-border bg-white p-10 text-center" data-testid="day-weekend">
-          <p class="font-medium text-foreground">The clinic is closed on weekends.</p>
-          <p class="mt-1 text-sm text-muted-foreground">Please choose a weekday to see bookings or free times.</p>
+        <div v-else-if="selectedDate && isClosedDay(selectedDate)" class="rounded-2xl border border-border bg-white p-10 text-center" data-testid="day-closed">
+          <p class="font-medium text-foreground">{{ getClosedDayMessage() }}</p>
+          <p class="mt-1 text-sm text-muted-foreground">Please choose another day to see bookings or free times.</p>
         </div>
 
         <div v-else>

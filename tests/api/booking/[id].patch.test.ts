@@ -2,7 +2,7 @@ import { describe, expect, it, afterAll } from 'vitest'
 import handler from '~/modules/booking/server/api/booking/[id].patch'
 import { prisma } from '~/server/utils/prisma'
 import { createApiEvent, expectApiError, createTestUser, deleteTestUser } from '../helpers'
-import { deleteTestBooking, createTestAdminSchedule, deleteTestAdminSchedule } from './helpers'
+import { deleteTestBooking, createTestAdminSchedule, deleteTestAdminSchedule, restoreSeedWeekendSchedules } from './helpers'
 
 const toDeleteUsers: string[] = []
 const toDeleteBookings: string[] = []
@@ -11,9 +11,9 @@ const toDeleteSchedules: string[] = []
 let fixtureWeek = 0
 
 /**
- * A unique future SATURDAY (dayOfWeek 6). Saturdays fall outside the seeded
- * Mon-Fri AdminSchedule, so tests create/delete their own Saturday schedule row
- * without clobbering seeded weekdays (same convention as the available-slots tests).
+ * A unique future SATURDAY (dayOfWeek 6). The seed covers Saturdays, so tests
+ * upsert their own Saturday schedule row and `restoreSeedWeekendSchedules()`
+ * repairs the seed row in `afterAll`.
  */
 function futureSaturday(): { date: Date; iso: string } {
   fixtureWeek += 1
@@ -60,6 +60,7 @@ afterAll(async () => {
   await Promise.all(toDeleteSchedules.map((id) => deleteTestAdminSchedule(id)))
   await Promise.all(toDeleteBookings.map((id) => deleteTestBooking(id)))
   await Promise.all(toDeleteUsers.map((id) => deleteTestUser(id)))
+  await restoreSeedWeekendSchedules()
 })
 
 describe('PATCH /api/booking/:id (patient reschedule)', () => {

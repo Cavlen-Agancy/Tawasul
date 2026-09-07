@@ -1,13 +1,15 @@
 import { describe, expect, it, afterAll } from 'vitest'
 import handler from '~/modules/booking/server/api/booking/available-dates.get'
 import { createApiEvent, expectApiError } from '../helpers'
-import { createTestAdminSchedule, deleteTestAdminSchedule, nextDateWithDayOfWeek } from './helpers'
+import { createTestAdminSchedule, deleteTestAdminSchedule, restoreSeedWeekendSchedules, nextDateWithDayOfWeek } from './helpers'
+import { isHoliday } from '~/server/utils/holidays'
 
 describe('GET /api/booking/available-dates', () => {
   const toDeleteSchedules: string[] = []
 
   afterAll(async () => {
     await Promise.all(toDeleteSchedules.map((id) => deleteTestAdminSchedule(id)))
+    await restoreSeedWeekendSchedules()
   })
 
   it('returns available dates for a month with admin-schedule availability', async () => {
@@ -29,6 +31,25 @@ describe('GET /api/booking/available-dates', () => {
     expect(Array.isArray(res.dates)).toBe(true)
     expect(res.dates.length).toBeGreaterThan(0)
     for (const d of res.dates) expect(d).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('includes Saturdays and Sundays covered by the weekend schedule', async () => {
+    // The seed covers all 7 days, so a future non-holiday Saturday and its
+    // Sunday must appear in that month's available dates.
+    let saturday = nextDateWithDayOfWeek(6)
+    for (let i = 0; i < 8 && isHoliday(saturday); i++) {
+      const [y, m, d] = saturday.split('-').map((v) => parseInt(v, 10))
+      const next = new Date(Date.UTC(y, m - 1, d + 7))
+      saturday = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-${String(next.getUTCDate()).padStart(2, '0')}`
+    }
+    const [y, m] = saturday.split('-').map((v) => parseInt(v, 10))
+    const event = createApiEvent({
+      method: 'GET',
+      url: `/api/booking/available-dates?month=${m}&year=${y}`,
+    })
+
+    const res = await handler(event) as { dates: string[] }
+    expect(res.dates).toContain(saturday)
   })
 
   it('rejects an invalid month with 400', async () => {

@@ -5,7 +5,7 @@ import slotsHandler from '~/modules/booking/server/api/booking/available-slots.g
 import appointmentsHandler from '~/modules/patient/server/api/patient/appointments.get'
 import { prisma } from '~/server/utils/prisma'
 import { createApiEvent, createTestUser, deleteTestUser } from '../helpers'
-import { createTestAdminSchedule, deleteTestAdminSchedule, deleteTestBooking, nextDateWithDayOfWeek } from './helpers'
+import { createTestAdminSchedule, deleteTestAdminSchedule, restoreSeedWeekendSchedules, deleteTestBooking, nextDateWithDayOfWeek } from './helpers'
 
 /**
  * Regression tests for the calendar off-by-one bug: a patient booking
@@ -25,6 +25,7 @@ describe('booking calendar-day handling (no off-by-one)', () => {
     await Promise.all(toDeleteBookings.map((id) => deleteTestBooking(id)))
     await Promise.all(toDeleteSchedules.map((id) => deleteTestAdminSchedule(id)))
     await Promise.all(toDeleteUsers.map((id) => deleteTestUser(id)))
+    await restoreSeedWeekendSchedules()
   })
 
   it('POST /api/booking/create stores the requested calendar day exactly', async () => {

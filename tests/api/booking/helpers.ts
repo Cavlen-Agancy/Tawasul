@@ -115,6 +115,22 @@ export async function deleteTestAdminSchedule(adminScheduleId: string): Promise<
   await prisma.adminSchedule.deleteMany({ where: { id: adminScheduleId } }).catch(() => undefined)
 }
 
+/**
+ * Restores the seeded weekend schedule rows (Sat/Sun 09:00-17:00, 60 min).
+ * Several suites upsert day 0/6 rows for their own fixtures and delete them in
+ * `afterAll`, which would otherwise destroy the seeded rows the E2E suite and
+ * other tests rely on. Call at the end of `afterAll`, after deletions.
+ */
+export async function restoreSeedWeekendSchedules(): Promise<void> {
+  for (const dayOfWeek of [0, 6]) {
+    await prisma.adminSchedule.upsert({
+      where: { dayOfWeek },
+      create: { dayOfWeek, startTime: '09:00', endTime: '17:00', sessionDuration: 60, isActive: true },
+      update: { startTime: '09:00', endTime: '17:00', sessionDuration: 60, isActive: true },
+    })
+  }
+}
+
 export async function createTestBlockedDate(date: string): Promise<string> {
   const [y, m, d] = date.split('-').map((p) => parseInt(p, 10))
   // `@db.Date` contract: store at UTC midnight so the intended calendar day
