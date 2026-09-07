@@ -13,6 +13,7 @@ let bookingFutureId = '' // CONFIRMED, +7 days
 let bookingSessionId = '' // CONFIRMED, today ~30 min away
 let pastConfirmedId = '' // CONFIRMED, -8 days (past, visible in calendar)
 let pastCancelledId = '' // CANCELLED, -7 days (past, visible in calendar)
+let bookingPendingId = '' // PENDING, +10 days, doctorId null (under review)
 let blockedDate = '' // next-month day 21 blocked => unavailable (not bookable)
 let blockedSlotIds: string[] = []
 let paymentId = ''
@@ -227,6 +228,19 @@ test.beforeAll(async () => {
   })
   pastCancelledId = pastCancelled.id
 
+  const pendingBooking = await prisma.booking.create({
+    data: {
+      userId: patientUser.id,
+      doctorId: null,
+      date: daysFromNow(10),
+      startTime: '10:00',
+      endTime: '11:00',
+      service: 'Marital Counseling',
+      status: 'PENDING',
+    },
+  })
+  bookingPendingId = pendingBooking.id
+
   const payment = await prisma.payment.create({
     data: { bookingId: nowBooking.id, amount: 250, currency: 'EGP', status: 'SUCCESS' },
   })
@@ -250,11 +264,11 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await prisma.sessionRoom
-    .deleteMany({ where: { bookingId: { in: [bookingNowId, bookingFutureId, bookingSessionId, pastConfirmedId, pastCancelledId] } } })
+    .deleteMany({ where: { bookingId: { in: [bookingNowId, bookingFutureId, bookingSessionId, pastConfirmedId, pastCancelledId, bookingPendingId] } } })
     .catch(() => undefined)
   await prisma.payment.deleteMany({ where: { id: paymentId } }).catch(() => undefined)
   await prisma.booking
-    .deleteMany({ where: { id: { in: [bookingNowId, bookingFutureId, bookingSessionId, pastConfirmedId, pastCancelledId] } } })
+    .deleteMany({ where: { id: { in: [bookingNowId, bookingFutureId, bookingSessionId, pastConfirmedId, pastCancelledId, bookingPendingId] } } })
     .catch(() => undefined)
   if (blockedSlotIds.length > 0) {
     await prisma.blockedSlot.deleteMany({ where: { id: { in: blockedSlotIds } } }).catch(() => undefined)
@@ -287,45 +301,80 @@ test.describe('Patient Dashboard', () => {
     await expect(page.getByTestId('page-title')).toHaveText('My Appointments')
   })
 
-  // A) Upcoming tab shows appointment cards
-  test('upcoming tab shows appointment cards', async ({ page }) => {
+  // A) Calendar shows the current month and the week starts on Saturday
+  test('calendar shows the current month starting Saturday', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
     await expect(page.getByTestId('page-title')).toHaveText('My Appointments', { timeout: 20_000 })
-    await expect(page.getByTestId(`appointment-${bookingFutureId}`)).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByTestId(`appointment-${bookingFutureId}`)).toContainText('Dr. Patient Dashboard')
+    await expect(page.locator('.fc-daygrid-body')).toBeVisible({ timeout: 20_000 })
+    const firstHeader = page.locator('.fc-col-header-cell').first()
+    await expect(firstHeader).toContainText('Sat', { timeout: 20_000 })
   })
 
-  // B) Future appointment Join is disabled with a tooltip, Cancel is visible
-  test('future appointment has disabled Join and visible Cancel', async ({ page }) => {
+  // B) Clicking a past date does nothing
+  test('clicking a past date does nothing', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    const pastDate = ymd(daysFromNow(-2))
+    const [py, pm] = pastDate.split('-').map((v) => parseInt(v, 10))
+    await gotoMonth(page, py, pm)
+    const cell = page.locator(`.fc-day[data-date="${pastDate}"]`)
+    await expect(cell).toHaveClass(/fc-past/, { timeout: 20_000 })
+    await cell.locator('.fc-daygrid-day-frame').click({ force: true })
+    await expect(page.getByTestId('day-panel')).toContainText('Select a date above')
+  })
+
+  // C) Clicking a holiday does nothing and the cell is styled gray
+  test('clicking a holiday does nothing', async ({ page }) => {
+    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    const holiday = '2027-01-07'
+    await gotoMonth(page, 2027, 1)
+    const cell = page.locator(`.fc-day[data-date="${holiday}"]`)
+    await expect(cell).toHaveClass(/fc-holiday/, { timeout: 20_000 })
+    await cell.locator('.fc-daygrid-day-frame').click({ force: true })
+    await expect(page.getByTestId('day-panel')).toContainText('Select a date above')
+    await gotoMonth(page, new Date().getFullYear(), new Date().getMonth() + 1)
+  })
+
+  // D) Date with a confirmed booking shows the card with Join/Cancel
+  test('confirmed booking date shows card with Join and Cancel', async ({ page }) => {
+    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    const date = ymd(daysFromNow(7))
+    const [ty, tm] = date.split('-').map((v) => parseInt(v, 10))
+    await gotoMonth(page, ty, tm)
+    const cell = page.locator(`.fc-day[data-date="${date}"]`)
+    await expect(cell).toHaveClass(/fc-dot-confirmed/, { timeout: 20_000 })
+    await cell.locator('.fc-daygrid-day-frame').click()
+    const card = page.getByTestId(`booking-${bookingFutureId}`)
+    await expect(card).toBeVisible({ timeout: 20_000 })
+    await expect(card).toContainText('Dr. Patient Dashboard')
+    await expect(page.getByTestId(`status-${bookingFutureId}`)).toContainText('Confirmed')
     const join = page.getByTestId(`join-${bookingFutureId}`)
-    await expect(join).toBeVisible({ timeout: 20_000 })
     await expect(join).toBeDisabled()
     await expect(join).toHaveAttribute('title', 'Available 5 minutes before your session')
     await expect(page.getByTestId(`cancel-${bookingFutureId}`)).toBeVisible()
   })
 
-  // C) Past tab shows completed and cancelled chips
-  test('past tab shows completed and cancelled appointments', async ({ page }) => {
+  // E) Pending booking shows Unknown Doctor and Under review with no buttons
+  test('pending booking shows Unknown Doctor and no action buttons', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    await page.getByTestId('tab-past').click()
-    await expect(page.getByTestId(`past-appointment-${pastConfirmedId}`)).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByTestId(`past-appointment-${pastConfirmedId}`)).toContainText('Completed')
-    await expect(page.getByTestId(`past-appointment-${pastCancelledId}`)).toContainText('Cancelled')
+    const date = ymd(daysFromNow(10))
+    const [ty, tm] = date.split('-').map((v) => parseInt(v, 10))
+    await gotoMonth(page, ty, tm)
+    const cell = page.locator(`.fc-day[data-date="${date}"]`)
+    await cell.locator('.fc-daygrid-day-frame').click()
+    const card = page.getByTestId(`booking-${bookingPendingId}`)
+    await expect(card).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId(`doctor-name-${bookingPendingId}`)).toContainText('Unknown Doctor')
+    await expect(page.getByTestId(`status-${bookingPendingId}`)).toContainText('Under review')
+    await expect(page.getByTestId(`join-${bookingPendingId}`)).toHaveCount(0)
+    await expect(page.getByTestId(`cancel-${bookingPendingId}`)).toHaveCount(0)
   })
 
-  // D) No empty states when the patient has bookings
-  test('no empty states are shown when bookings exist', async ({ page }) => {
-    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    await expect(page.getByTestId(`appointment-${bookingFutureId}`)).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByTestId('no-upcoming')).toHaveCount(0)
-    await page.getByTestId('tab-past').click()
-    await expect(page.getByTestId('no-past')).toHaveCount(0)
-  })
-
-  // E) Join button is active within the window and opens the session page
+  // F) Join button is active near session time and opens the session page
   test('join button is active near session time and opens the session page', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    const today = ymd(new Date())
+    const cell = page.locator(`.fc-day[data-date="${today}"]`)
+    await cell.locator('.fc-daygrid-day-frame').click()
     const join = page.getByTestId(`join-${bookingNowId}`)
     await expect(join).toBeVisible({ timeout: 20_000 })
     await expect(join).toBeEnabled({ timeout: 20_000 })
@@ -333,18 +382,47 @@ test.describe('Patient Dashboard', () => {
     await page.waitForURL(`**/dashboard/session/${bookingNowId}`, { timeout: 20_000 })
   })
 
-  // F) Cancel moves the card to the past tab without a reload
-  test('cancelling an appointment moves it to the past tab', async ({ page }) => {
+  // G) Join stays disabled outside the window
+  test('join button stays disabled outside the join window', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    await expect(page.getByTestId(`appointment-${bookingFutureId}`)).toBeVisible({ timeout: 20_000 })
+    const today = ymd(new Date())
+    const cell = page.locator(`.fc-day[data-date="${today}"]`)
+    await cell.locator('.fc-daygrid-day-frame').click()
+    const join = page.getByTestId(`join-${bookingSessionId}`)
+    await expect(join).toBeVisible({ timeout: 20_000 })
+    await expect(join).toBeDisabled()
+  })
+
+  // H) Free slot navigates to /book pre-filled and lands on review
+  test('free slot pre-fills the booking review step', async ({ page }) => {
+    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    const slotCell = page.locator('.fc-day.fc-available:not(.fc-dot-confirmed):not(.fc-dot-pending):not(.fc-dot-cancelled)').first()
+    await expect(slotCell).toBeVisible({ timeout: 20_000 })
+    const date = await slotCell.getAttribute('data-date')
+    await slotCell.locator('.fc-daygrid-day-frame').click()
+    const slot = page.locator('[data-testid^="slot-"]').first()
+    await expect(slot).toBeVisible({ timeout: 20_000 })
+    const time = (await slot.getAttribute('data-testid'))?.replace('slot-', '')
+    await slot.click()
+    await page.waitForURL(`**/book?date=${date}&time=${time}`, { timeout: 20_000 })
+    await expect(page.getByRole('heading', { name: 'Review your booking' })).toBeVisible({ timeout: 20_000 })
+  })
+
+  // I) Cancel moves the booking to Cancelled state in the panel and calendar
+  test('cancelling an appointment shows Cancelled state', async ({ page }) => {
+    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
+    const date = ymd(daysFromNow(7))
+    const [ty, tm] = date.split('-').map((v) => parseInt(v, 10))
+    await gotoMonth(page, ty, tm)
+    const cell = page.locator(`.fc-day[data-date="${date}"]`)
+    await cell.locator('.fc-daygrid-day-frame').click()
+    await expect(page.getByTestId(`booking-${bookingFutureId}`)).toBeVisible({ timeout: 20_000 })
     await page.getByTestId(`cancel-${bookingFutureId}`).click()
     await expect(page.getByTestId('cancel-dialog-confirm')).toBeVisible({ timeout: 20_000 })
     await page.getByTestId('cancel-dialog-confirm').click()
-    await expect(page.getByTestId(`appointment-${bookingFutureId}`)).toHaveCount(0, { timeout: 20_000 })
-    await page.getByTestId('tab-past').click()
-    const pastCard = page.getByTestId(`past-appointment-${bookingFutureId}`)
-    await expect(pastCard).toBeVisible({ timeout: 20_000 })
-    await expect(pastCard).toContainText('Cancelled')
+    await expect(page.getByTestId(`status-${bookingFutureId}`)).toContainText('Cancelled', { timeout: 20_000 })
+    await expect(page.getByTestId(`cancel-${bookingFutureId}`)).toHaveCount(0)
+    await expect(cell).toHaveClass(/fc-dot-cancelled/, { timeout: 20_000 })
   })
 
   test('payments page loads with payment history', async ({ page }) => {
@@ -393,13 +471,6 @@ test.describe('Patient Dashboard', () => {
     await expect(page.getByRole('heading', { name: 'Meeting not open yet' })).toBeVisible()
   })
 
-  test('join button stays disabled outside the join window', async ({ page }) => {
-    await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    const join = page.getByTestId(`join-${bookingSessionId}`)
-    await expect(join).toBeVisible({ timeout: 20_000 })
-    await expect(join).toBeDisabled()
-  })
-
   test('sidebar navigation works and logout redirects', async ({ page }) => {
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
     await page.setViewportSize({ width: 1280, height: 800 })
@@ -424,11 +495,12 @@ test.describe('Patient Dashboard', () => {
     await expect(page.getByTestId('page-title')).toHaveText('My Appointments', { timeout: 20_000 })
   })
 
-  // M) Mobile appointments page does not overlap or overflow horizontally
+  // J) Mobile appointments page does not overlap or overflow horizontally
   test('mobile appointments page does not overflow horizontally', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 700 })
     await loginAs(page, patient.email, patient.password, '/dashboard/appointments')
-    await expect(page.getByTestId('appointments-tabs')).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator('.fc-daygrid-body')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId('day-panel')).toBeVisible({ timeout: 20_000 })
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
     expect(overflow).toBe(false)
   })

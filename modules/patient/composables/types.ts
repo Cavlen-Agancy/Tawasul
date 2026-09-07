@@ -11,6 +11,7 @@ export interface PatientProfile {
 
 export interface Appointment {
   id: string
+  doctorId: string | null
   doctorName: string
   doctorPhoto?: string
   date: string // YYYY-MM-DD

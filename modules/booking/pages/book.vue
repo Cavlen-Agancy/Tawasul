@@ -25,6 +25,21 @@ const {
 
 const currentMonth = ref(new Date().getMonth() + 1)
 const currentYear = ref(new Date().getFullYear())
+const route = useRoute()
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
+
+async function prefillFromQuery() {
+  const date = typeof route.query.date === 'string' ? route.query.date : ''
+  const time = typeof route.query.time === 'string' ? route.query.time : ''
+  if (!DATE_RE.test(date) || !TIME_RE.test(time)) return
+  const slots = await fetchAvailableSlots(date)
+  const match = slots.find((s) => s.startTime === time)
+  if (match) {
+    selectSlot(date, match)
+  }
+}
 
 function toISODate(date: Date): string {
   const y = date.getFullYear()
@@ -93,6 +108,7 @@ const calendarOptions = computed(() => ({
 
 onMounted(async () => {
   await loadDates(currentMonth.value, currentYear.value)
+  await prefillFromQuery()
 })
 </script>
 

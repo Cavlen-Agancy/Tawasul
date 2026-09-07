@@ -38,6 +38,7 @@ export default defineEventHandler(async (event) => {
 
   const appointments = bookings.map((b) => ({
     id: b.id,
+    doctorId: b.doctorId,
     doctorName: b.doctor?.user?.name ?? 'Unknown Doctor',
     doctorPhoto: b.doctor?.user?.photo ?? undefined,
     date: formatDateISO(b.date),

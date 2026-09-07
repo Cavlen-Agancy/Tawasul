@@ -8,6 +8,12 @@ import type {
 } from './types'
 import { getApiMessage } from '~/lib/api'
 
+export interface AvailableSlot {
+  startTime: string
+  endTime: string
+  sessionDuration: number
+}
+
 export function usePatientDashboard() {
   const profile = useState<PatientProfile | null>('patient-profile', () => null)
   const upcomingAppointments = useState<Appointment[]>('patient-upcoming-appointments', () => [])
@@ -15,6 +21,10 @@ export function usePatientDashboard() {
   const payments = useState<PaymentRecord[]>('patient-payments', () => [])
   const isLoading = useState<boolean>('patient-dashboard-loading', () => false)
   const error = useState<string | null>('patient-dashboard-error', () => null)
+  const allBookings = useState<Appointment[]>('patient-all-bookings', () => [])
+  const availableDates = useState<string[]>('patient-available-dates', () => [])
+  const availableSlots = useState<AvailableSlot[]>('patient-available-slots', () => [])
+  const selectedDate = useState<string | null>('patient-selected-date', () => null)
 
   async function fetchProfile(): Promise<PatientProfile | null> {
     isLoading.value = true
@@ -109,10 +119,68 @@ export function usePatientDashboard() {
       if (moved) {
         pastAppointments.value = [{ ...moved, status: 'CANCELLED' }, ...pastAppointments.value]
       }
+      allBookings.value = allBookings.value.map((a) =>
+        a.id === bookingId ? { ...a, status: 'CANCELLED' } : a,
+      )
     } catch (e) {
       error.value = getApiMessage(e)
       throw e
     }
+  }
+
+  async function fetchAllBookings(): Promise<Appointment[]> {
+    isLoading.value = true
+    error.value = null
+    try {
+      const data = await $fetch<AppointmentResponse>('/api/patient/appointments', { query: { tab: 'all' } })
+      allBookings.value = data.appointments
+      return allBookings.value
+    } catch (e) {
+      error.value = getApiMessage(e)
+      return []
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function fetchAvailableDates(month: number, year: number): Promise<string[]> {
+    try {
+      const data = await $fetch<{ dates: string[] }>('/api/booking/available-dates', {
+        query: { month, year },
+      })
+      availableDates.value = data.dates
+      return data.dates
+    } catch (e) {
+      error.value = getApiMessage(e)
+      return []
+    }
+  }
+
+  async function fetchAvailableSlots(date: string): Promise<AvailableSlot[]> {
+    try {
+      const data = await $fetch<{ slots: AvailableSlot[] }>('/api/booking/available-slots', {
+        query: { date },
+      })
+      availableSlots.value = data.slots
+      return data.slots
+    } catch (e) {
+      error.value = getApiMessage(e)
+      return []
+    }
+  }
+
+  function fetchBookingsForDate(date: string): Appointment[] {
+    return allBookings.value.filter((a) => a.date === date)
+  }
+
+  async function selectDate(date: string): Promise<Appointment[]> {
+    selectedDate.value = date
+    availableSlots.value = []
+    const bookings = fetchBookingsForDate(date)
+    if (bookings.length === 0) {
+      await fetchAvailableSlots(date)
+    }
+    return bookings
   }
 
   async function fetchPayments(): Promise<void> {
@@ -141,6 +209,10 @@ export function usePatientDashboard() {
     upcomingAppointments.value = []
     pastAppointments.value = []
     payments.value = []
+    allBookings.value = []
+    availableDates.value = []
+    availableSlots.value = []
+    selectedDate.value = null
     error.value = null
   }
 
@@ -151,12 +223,21 @@ export function usePatientDashboard() {
     payments,
     isLoading,
     error,
+    allBookings,
+    availableDates,
+    availableSlots,
+    selectedDate,
     fetchProfile,
     updateProfile,
     uploadPhoto,
     fetchAppointments,
     fetchAllAppointments,
     cancelAppointment,
+    fetchAllBookings,
+    fetchAvailableDates,
+    fetchAvailableSlots,
+    fetchBookingsForDate,
+    selectDate,
     fetchPayments,
     fetchSession,
     clear,

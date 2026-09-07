@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import handler from '~/modules/patient/server/api/patient/appointments.get'
+import { prisma } from '~/server/utils/prisma'
 import { createApiEvent, expectApiError } from '../helpers'
 import { createPatient, createBookedFixture, deletePatientBookingFixture, deletePatient } from './helpers'
 
 interface Appointment {
   id: string
   status: string
+  doctorId?: string | null
+  doctorName?: string
 }
 
 describe('GET /api/patient/appointments', () => {
@@ -176,6 +179,38 @@ describe('GET /api/patient/appointments', () => {
       expect.unreachable('should have thrown')
     } catch (e) {
       expectApiError(e, 401, 'Unauthorized')
+    }
+  })
+
+  it('returns doctorId null with Unknown Doctor for pending bookings', async () => {
+    const patient = await createPatient({ email: `appt-pending-${Date.now()}@test.com` })
+    const booking = await prisma.booking.create({
+      data: {
+        userId: patient.id,
+        doctorId: null,
+        date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+        startTime: '10:00',
+        endTime: '11:00',
+        service: 'Online Consultation',
+        status: 'PENDING',
+      },
+    })
+    try {
+      const event = createApiEvent({
+        method: 'GET',
+        url: '/api/patient/appointments?tab=all',
+        context: { user: { userId: patient.id, email: patient.email, accountType: 'PATIENT' } },
+      })
+      const res = await handler(event) as { appointments: Appointment[] }
+      const found = res.appointments.find((a) => a.id === booking.id)
+      expect(found).toBeTruthy()
+      expect(found?.doctorId).toBeNull()
+      expect(found?.doctorName).toBe('Unknown Doctor')
+      expect(found?.status).toBe('PENDING')
+    } finally {
+      await prisma.payment.deleteMany({ where: { bookingId: booking.id } }).catch(() => undefined)
+      await prisma.booking.deleteMany({ where: { id: booking.id } }).catch(() => undefined)
+      await deletePatient(patient)
     }
   })
 })

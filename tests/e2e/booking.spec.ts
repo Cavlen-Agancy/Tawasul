@@ -166,17 +166,19 @@ test.describe('Booking Flow', () => {
     const dbBooking = await prisma.booking.findFirst({ where: { doctorId }, include: { payment: true }, orderBy: { createdAt: 'desc' } })
     console.log('DIAG booking:', JSON.stringify(dbBooking ? { id: dbBooking.id, status: dbBooking.status, pay: dbBooking.payment?.status } : null))
 
-    await expect(page.getByRole('heading', { name: 'Booking Confirmed' })).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByText(/session has been confirmed/)).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Booking Request Received' })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/review and confirm your session shortly/)).toBeVisible()
 
-    // Verify DB state: booking confirmed, payment succeeded.
-    const booking = await prisma.booking.findFirst({
-      where: { doctorId },
+    // Verify DB state: booking PENDING (admin assigns a doctor later), payment succeeded.
+    const bookingId = new URL(page.url()).searchParams.get('bookingId')
+    expect(bookingId).toBeTruthy()
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId! },
       include: { payment: true },
-      orderBy: { createdAt: 'desc' },
     })
     expect(booking).toBeTruthy()
-    expect(booking?.status).toBe('CONFIRMED')
+    expect(booking?.status).toBe('PENDING')
+    expect(booking?.doctorId).toBeNull()
     expect(booking?.payment?.status).toBe('SUCCESS')
   })
 

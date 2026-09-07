@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { CalendarX2, Video } from 'lucide-vue-next'
+import FullCalendar from '@fullcalendar/vue3'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import interactionPlugin from '@fullcalendar/interaction'
+import { Calendar as CalendarIcon, CalendarX2, ChevronLeft, ChevronRight, Video } from 'lucide-vue-next'
+import type { DateClickArg, DatesSetArg, DayCellContentArg } from '@fullcalendar/core'
 import type { Appointment } from '~/modules/patient/composables/types'
 
 definePageMeta({
@@ -8,21 +12,48 @@ definePageMeta({
 })
 
 const {
-  upcomingAppointments,
-  pastAppointments,
+  allBookings,
+  availableDates,
+  availableSlots,
+  selectedDate,
   isLoading,
   error,
-  fetchAppointments,
+  fetchAllBookings,
+  fetchAvailableDates,
+  fetchBookingsForDate,
+  selectDate,
   cancelAppointment,
 } = usePatientDashboard()
+const { isHoliday } = useHolidays()
 const { toast } = useToast()
 
-const activeTab = ref('upcoming')
+const currentMonth = ref(new Date().getMonth() + 1)
+const currentYear = ref(new Date().getFullYear())
 const now = ref(Date.now())
+const calendarKey = ref(0)
+const loadedMonthKey = ref('')
+
+const selectedBookings = ref<Appointment[]>([])
+const panelLoading = ref(false)
 
 const cancelTarget = ref<Appointment | null>(null)
 const cancelDialogOpen = ref(false)
 const cancelling = ref(false)
+
+function toISODate(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function todayStr(): string {
+  return toISODate(new Date())
+}
+
+function isPastStr(dateStr: string): boolean {
+  return dateStr < todayStr()
+}
 
 function parseDateTime(dateISO: string, time: string): Date {
   const [y, m, d] = dateISO.split('-').map((v) => parseInt(v, 10))
@@ -50,6 +81,91 @@ function canCancel(appt: Appointment): boolean {
   return now.value < sessionStart(appt).getTime() - 24 * 60 * 60 * 1000
 }
 
+function statusForDate(dateStr: string): 'confirmed' | 'pending' | 'cancelled' | null {
+  const day = allBookings.value.filter((a) => a.date === dateStr).map((a) => a.status)
+  if (day.includes('CONFIRMED')) return 'confirmed'
+  if (day.includes('PENDING')) return 'pending'
+  if (day.includes('CANCELLED')) return 'cancelled'
+  return null
+}
+
+function dayCellClass(info: DayCellContentArg): string[] {
+  const dateStr = toISODate(info.date)
+  if (isPastStr(dateStr)) return ['fc-past']
+  if (isHoliday(dateStr)) return ['fc-holiday']
+  const classes: string[] = []
+  const st = statusForDate(dateStr)
+  if (st === 'confirmed') classes.push('fc-dot-confirmed')
+  else if (st === 'pending') classes.push('fc-dot-pending')
+  else if (st === 'cancelled') classes.push('fc-dot-cancelled')
+  if (availableDates.value.includes(dateStr)) classes.push('fc-available')
+  return classes
+}
+
+async function loadMonth(month: number, year: number, remount = false) {
+  await fetchAvailableDates(month, year)
+  if (remount) calendarKey.value += 1
+  if (selectedDate.value) {
+    selectedBookings.value = fetchBookingsForDate(selectedDate.value)
+  }
+}
+
+async function onDatesSet(info: DatesSetArg) {
+  // NB: view.currentStart is the first *visible* day, which can belong to the
+  // previous month (week starts Saturday). Use the calendar anchor date so the
+  // month label and navigation stay on the month actually being viewed.
+  const anchor = info.view.calendar.getDate()
+  const month = anchor.getMonth() + 1
+  const year = anchor.getFullYear()
+  currentMonth.value = month
+  currentYear.value = year
+  const key = `${year}-${month}`
+  if (key === loadedMonthKey.value) return
+  loadedMonthKey.value = key
+  await loadMonth(month, year)
+  // Re-render once with the freshly fetched dates/bookings: FullCalendar does
+  // not re-evaluate dayCellClassNames when our async data arrives. The remount
+  // fires datesSet again, which returns early via loadedMonthKey (no loop).
+  calendarKey.value += 1
+}
+
+async function onDateClick(info: DateClickArg) {
+  const dateStr = toISODate(info.date)
+  if (isPastStr(dateStr)) return
+  if (isHoliday(dateStr)) {
+    toast({ title: 'Clinic closed for a public holiday', variant: 'info' })
+    return
+  }
+  panelLoading.value = true
+  try {
+    await selectDate(dateStr)
+    selectedBookings.value = fetchBookingsForDate(dateStr)
+  } finally {
+    panelLoading.value = false
+  }
+}
+
+function onMonthChange(dir: number) {
+  const d = new Date(currentYear.value, currentMonth.value - 1 + dir, 1)
+  currentMonth.value = d.getMonth() + 1
+  currentYear.value = d.getFullYear()
+  void loadMonth(currentMonth.value, currentYear.value, true)
+}
+
+function goToday() {
+  const t = new Date()
+  currentMonth.value = t.getMonth() + 1
+  currentYear.value = t.getFullYear()
+  void loadMonth(currentMonth.value, currentYear.value, true)
+}
+
+function formatMonthLabel(): string {
+  return new Date(currentYear.value, currentMonth.value - 1).toLocaleDateString('en-GB', {
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
 function formatDateLabel(dateStr: string): string {
   return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-GB', {
     weekday: 'long',
@@ -64,6 +180,17 @@ function formatTime(time: string): string {
   const period = (hh || 0) >= 12 ? 'PM' : 'AM'
   const hour = (hh || 0) % 12 === 0 ? 12 : (hh || 0) % 12
   return `${hour}:${String(mm).padStart(2, '0')} ${period}`
+}
+
+function statusLabel(status: string): string {
+  if (status === 'CONFIRMED') return 'Confirmed'
+  if (status === 'PENDING') return 'Under review'
+  return 'Cancelled'
+}
+
+function bookSlot(startTime: string) {
+  if (!selectedDate.value) return
+  navigateTo(`/book?date=${selectedDate.value}&time=${startTime}`)
 }
 
 function joinSession(appt: Appointment) {
@@ -83,6 +210,11 @@ async function confirmCancel() {
     toast({ title: 'Appointment cancelled', variant: 'success' })
     cancelDialogOpen.value = false
     cancelTarget.value = null
+    await fetchAllBookings()
+    if (selectedDate.value) {
+      selectedBookings.value = fetchBookingsForDate(selectedDate.value)
+    }
+    calendarKey.value += 1
   } catch (e) {
     toast({
       title: (e as { data?: { message?: string } }).data?.message || 'Could not cancel appointment',
@@ -93,8 +225,25 @@ async function confirmCancel() {
   }
 }
 
-onMounted(() => {
-  void fetchAppointments()
+const calendarOptions = computed(() => ({
+  plugins: [dayGridPlugin, interactionPlugin],
+  initialView: 'dayGridMonth',
+  initialDate: new Date(currentYear.value, currentMonth.value - 1, 1),
+  headerToolbar: false,
+  height: 'auto',
+  firstDay: 6,
+  weekends: true,
+  dayCellClassNames: dayCellClass,
+  dateClick: onDateClick,
+  datesSet: onDatesSet,
+}))
+
+onMounted(async () => {
+  now.value = Date.now()
+  await Promise.all([
+    fetchAllBookings(),
+    loadMonth(currentMonth.value, currentYear.value),
+  ])
   window.setInterval(() => {
     now.value = Date.now()
   }, 60 * 1000)
@@ -102,12 +251,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-[900px]">
+  <div class="mx-auto w-full max-w-[1100px]">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h1 class="text-2xl font-semibold tracking-tight text-foreground" data-testid="page-title">
-        My Appointments
-      </h1>
-      <Button as="a" href="/book" data-testid="book-session-button">
+      <div class="min-w-0">
+        <h1 class="text-2xl font-semibold tracking-tight text-foreground" data-testid="page-title">
+          My Appointments
+        </h1>
+        <p class="mt-1 text-sm text-muted-foreground">Select a day to see your bookings or free times.</p>
+      </div>
+      <Button as="a" href="/book" data-testid="book-session-button" class="shrink-0">
         <CalendarX2 class="size-4" />
         Book a Session
       </Button>
@@ -115,94 +267,149 @@ onMounted(() => {
 
     <p v-if="error" class="mt-4 text-sm text-destructive">{{ error }}</p>
 
-    <div v-if="isLoading" class="mt-6 grid gap-4">
-      <Skeleton v-for="i in 3" :key="i" class="h-28 w-full" />
-    </div>
+    <Card class="mt-6 w-full overflow-hidden">
+      <CardContent class="p-3 sm:p-5">
+        <div class="mb-3 flex items-center justify-between gap-2">
+          <Button variant="ghost" size="sm" aria-label="Previous month" @click="onMonthChange(-1)">
+            <ChevronLeft class="size-5" />
+          </Button>
 
-    <Tabs v-else v-model="activeTab" class="mt-6 w-full" data-testid="appointments-tabs">
-      <TabsList>
-        <TabsTrigger value="upcoming" data-testid="tab-upcoming">Upcoming</TabsTrigger>
-        <TabsTrigger value="past" data-testid="tab-past">Past</TabsTrigger>
-      </TabsList>
+          <div class="flex items-center gap-2 text-base font-semibold text-foreground">
+            <CalendarIcon class="size-4 text-primary" />
+            <span data-testid="calendar-month">{{ formatMonthLabel() }}</span>
+          </div>
 
-      <TabsContent value="upcoming" class="mt-4">
-        <div v-if="upcomingAppointments.length === 0" class="flex flex-col items-center rounded-2xl border border-border bg-white p-10 text-center" data-testid="no-upcoming">
-          <Video class="size-10 text-muted-foreground" />
-          <p class="mt-3 font-medium text-foreground">No upcoming appointments. Book your first session.</p>
-          <Button as="a" href="/book" class="mt-4" data-testid="book-now-empty">Book Now</Button>
+          <div class="flex items-center gap-1">
+            <Button variant="ghost" size="sm" data-testid="calendar-today" @click="goToday">Today</Button>
+            <Button variant="ghost" size="sm" aria-label="Next month" @click="onMonthChange(1)">
+              <ChevronRight class="size-5" />
+            </Button>
+          </div>
         </div>
-        <div v-else class="grid gap-4">
+
+        <ClientOnly>
+          <FullCalendar :key="calendarKey" :options="calendarOptions" />
+          <template #fallback>
+            <div class="py-10 text-center text-sm text-muted-foreground">Loading calendar…</div>
+          </template>
+        </ClientOnly>
+
+        <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
+          <span class="inline-flex items-center gap-1.5">
+            <span class="size-3 rounded-sm border border-primary"></span>
+            Available day
+          </span>
+          <span class="inline-flex items-center gap-1.5">
+            <span class="size-2.5 rounded-full bg-green-600"></span>
+            Confirmed
+          </span>
+          <span class="inline-flex items-center gap-1.5">
+            <span class="size-2.5 rounded-full bg-yellow-500"></span>
+            Under review
+          </span>
+          <span class="inline-flex items-center gap-1.5">
+            <span class="size-2.5 rounded-full bg-slate-400"></span>
+            Cancelled
+          </span>
+          <span class="inline-flex items-center gap-1.5">
+            <span class="size-3 rounded-sm bg-slate-200"></span>
+            Holiday / Past
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+
+    <div class="mt-6" data-testid="day-panel">
+      <div v-if="isLoading && allBookings.length === 0" class="grid gap-3">
+        <Skeleton v-for="i in 2" :key="i" class="h-28 w-full" />
+      </div>
+
+      <div v-else-if="!selectedDate" class="rounded-2xl border border-border bg-white px-4 py-8 text-center text-sm text-muted-foreground">
+        Select a date above to see your bookings or free times.
+      </div>
+
+      <div v-else>
+        <h2 class="mb-3 text-base font-semibold text-foreground" data-testid="panel-date">
+          {{ formatDateLabel(selectedDate) }}
+        </h2>
+
+        <div v-if="panelLoading" class="grid gap-3">
+          <Skeleton v-for="i in 2" :key="i" class="h-24 w-full" />
+        </div>
+
+        <div v-else-if="selectedBookings.length > 0" class="grid gap-4">
           <Card
-            v-for="appt in upcomingAppointments"
+            v-for="appt in selectedBookings"
             :key="appt.id"
             class="overflow-hidden"
-            :data-testid="`appointment-${appt.id}`"
+            :data-testid="`booking-${appt.id}`"
           >
             <CardContent class="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
               <Avatar class="size-14 shrink-0">
                 <AvatarImage :src="appt.doctorPhoto || undefined" :alt="appt.doctorName" />
-                <AvatarFallback class="text-lg">{{ appt.doctorName.slice(0, 1).toUpperCase() }}</AvatarFallback>
+                <AvatarFallback class="text-lg">{{ (appt.doctorName || 'U').slice(0, 1).toUpperCase() }}</AvatarFallback>
               </Avatar>
               <div class="min-w-0 flex-1">
-                <p class="truncate text-base font-semibold text-foreground">{{ appt.doctorName }}</p>
-                <p class="mt-0.5 text-sm text-muted-foreground">{{ formatDateLabel(appt.date) }}</p>
+                <p class="truncate text-base font-semibold text-foreground" :data-testid="`doctor-name-${appt.id}`">
+                  {{ appt.doctorId ? appt.doctorName : 'Unknown Doctor' }}
+                </p>
                 <p class="text-sm text-muted-foreground">{{ formatTime(appt.startTime) }} – {{ formatTime(appt.endTime) }}</p>
                 <p class="mt-1 text-sm text-muted-foreground">{{ appt.service }}</p>
               </div>
               <div class="flex shrink-0 flex-col gap-2 sm:items-end">
-                <Button
-                  :variant="canJoin(appt) ? 'default' : 'secondary'"
-                  :disabled="!canJoin(appt)"
-                  :title="!canJoin(appt) ? 'Available 5 minutes before your session' : undefined"
-                  :data-testid="`join-${appt.id}`"
-                  @click="joinSession(appt)"
+                <Badge
+                  :variant="appt.status === 'CONFIRMED' ? 'default' : 'secondary'"
+                  :class="appt.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : appt.status === 'CANCELLED' ? 'bg-slate-200 text-slate-600' : ''"
+                  :data-testid="`status-${appt.id}`"
                 >
-                  Join Session
-                </Button>
-                <Button
-                  v-if="canCancel(appt)"
-                  variant="outline"
-                  :data-testid="`cancel-${appt.id}`"
-                  @click="openCancelDialog(appt)"
-                >
-                  Cancel
-                </Button>
+                  {{ statusLabel(appt.status) }}
+                </Badge>
+                <template v-if="appt.status === 'CONFIRMED'">
+                  <Button
+                    :variant="canJoin(appt) ? 'default' : 'secondary'"
+                    :disabled="!canJoin(appt)"
+                    :title="!canJoin(appt) ? 'Available 5 minutes before your session' : undefined"
+                    :data-testid="`join-${appt.id}`"
+                    @click="joinSession(appt)"
+                  >
+                    Join Session
+                  </Button>
+                  <Button
+                    v-if="canCancel(appt)"
+                    variant="outline"
+                    :data-testid="`cancel-${appt.id}`"
+                    @click="openCancelDialog(appt)"
+                  >
+                    Cancel
+                  </Button>
+                </template>
               </div>
             </CardContent>
           </Card>
         </div>
-      </TabsContent>
 
-      <TabsContent value="past" class="mt-4">
-        <div v-if="pastAppointments.length === 0" class="flex flex-col items-center rounded-2xl border border-border bg-white p-10 text-center" data-testid="no-past">
-          <p class="font-medium text-foreground">No past appointments.</p>
+        <div v-else-if="availableSlots.length > 0" class="rounded-2xl border border-border bg-white p-5">
+          <p class="mb-3 text-sm font-medium text-foreground">Free times on this day</p>
+          <div class="flex flex-wrap gap-2">
+            <Button
+              v-for="slot in availableSlots"
+              :key="slot.startTime"
+              variant="outline"
+              :data-testid="`slot-${slot.startTime}`"
+              @click="bookSlot(slot.startTime)"
+            >
+              {{ formatTime(slot.startTime) }}
+            </Button>
+          </div>
         </div>
-        <div v-else class="grid gap-4">
-          <Card
-            v-for="appt in pastAppointments"
-            :key="appt.id"
-            class="overflow-hidden"
-            :data-testid="`past-appointment-${appt.id}`"
-          >
-            <CardContent class="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
-              <Avatar class="size-14 shrink-0">
-                <AvatarImage :src="appt.doctorPhoto || undefined" :alt="appt.doctorName" />
-                <AvatarFallback class="text-lg">{{ appt.doctorName.slice(0, 1).toUpperCase() }}</AvatarFallback>
-              </Avatar>
-              <div class="min-w-0 flex-1">
-                <p class="truncate text-base font-semibold text-foreground">{{ appt.doctorName }}</p>
-                <p class="mt-0.5 text-sm text-muted-foreground">{{ formatDateLabel(appt.date) }}</p>
-                <p class="text-sm text-muted-foreground">{{ formatTime(appt.startTime) }} – {{ formatTime(appt.endTime) }}</p>
-                <p class="mt-1 text-sm text-muted-foreground">{{ appt.service }}</p>
-              </div>
-              <Badge :variant="appt.status === 'CANCELLED' ? 'secondary' : 'default'">
-                {{ appt.status === 'CANCELLED' ? 'Cancelled' : 'Completed' }}
-              </Badge>
-            </CardContent>
-          </Card>
+
+        <div v-else class="flex flex-col items-center rounded-2xl border border-border bg-white p-10 text-center" data-testid="day-empty">
+          <Video class="size-10 text-muted-foreground" />
+          <p class="mt-3 font-medium text-foreground">No appointments on this day. Select another date or book a new session.</p>
+          <Button as="a" href="/book" class="mt-4" data-testid="book-now-empty">Book Now</Button>
         </div>
-      </TabsContent>
-    </Tabs>
+      </div>
+    </div>
 
     <Teleport to="body">
       <Dialog v-model:open="cancelDialogOpen">
@@ -226,3 +433,53 @@ onMounted(() => {
     </Teleport>
   </div>
 </template>
+
+<style>
+.fc-holiday .fc-daygrid-day-frame {
+  background-color: #f1f5f9;
+  cursor: not-allowed;
+}
+.fc-holiday .fc-daygrid-day-number {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+.fc-past {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.fc-past .fc-daygrid-day-frame {
+  pointer-events: none;
+}
+.fc-available .fc-daygrid-day-frame {
+  cursor: pointer;
+}
+.fc-available .fc-daygrid-day-number {
+  color: #e91e8c;
+  font-weight: 600;
+}
+.fc-dot-confirmed .fc-daygrid-day-number::after,
+.fc-dot-pending .fc-daygrid-day-number::after,
+.fc-dot-cancelled .fc-daygrid-day-number::after {
+  content: '';
+  display: block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin: 1px auto 0;
+  border-radius: 9999px;
+}
+.fc-dot-confirmed .fc-daygrid-day-number::after {
+  background-color: #16a34a;
+}
+.fc-dot-pending .fc-daygrid-day-number::after {
+  background-color: #eab308;
+}
+.fc-dot-cancelled .fc-daygrid-day-number::after {
+  background-color: #94a3b8;
+}
+@media (max-width: 640px) {
+  .fc .fc-daygrid-day-number {
+    font-size: 0.75rem;
+    padding: 2px;
+  }
+}
+</style>
