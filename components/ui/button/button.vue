@@ -29,7 +29,7 @@ const buttonVariants = cva(
       variant: {
         default: 'bg-primary text-primary-foreground shadow-magenta hover:bg-primary/90 active:scale-[0.98]',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98]',
-        outline: 'border-2 border-primary/60 bg-white text-primary hover:bg-secondary active:scale-[0.98]',
+        outline: 'border-2 border-primary/60 bg-background text-primary hover:bg-secondary active:scale-[0.98]',
         ghost: 'text-primary underline-offset-4 hover:bg-transparent hover:underline',
         destructive: 'bg-destructive text-destructive-foreground active:scale-[0.98]',
         link: 'text-primary underline-offset-4 hover:underline',

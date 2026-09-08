@@ -6,6 +6,5 @@
 
 body {
   font-family: 'Inter', 'DM Sans', sans-serif;
-  color: #2D2D2D;
-  background-color: #ffffff;
+  @apply bg-background text-foreground min-h-screen transition-colors duration-150;
 }

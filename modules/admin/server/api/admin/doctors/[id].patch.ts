@@ -24,28 +24,26 @@ export default defineEventHandler(async (event) => {
 
   const { name, phone, bio, specializations, isActive } = parsed.data
 
-  if (name !== undefined || phone !== undefined || isActive !== undefined) {
-    await prisma.user.update({
-      where: { id: doctor.userId },
-      data: {
-        name: name ?? undefined,
-        phone: phone !== undefined ? (phone ? phone : null) : undefined,
-      },
-    })
+  const userUpdateData: { name?: string; phone?: string | null; isActive?: boolean } = {}
+  if (name !== undefined) userUpdateData.name = name
+  if (phone !== undefined) userUpdateData.phone = phone ? phone : null
+  if (isActive !== undefined) userUpdateData.isActive = isActive
+
+  const doctorUpdateData: { isActive?: boolean; bio?: string | null; specializations?: string[] } = {}
+  if (isActive !== undefined) doctorUpdateData.isActive = isActive
+  if (bio !== undefined) doctorUpdateData.bio = bio ? bio : null
+  if (specializations !== undefined) doctorUpdateData.specializations = specializations
+
+  const ops = []
+  if (Object.keys(userUpdateData).length > 0) {
+    ops.push(prisma.user.update({ where: { id: doctor.userId }, data: userUpdateData }))
+  }
+  if (Object.keys(doctorUpdateData).length > 0) {
+    ops.push(prisma.doctor.update({ where: { id }, data: doctorUpdateData }))
   }
 
-  if (isActive !== undefined) {
-    await prisma.doctor.update({ where: { id }, data: { isActive } })
-  }
-
-  if (bio !== undefined || specializations !== undefined) {
-    await prisma.doctor.update({
-      where: { id },
-      data: {
-        bio: bio !== undefined ? (bio ? bio : null) : undefined,
-        specializations: specializations ?? undefined,
-      },
-    })
+  if (ops.length > 0) {
+    await prisma.$transaction(ops)
   }
 
   const updated = await prisma.doctor.findUnique({

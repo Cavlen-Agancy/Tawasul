@@ -2,8 +2,7 @@ import { defineEventHandler, readBody, createError, setResponseStatus } from 'h3
 import { prisma } from '~/server/utils/prisma'
 import { requirePermission } from '~/server/utils/permissions'
 import { blockedDateSchema } from '~/server/utils/validation'
-import { formatDateISO } from '~/server/utils/admin-availability'
-import { parseDateUTC } from '~/server/utils/availability'
+import { formatDateISO, parseDateUTC } from '~/server/utils/availability'
 
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'SETTINGS', 'UPDATE')

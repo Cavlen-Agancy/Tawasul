@@ -87,7 +87,7 @@ onBeforeUnmount(stopPolling)
     <!-- Error / not authorized / not confirmed / not found -->
     <div
       v-else-if="status === 'error' || waiting"
-      class="rounded-2xl border border-border bg-white p-8 text-center"
+      class="rounded-2xl border border-border bg-card p-8 text-center"
       :data-testid="waiting ? 'meeting-waiting' : 'meeting-error'"
     >
       <Clock3 v-if="waiting" class="mx-auto size-12 text-primary" />
@@ -107,7 +107,7 @@ onBeforeUnmount(stopPolling)
     <!-- Ready to join -->
     <div
       v-else-if="meeting"
-      class="overflow-hidden rounded-2xl border border-border bg-white"
+      class="overflow-hidden rounded-2xl border border-border bg-card"
       data-testid="meeting-lobby"
     >
       <div class="h-1.5 bg-primary" />

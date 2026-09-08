@@ -138,19 +138,19 @@ onBeforeUnmount(() => {
       <Skeleton class="h-96 w-full" />
     </div>
 
-    <div v-else-if="status === 'waiting'" class="flex flex-col items-center justify-center rounded-2xl border border-border bg-white p-10 text-center" data-testid="session-waiting">
+    <div v-else-if="status === 'waiting'" class="flex flex-col items-center justify-center rounded-2xl border border-border bg-card p-10 text-center" data-testid="session-waiting">
       <Video class="size-12 text-primary" />
       <h2 class="mt-4 text-xl font-semibold text-foreground">Your session starts soon</h2>
       <p class="mt-2 text-sm text-muted-foreground">This page will refresh automatically when your session is ready to join.</p>
       <p class="mt-4 text-xs text-muted-foreground">{{ message }}</p>
     </div>
 
-    <div v-else-if="status === 'error'" class="flex flex-col items-center justify-center rounded-2xl border border-border bg-white p-10 text-center" data-testid="session-error">
+    <div v-else-if="status === 'error'" class="flex flex-col items-center justify-center rounded-2xl border border-border bg-card p-10 text-center" data-testid="session-error">
       <h2 class="text-xl font-semibold text-destructive">Session unavailable</h2>
       <p class="mt-2 text-sm text-muted-foreground">{{ message }}</p>
     </div>
 
-    <div v-else class="relative flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-border bg-white">
+    <div v-else class="relative flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-border bg-card">
       <div class="absolute right-4 top-4 z-10">
         <Button variant="destructive" data-testid="leave-session" @click="openLeaveDialog">
           <LogOut class="size-4" />

@@ -1,5 +1,9 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'admin', middleware: ['auth', 'staff-only'] })
+definePageMeta({
+  layout: 'admin',
+  middleware: ['auth', 'staff-only'],
+  permission: { resource: 'PAYMENTS', action: 'READ' },
+})
 
 const { payments, paymentsSummary, activeDoctors, loading, error, fetchPayments, fetchActiveDoctors } = useAdminDashboard()
 
@@ -89,7 +93,7 @@ onMounted(() => {
       <Skeleton v-for="i in 5" :key="i" class="h-14 w-full" />
     </div>
 
-    <p v-else-if="payments.length === 0" class="mt-4 rounded-2xl border border-border bg-white px-4 py-10 text-center text-sm text-muted-foreground" data-testid="no-payments">
+    <p v-else-if="payments.length === 0" class="mt-4 rounded-2xl border border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground" data-testid="no-payments">
       No payments found.
     </p>
 

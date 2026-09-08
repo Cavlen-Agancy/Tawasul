@@ -2,7 +2,7 @@ import { defineEventHandler, readBody, getRouterParam, createError, setResponseS
 import { prisma } from '~/server/utils/prisma'
 import { requirePermission } from '~/server/utils/permissions'
 import { blockSlotSchema, validationMessage } from '~/server/utils/validation'
-import { formatDateISO } from '~/server/utils/admin-availability'
+import { formatDateISO } from '~/server/utils/availability'
 import { parseDateUTC } from '~/server/utils/availability'
 import { timeToMinutes } from '~/server/utils/availability'
 

@@ -21,7 +21,7 @@ const isActive = computed(() => active.value === props.value)
     :class="cn(
       'inline-flex items-center justify-center whitespace-nowrap rounded-xl px-3 py-1.5 text-sm font-medium transition-all',
       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-      isActive ? 'bg-white text-foreground shadow-sm' : 'hover:text-foreground',
+      isActive ? 'bg-background text-foreground shadow-sm' : 'hover:text-foreground',
       props.class,
     )"
     :data-testid="`tab-${props.value}`"

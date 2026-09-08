@@ -194,6 +194,11 @@ export default defineNuxtConfig({
         { name: 'description', content: 'Online mental health counseling platform' },
         { name: 'theme-color', content: '#E91E8C' },
       ],
+      script: [
+        {
+          innerHTML: `(function(){try{var m=localStorage.getItem('tawasul-color-mode')||'system';var d=m==='dark'||(m==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d){document.documentElement.classList.add('dark');}else{document.documentElement.classList.remove('dark');}}catch(e){}})();`,
+        },
+      ],
       link: [
         { rel: 'icon', type: 'image/png', href: '/favicon.png' },
         {

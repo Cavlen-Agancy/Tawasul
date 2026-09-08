@@ -1,5 +1,9 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'admin', middleware: ['auth', 'staff-only'] })
+definePageMeta({
+  layout: 'admin',
+  middleware: ['auth', 'staff-only'],
+  permission: { resource: 'PATIENTS', action: 'READ' },
+})
 
 const { patients, loading, error, fetchPatients } = useAdminDashboard()
 

@@ -25,23 +25,23 @@
   }
 
   .dark {
-    --background: 300 2% 10%;
-    --foreground: 0 0% 96%;
-    --card: 300 2% 13%;
-    --card-foreground: 0 0% 96%;
-    --primary: 329 75% 55%;
+    --background: 250 8% 9%;
+    --foreground: 0 0% 98%;
+    --card: 250 8% 13%;
+    --card-foreground: 0 0% 98%;
+    --primary: 329 78% 58%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 329 30% 20%;
-    --secondary-foreground: 326 78% 90%;
-    --muted: 300 2% 16%;
-    --muted-foreground: 0 0% 70%;
-    --accent: 329 30% 20%;
-    --accent-foreground: 326 78% 90%;
+    --secondary: 329 35% 18%;
+    --secondary-foreground: 326 80% 92%;
+    --muted: 250 8% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 329 35% 18%;
+    --accent-foreground: 326 80% 92%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 300 2% 22%;
-    --input: 300 2% 22%;
-    --ring: 329 75% 55%;
+    --border: 250 7% 20%;
+    --input: 250 7% 20%;
+    --ring: 329 75% 58%;
   }
 }
 
@@ -52,4 +52,66 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* FullCalendar dark mode support */
+.dark .fc {
+  --fc-border-color: hsl(var(--border));
+  --fc-page-bg-color: hsl(var(--card));
+  --fc-neutral-bg-color: hsl(var(--muted));
+  --fc-list-event-hover-bg-color: hsl(var(--muted));
+  --fc-today-bg-color: hsla(var(--primary) / 0.12);
+}
+
+.dark .fc .fc-col-header-cell {
+  background-color: hsl(var(--muted) / 0.6);
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+
+.dark .fc .fc-scrollgrid,
+.dark .fc td,
+.dark .fc th {
+  border-color: hsl(var(--border));
+}
+
+.dark .fc .fc-daygrid-day-number {
+  color: hsl(var(--foreground));
+}
+
+.dark .fc .fc-day-other .fc-daygrid-day-number {
+  color: hsl(var(--muted-foreground)) !important;
+  opacity: 0.35;
+}
+
+.dark .fc-holiday .fc-daygrid-day-frame {
+  background-color: hsl(var(--muted) / 0.5) !important;
+}
+
+.dark .fc-holiday .fc-daygrid-day-number {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.dark .fc-past .fc-daygrid-day-frame {
+  opacity: 0.5;
+}
+
+.dark .fc-tawasul-available {
+  background-color: hsla(var(--primary) / 0.15) !important;
+}
+
+.dark .fc-tawasul-available .fc-daygrid-day-number {
+  color: hsl(var(--primary)) !important;
+}
+
+.dark .fc-tawasul-unavailable .fc-daygrid-day-number {
+  color: hsl(var(--muted-foreground)) !important;
+  opacity: 0.4;
+}
+
+.dark .fc-tawasul-event-cancelled {
+  background-color: hsl(var(--muted)) !important;
+  border-color: hsl(var(--border)) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  opacity: 0.7;
 }

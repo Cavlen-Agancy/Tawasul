@@ -16,7 +16,7 @@ const { dismiss } = useToast()
 <template>
   <div
     :class="cn(
-      'group pointer-events-auto relative flex w-full items-start gap-3 rounded-xl border bg-white p-4 shadow-lg',
+      'group pointer-events-auto relative flex w-full items-start gap-3 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-lg',
       toast.variant === 'destructive' && 'border-destructive/40 text-destructive',
       toast.variant === 'success' && 'border-success/40',
       toast.variant === 'info' && 'border-primary/40',

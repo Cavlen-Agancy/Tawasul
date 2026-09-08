@@ -52,15 +52,18 @@ onMounted(() => {
         </nav>
 
         <div class="border-t border-border p-4">
-          <div class="mb-3 flex items-center gap-3">
-            <Avatar class="size-10 shrink-0">
-              <AvatarImage :src="user?.photo" :alt="user?.name" />
-              <AvatarFallback class="text-base">{{ user?.name?.slice(0, 1).toUpperCase() }}</AvatarFallback>
-            </Avatar>
-            <div class="min-w-0">
-              <p class="truncate text-sm font-semibold text-foreground">{{ user?.name }}</p>
-              <p class="truncate text-xs text-muted-foreground">{{ user?.email }}</p>
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <Avatar class="size-10 shrink-0">
+                <AvatarImage :src="user?.photo" :alt="user?.name" />
+                <AvatarFallback class="text-base">{{ user?.name?.slice(0, 1).toUpperCase() }}</AvatarFallback>
+              </Avatar>
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-foreground">{{ user?.name }}</p>
+                <p class="truncate text-xs text-muted-foreground">{{ user?.email }}</p>
+              </div>
             </div>
+            <ThemeToggle size="sm" />
           </div>
           <button
             type="button"
@@ -76,24 +79,27 @@ onMounted(() => {
     </aside>
 
     <main class="flex min-w-0 flex-1 flex-col overflow-auto">
-      <header class="flex h-16 shrink-0 items-center justify-between border-b border-border bg-white px-4 lg:hidden">
+      <header class="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-4 lg:hidden">
         <NuxtLink to="/" class="flex items-center text-lg font-semibold">
           Tawasul <span class="text-primary">Academy</span>
         </NuxtLink>
-        <button
-          type="button"
-          class="flex h-10 w-10 items-center justify-center rounded-2xl text-foreground transition-colors duration-150 hover:bg-secondary"
-          :aria-expanded="mobileNavOpen"
-          aria-label="Toggle dashboard navigation"
-          @click="mobileNavOpen = !mobileNavOpen"
-        >
-          <MenuIcon class="size-5" />
-        </button>
+        <div class="flex items-center gap-2">
+          <ThemeToggle size="sm" />
+          <button
+            type="button"
+            class="flex h-10 w-10 items-center justify-center rounded-2xl text-foreground transition-colors duration-150 hover:bg-secondary"
+            :aria-expanded="mobileNavOpen"
+            aria-label="Toggle dashboard navigation"
+            @click="mobileNavOpen = !mobileNavOpen"
+          >
+            <MenuIcon class="size-5" />
+          </button>
+        </div>
       </header>
 
       <nav
         v-if="mobileNavOpen"
-        class="flex flex-col gap-1 border-b border-border bg-white px-4 py-4 lg:hidden"
+        class="flex flex-col gap-1 border-b border-border bg-card px-4 py-4 lg:hidden"
       >
         <NuxtLink
           v-for="item in navItems"
@@ -123,11 +129,11 @@ onMounted(() => {
           <Toaster />
           <div
             v-if="profile && !profile.bio"
-            class="mb-4 flex items-start gap-3 rounded-2xl border border-yellow-300 bg-yellow-50 p-4"
+            class="mb-4 flex items-start gap-3 rounded-2xl border border-yellow-300 bg-yellow-50 p-4 dark:border-yellow-900/50 dark:bg-yellow-950/30"
             data-testid="incomplete-profile-banner"
           >
-            <TriangleAlert class="mt-0.5 size-5 shrink-0 text-yellow-600" />
-            <p class="text-sm text-yellow-800">
+            <TriangleAlert class="mt-0.5 size-5 shrink-0 text-yellow-600 dark:text-yellow-400" />
+            <p class="text-sm text-yellow-800 dark:text-yellow-200">
               Your profile is incomplete. Please complete your profile so patients can find you.
               <NuxtLink to="/doctor/profile" class="font-semibold underline">Complete profile</NuxtLink>
             </p>
@@ -136,8 +142,8 @@ onMounted(() => {
         </div>
       </div>
 
-      <nav class="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-white py-2 lg:hidden">
-        <div class="flex items-center justify-around rounded-2xl bg-white/90 backdrop-blur">
+      <nav class="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-card/95 backdrop-blur py-2 lg:hidden">
+        <div class="flex items-center justify-around rounded-2xl bg-card/90 backdrop-blur">
           <NuxtLink
             v-for="item in navItems"
             :key="item.to"

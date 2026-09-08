@@ -87,14 +87,14 @@ test.describe('Login Flow', () => {
 
   test('doctor logs in and is redirected to /doctor', async ({ page }) => {
     await loginAs(page, doctor.email, doctor.password)
-    await page.waitForURL('**/doctor')
-    await expect(page.getByRole('heading', { name: 'Doctor Dashboard' })).toBeVisible()
+    await page.waitForURL('**/doctor**')
+    await expect(page.getByTestId('page-title')).toHaveText('My Calendar')
   })
 
   test('staff logs in and is redirected to /admin', async ({ page }) => {
     await loginAs(page, staff.email, staff.password)
     await page.waitForURL('**/admin')
-    await expect(page.getByRole('heading', { name: 'Admin Dashboard' })).toBeVisible()
+    await expect(page.getByTestId('page-title')).toHaveText('Admin Overview')
   })
 
   test('wrong password shows Invalid credentials and stays on /login', async ({ page }) => {

@@ -16,15 +16,15 @@ const { data: settings } = useFetch('/api/public/settings')
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col bg-white">
-    <header class="sticky top-0 z-50 border-b border-border bg-white/95 backdrop-blur">
+  <div class="flex min-h-screen flex-col bg-background text-foreground">
+    <header class="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur">
       <div class="mx-auto flex h-20 w-full max-w-[1200px] items-center justify-between px-4 lg:px-12">
         <NuxtLink to="/" class="flex shrink-0 items-center gap-2" aria-label="Tawasul Academy home">
           <img
             v-if="!showTextLogo"
             src="/logo.png"
             alt="Tawasul Academy"
-            class="h-14 w-auto"
+            class="h-14 w-auto dark:brightness-110"
             @error="showTextLogo = true"
           >
           <span v-else class="text-xl font-semibold tracking-tight">
@@ -44,6 +44,7 @@ const { data: settings } = useFetch('/api/public/settings')
         </nav>
 
         <div class="hidden items-center gap-3 md:flex">
+          <ThemeToggle />
           <Button variant="outline" size="sm" as="a" href="/login">
             Login
           </Button>
@@ -52,16 +53,19 @@ const { data: settings } = useFetch('/api/public/settings')
           </Button>
         </div>
 
-        <button
-          class="flex h-10 w-10 items-center justify-center rounded-2xl text-foreground transition-colors duration-150 hover:bg-secondary md:hidden"
-          type="button"
-          :aria-expanded="mobileMenuOpen"
-          aria-label="Toggle navigation menu"
-          @click="mobileMenuOpen = !mobileMenuOpen"
-        >
-          <MenuIcon v-if="!mobileMenuOpen" class="size-5" />
-          <XIcon v-else class="size-5" />
-        </button>
+        <div class="flex items-center gap-2 md:hidden">
+          <ThemeToggle size="sm" />
+          <button
+            class="flex h-10 w-10 items-center justify-center rounded-2xl text-foreground transition-colors duration-150 hover:bg-secondary"
+            type="button"
+            :aria-expanded="mobileMenuOpen"
+            aria-label="Toggle navigation menu"
+            @click="mobileMenuOpen = !mobileMenuOpen"
+          >
+            <MenuIcon v-if="!mobileMenuOpen" class="size-5" />
+            <XIcon v-else class="size-5" />
+          </button>
+        </div>
       </div>
 
       <Transition
@@ -72,7 +76,7 @@ const { data: settings } = useFetch('/api/public/settings')
       >
         <nav
           v-if="mobileMenuOpen"
-          class="flex flex-col border-t border-border bg-white px-4 py-4 md:hidden"
+          class="flex flex-col border-t border-border bg-background px-4 py-4 md:hidden"
           aria-label="Mobile navigation"
         >
           <NuxtLink
@@ -100,7 +104,7 @@ const { data: settings } = useFetch('/api/public/settings')
       <slot />
     </main>
 
-    <footer class="border-t border-border bg-white">
+    <footer class="border-t border-border bg-background">
       <div class="mx-auto flex w-full max-w-[1200px] flex-col items-center gap-2 px-4 py-8 text-center lg:px-12">
         <p class="text-sm text-muted-foreground">© 2024 Tawasul Academy</p>
         <p v-if="settings?.contactEmail || settings?.contactPhone" class="text-sm text-muted-foreground">

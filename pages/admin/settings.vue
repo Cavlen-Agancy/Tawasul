@@ -2,7 +2,11 @@
 import { CalendarOff, Plus, Save, Trash2 } from 'lucide-vue-next'
 import { DAYS_OF_WEEK } from '~/modules/admin/composables/types'
 
-definePageMeta({ layout: 'admin', middleware: 'staff-only' })
+definePageMeta({
+  layout: 'admin',
+  middleware: ['auth', 'staff-only'],
+  permission: { resource: 'SETTINGS', action: 'READ' },
+})
 
 const {
   schedules,

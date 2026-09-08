@@ -402,7 +402,7 @@ onMounted(async () => {
             Available day
           </span>
           <span class="inline-flex items-center gap-1.5">
-            <span class="size-3 rounded-sm bg-slate-200"></span>
+            <span class="size-3 rounded-sm bg-slate-200 dark:bg-muted"></span>
             Holiday / Past
           </span>
         </div>
@@ -410,7 +410,7 @@ onMounted(async () => {
     </Card>
 
     <div class="mt-6" data-testid="day-panel">
-      <div v-if="fetchError" class="rounded-2xl border border-destructive/40 bg-white p-6 text-center" data-testid="day-error">
+      <div v-if="fetchError" class="rounded-2xl border border-destructive/40 bg-card p-6 text-center" data-testid="day-error">
         <p class="text-sm font-medium text-destructive">{{ fetchError }}</p>
         <Button variant="outline" class="mt-4" data-testid="day-retry" @click="retryLoad">Retry</Button>
       </div>
@@ -419,7 +419,7 @@ onMounted(async () => {
         <div v-if="isLoading || availableDates.length === 0" class="grid gap-3">
           <Skeleton v-for="i in 2" :key="i" class="h-28 w-full" />
         </div>
-        <div v-else class="rounded-2xl border border-border bg-white px-4 py-8 text-center text-sm text-muted-foreground">
+        <div v-else class="rounded-2xl border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
           Select a date above to see your bookings or free times.
         </div>
       </div>
@@ -433,7 +433,7 @@ onMounted(async () => {
           <Skeleton v-for="i in 2" :key="i" class="h-24 w-full" />
         </div>
 
-        <div v-else-if="selectedDate && isClosedDay(selectedDate)" class="rounded-2xl border border-border bg-white p-10 text-center" data-testid="day-closed">
+        <div v-else-if="selectedDate && isClosedDay(selectedDate)" class="rounded-2xl border border-border bg-card p-10 text-center" data-testid="day-closed">
           <p class="font-medium text-foreground">{{ getClosedDayMessage() }}</p>
           <p class="mt-1 text-sm text-muted-foreground">Please choose another day to see bookings or free times.</p>
         </div>
@@ -468,7 +468,7 @@ onMounted(async () => {
               <div class="flex shrink-0 flex-col gap-2 sm:items-end">
                 <Badge
                   :variant="appt.status === 'CONFIRMED' ? 'default' : 'secondary'"
-                  :class="appt.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : appt.status === 'CANCELLED' ? 'bg-slate-200 text-slate-600' : ''"
+                  :class="appt.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-300' : appt.status === 'CANCELLED' ? 'bg-slate-200 text-slate-600 dark:bg-muted dark:text-muted-foreground' : ''"
                   :data-testid="`status-${appt.id}`"
                 >
                   {{ statusLabel(appt.status) }}
@@ -507,7 +507,7 @@ onMounted(async () => {
           </Card>
         </div>
 
-        <div v-if="availableSlots.length > 0" class="rounded-2xl border border-border bg-white p-5" :class="{ 'mt-4': selectedBookings.length > 0 }">
+        <div v-if="availableSlots.length > 0" class="rounded-2xl border border-border bg-card p-5" :class="{ 'mt-4': selectedBookings.length > 0 }">
           <p class="mb-3 text-sm font-medium text-foreground">Other available times on this day:</p>
           <div class="flex flex-wrap gap-2">
             <Button
@@ -522,7 +522,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div v-if="selectedBookings.length === 0 && availableSlots.length === 0" class="flex flex-col items-center rounded-2xl border border-border bg-white p-10 text-center" data-testid="day-empty">
+        <div v-if="selectedBookings.length === 0 && availableSlots.length === 0" class="flex flex-col items-center rounded-2xl border border-border bg-card p-10 text-center" data-testid="day-empty">
           <Video class="size-10 text-muted-foreground" />
           <p class="mt-3 font-medium text-foreground">No appointments or available slots on this day. Select another date or book a new session.</p>
           <Button as="a" href="/book" class="mt-4" data-testid="book-now-empty">Book Now</Button>

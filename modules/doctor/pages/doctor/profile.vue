@@ -128,7 +128,7 @@ onMounted(async () => {
               class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
               data-testid="doctor-profile-bio"
             />
-            <p v-if="!bio" class="mt-1 text-xs text-yellow-700" data-testid="bio-warning">
+            <p v-if="!bio" class="mt-1 text-xs text-yellow-700 dark:text-yellow-400" data-testid="bio-warning">
               Add a bio so patients can find you.
             </p>
           </div>

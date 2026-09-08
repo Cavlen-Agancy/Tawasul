@@ -4,7 +4,11 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { DAYS_OF_WEEK } from '~/modules/admin/composables/types'
 
-definePageMeta({ layout: 'admin', middleware: ['auth', 'staff-only'] })
+definePageMeta({
+  layout: 'admin',
+  middleware: ['auth', 'staff-only'],
+  permission: { resource: 'DOCTORS', action: 'READ' },
+})
 
 const route = useRoute()
 const doctorId = String(route.params.id ?? '')

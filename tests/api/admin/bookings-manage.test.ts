@@ -114,4 +114,62 @@ describe('PATCH /api/admin/bookings/:id/cancel', () => {
       expectApiError(e, 400, 'Booking is already cancelled')
     }
   })
+
+  it('refunds SUCCESS payment, but leaves PENDING and FAILED payments unchanged', async () => {
+    const staffId = await staffWithDelete()
+    const patient = await createTestUser({ emailVerified: true, email: `abm-pay-${Date.now()}-${Math.random()}@test.com` })
+    toDeleteUsers.push(patient.id)
+
+    // Booking with PENDING payment
+    const pendingBooking = await prisma.booking.create({
+      data: {
+        userId: patient.id,
+        date: new Date('2030-08-11T00:00:00'),
+        startTime: '11:00',
+        endTime: '12:00',
+        service: 'Online Consultation',
+        status: 'CONFIRMED',
+      },
+    })
+    toDeleteBookings.push(pendingBooking.id)
+    await prisma.payment.create({
+      data: { bookingId: pendingBooking.id, amount: 500, currency: 'EGP', status: 'PENDING' },
+    })
+
+    // Booking with FAILED payment
+    const failedBooking = await prisma.booking.create({
+      data: {
+        userId: patient.id,
+        date: new Date('2030-08-12T00:00:00'),
+        startTime: '12:00',
+        endTime: '13:00',
+        service: 'Online Consultation',
+        status: 'CONFIRMED',
+      },
+    })
+    toDeleteBookings.push(failedBooking.id)
+    await prisma.payment.create({
+      data: { bookingId: failedBooking.id, amount: 500, currency: 'EGP', status: 'FAILED' },
+    })
+
+    // Cancel pending booking
+    await cancelHandler(createApiEvent({
+      method: 'PATCH',
+      url: `/api/admin/bookings/${pendingBooking.id}/cancel`,
+      context: { params: { id: pendingBooking.id }, ...staffContext(staffId) },
+    }))
+
+    // Cancel failed booking
+    await cancelHandler(createApiEvent({
+      method: 'PATCH',
+      url: `/api/admin/bookings/${failedBooking.id}/cancel`,
+      context: { params: { id: failedBooking.id }, ...staffContext(staffId) },
+    }))
+
+    const pendingPayAfter = await prisma.payment.findUnique({ where: { bookingId: pendingBooking.id } })
+    expect(pendingPayAfter?.status).toBe('PENDING')
+
+    const failedPayAfter = await prisma.payment.findUnique({ where: { bookingId: failedBooking.id } })
+    expect(failedPayAfter?.status).toBe('FAILED')
+  })
 })

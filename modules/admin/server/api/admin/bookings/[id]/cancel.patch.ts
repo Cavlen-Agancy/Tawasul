@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
   await prisma.$transaction([
     prisma.booking.update({ where: { id }, data: { status: 'CANCELLED' } }),
     prisma.payment.updateMany({
-      where: { bookingId: id, status: { not: 'REFUNDED' } },
+      where: { bookingId: id, status: 'SUCCESS' },
       data: { status: 'REFUNDED' },
     }),
   ])

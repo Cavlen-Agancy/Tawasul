@@ -1,5 +1,9 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'admin', middleware: ['auth', 'staff-only'] })
+definePageMeta({
+  layout: 'admin',
+  middleware: ['auth', 'staff-only'],
+  permission: { resource: 'STAFF', action: 'READ' },
+})
 
 const { staff, loading, error, fetchStaff, createStaff, updateStaff, deactivateStaff } = useAdminDashboard()
 const { hasPermission } = useAuth()

@@ -31,11 +31,11 @@ const props = withDefaults(
     :placeholder="props.placeholder"
     :autocomplete="props.autocomplete"
     :class="cn(
-      'h-12 w-full rounded-xl border-[1.5px] bg-[#FAFAFA] px-4 text-base text-foreground transition-all duration-150 ease-out',
+      'h-12 w-full rounded-xl border-[1.5px] bg-muted/40 px-4 text-base text-foreground transition-all duration-150 ease-out',
       'placeholder:text-muted-foreground placeholder:text-sm',
-      'focus:border-primary focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#FCE4F3]',
-      'disabled:cursor-not-allowed disabled:border-border disabled:bg-[#F5F5F5] disabled:text-[#888888]',
-      props.error ? 'border-destructive bg-[#FEF2F2]' : 'border-input',
+      'focus:border-primary focus:bg-background focus:outline-none focus:ring-4 focus:ring-primary/20',
+      'disabled:cursor-not-allowed disabled:border-border disabled:bg-muted/60 disabled:text-muted-foreground',
+      props.error ? 'border-destructive bg-destructive/10' : 'border-input',
       props.class,
     )"
   >

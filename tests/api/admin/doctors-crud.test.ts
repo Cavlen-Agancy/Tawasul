@@ -106,7 +106,7 @@ describe('GET /api/admin/doctors/:id', () => {
 })
 
 describe('PATCH /api/admin/doctors/:id', () => {
-  it('updates bio and deactivates', async () => {
+  it('updates bio and deactivates both Doctor and User records', async () => {
     const staffId = await staffWithDoctosPerms()
     const email = `adc-patch-${Date.now()}@test.com`
     const created = await postHandler(createApiEvent({
@@ -116,7 +116,8 @@ describe('PATCH /api/admin/doctors/:id', () => {
       context: staffContext(staffId),
     })) as { id: string }
     toDeleteDoctors.push(created.id)
-    toDeleteUsers.push((await prisma.doctor.findUnique({ where: { id: created.id } }))!.userId)
+    const docRecord = await prisma.doctor.findUnique({ where: { id: created.id } })
+    toDeleteUsers.push(docRecord!.userId)
 
     const res = await patchHandler(createApiEvent({
       method: 'PATCH',
@@ -126,6 +127,69 @@ describe('PATCH /api/admin/doctors/:id', () => {
     }) as never) as { bio: string; isActive: boolean }
     expect(res.bio).toBe('Updated bio')
     expect(res.isActive).toBe(false)
+
+    // Verify User record was also deactivated
+    const updatedUser = await prisma.user.findUnique({ where: { id: docRecord!.userId } })
+    expect(updatedUser?.isActive).toBe(false)
+  })
+
+  it('reactivates both Doctor and User when isActive: true is sent', async () => {
+    const staffId = await staffWithDoctosPerms()
+    const email = `adc-reactivate-${Date.now()}@test.com`
+    const created = await postHandler(createApiEvent({
+      method: 'POST',
+      url: '/api/admin/doctors',
+      body: { name: 'Dr. Reactivate Me', email },
+      context: staffContext(staffId),
+    })) as { id: string }
+    toDeleteDoctors.push(created.id)
+    const docRecord = await prisma.doctor.findUnique({ where: { id: created.id } })
+    toDeleteUsers.push(docRecord!.userId)
+
+    // First deactivate
+    await patchHandler(createApiEvent({
+      method: 'PATCH',
+      url: `/api/admin/doctors/${created.id}`,
+      body: { isActive: false },
+      context: { ...staffContext(staffId), params: { id: created.id } } as never,
+    }) as never)
+
+    // Reactivate
+    const res = await patchHandler(createApiEvent({
+      method: 'PATCH',
+      url: `/api/admin/doctors/${created.id}`,
+      body: { isActive: true },
+      context: { ...staffContext(staffId), params: { id: created.id } } as never,
+    }) as never) as { isActive: boolean }
+    expect(res.isActive).toBe(true)
+
+    const updatedUser = await prisma.user.findUnique({ where: { id: docRecord!.userId } })
+    expect(updatedUser?.isActive).toBe(true)
+  })
+
+  it('does not modify User.isActive when isActive is omitted', async () => {
+    const staffId = await staffWithDoctosPerms()
+    const email = `adc-omit-${Date.now()}@test.com`
+    const created = await postHandler(createApiEvent({
+      method: 'POST',
+      url: '/api/admin/doctors',
+      body: { name: 'Dr. Omit Test', email },
+      context: staffContext(staffId),
+    })) as { id: string }
+    toDeleteDoctors.push(created.id)
+    const docRecord = await prisma.doctor.findUnique({ where: { id: created.id } })
+    toDeleteUsers.push(docRecord!.userId)
+
+    await patchHandler(createApiEvent({
+      method: 'PATCH',
+      url: `/api/admin/doctors/${created.id}`,
+      body: { name: 'Dr. Renamed Doctor' },
+      context: { ...staffContext(staffId), params: { id: created.id } } as never,
+    }) as never)
+
+    const updatedUser = await prisma.user.findUnique({ where: { id: docRecord!.userId } })
+    expect(updatedUser?.name).toBe('Dr. Renamed Doctor')
+    expect(updatedUser?.isActive).toBe(true)
   })
 })
 

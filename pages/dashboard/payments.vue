@@ -55,7 +55,7 @@ onMounted(fetchPayments)
     </div>
 
     <template v-else>
-      <div class="mt-6 overflow-hidden rounded-2xl border border-border bg-white">
+      <div class="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
         <div class="hidden md:block">
           <Table>
             <TableHeader>

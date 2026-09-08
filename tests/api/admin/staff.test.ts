@@ -93,6 +93,92 @@ describe('PATCH /api/admin/staff/:id', () => {
     })) as { permissions: Array<{ resource: string }> }
     expect(res.permissions).toHaveLength(2)
   })
+
+  it('rejects deactivating the seed admin via PATCH', async () => {
+    const previous = process.env.SEED_ADMIN_EMAIL
+    const seedEmail = `ast-seed-patch-${Date.now()}@test.com`
+    process.env.SEED_ADMIN_EMAIL = seedEmail
+    try {
+      const staffId = await staffWithAll()
+      const created = await postHandler(createApiEvent({
+        method: 'POST',
+        url: '/api/admin/staff',
+        body: { name: 'Seed Staff Patch', email: seedEmail },
+        context: staffContext(staffId),
+      })) as { id: string }
+      toDeleteUsers.push(created.id)
+
+      try {
+        await patchHandler(createApiEvent({
+          method: 'PATCH',
+          url: `/api/admin/staff/${created.id}`,
+          body: { isActive: false },
+          context: { params: { id: created.id }, ...staffContext(staffId) },
+        }))
+        expect.unreachable('should have thrown')
+      } catch (e) {
+        expectApiError(e, 403, 'Cannot deactivate seed admin')
+      }
+    } finally {
+      if (previous === undefined) delete process.env.SEED_ADMIN_EMAIL
+      else process.env.SEED_ADMIN_EMAIL = previous
+    }
+  })
+
+  it('rejects removing all permissions from the seed admin via PATCH', async () => {
+    const previous = process.env.SEED_ADMIN_EMAIL
+    const seedEmail = `ast-seed-noperm-${Date.now()}@test.com`
+    process.env.SEED_ADMIN_EMAIL = seedEmail
+    try {
+      const staffId = await staffWithAll()
+      const created = await postHandler(createApiEvent({
+        method: 'POST',
+        url: '/api/admin/staff',
+        body: {
+          name: 'Seed Staff No Perm',
+          email: seedEmail,
+          permissions: [{ resource: 'STAFF', action: 'READ' }],
+        },
+        context: staffContext(staffId),
+      })) as { id: string }
+      toDeleteUsers.push(created.id)
+
+      try {
+        await patchHandler(createApiEvent({
+          method: 'PATCH',
+          url: `/api/admin/staff/${created.id}`,
+          body: { permissions: [] },
+          context: { params: { id: created.id }, ...staffContext(staffId) },
+        }))
+        expect.unreachable('should have thrown')
+      } catch (e) {
+        expectApiError(e, 403, 'Cannot remove permissions from seed admin')
+      }
+    } finally {
+      if (previous === undefined) delete process.env.SEED_ADMIN_EMAIL
+      else process.env.SEED_ADMIN_EMAIL = previous
+    }
+  })
+
+  it('allows valid profile updates to another staff member', async () => {
+    const staffId = await staffWithAll()
+    const created = await postHandler(createApiEvent({
+      method: 'POST',
+      url: '/api/admin/staff',
+      body: { name: 'Normal Staff', email: `ast-normal-${Date.now()}@test.com` },
+      context: staffContext(staffId),
+    })) as { id: string }
+    toDeleteUsers.push(created.id)
+
+    const res = await patchHandler(createApiEvent({
+      method: 'PATCH',
+      url: `/api/admin/staff/${created.id}`,
+      body: { name: 'Normal Staff Updated', phone: '+20111222333' },
+      context: { params: { id: created.id }, ...staffContext(staffId) },
+    })) as { name: string; phone: string | null }
+    expect(res.name).toBe('Normal Staff Updated')
+    expect(res.phone).toBe('+20111222333')
+  })
 })
 
 describe('DELETE /api/admin/staff/:id', () => {

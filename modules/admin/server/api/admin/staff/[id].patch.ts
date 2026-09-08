@@ -27,6 +27,16 @@ export default defineEventHandler(async (event) => {
 
   const { name, phone, permissions, isActive } = parsed.data
 
+  const seedEmail = process.env.SEED_ADMIN_EMAIL
+  if (seedEmail && target.email.toLowerCase() === seedEmail.toLowerCase()) {
+    if (isActive === false) {
+      throw createError({ statusCode: 403, message: 'Cannot deactivate seed admin' })
+    }
+    if (permissions !== undefined && permissions.length === 0) {
+      throw createError({ statusCode: 403, message: 'Cannot remove permissions from seed admin' })
+    }
+  }
+
   if (permissions) {
     for (const p of permissions) {
       if (!VALID_RESOURCES.has(p.resource) || !VALID_ACTIONS.has(p.action)) {

@@ -1,6 +1,12 @@
 import { prisma } from '~/server/utils/prisma'
 import { isHoliday } from '~/server/utils/holidays'
-import { parseDateUTC, formatDateUTC } from '~/server/utils/availability'
+import {
+  parseDateUTC,
+  formatDateUTC,
+  timeToMinutes,
+  formatDateISO,
+  parseISODate,
+} from '~/server/utils/availability'
 
 export interface AdminSlot {
   startTime: string
@@ -12,30 +18,6 @@ const DEFAULT_SERVICE = 'Online Consultation'
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0')
-}
-
-/**
- * Converts an "HH:MM" string into the number of minutes since midnight.
- * e.g. "09:30" -> 570
- */
-export function timeToMinutes(time: string): number {
-  const [h, m] = time.split(':').map((p) => parseInt(p, 10))
-  return (h || 0) * 60 + (m || 0)
-}
-
-/**
- * Formats a date object as "YYYY-MM-DD" in local time.
- */
-export function formatDateISO(d: Date): string {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
-}
-
-/**
- * Parses "YYYY-MM-DD" into a local Date at midnight.
- */
-export function parseISODate(date: string): Date {
-  const [y, m, d] = date.split('-').map((p) => parseInt(p, 10))
-  return new Date(y, m - 1, d)
 }
 
 /**

@@ -7,10 +7,15 @@ import {
   ChevronLeft,
   ChevronRight,
   UserCheck,
+  Filter,
 } from 'lucide-vue-next'
 import type { AdminBooking } from '~/modules/admin/composables/types'
 
-definePageMeta({ layout: 'admin', middleware: 'staff-only' })
+definePageMeta({
+  layout: 'admin',
+  middleware: ['auth', 'staff-only'],
+  permission: { resource: 'APPOINTMENTS', action: 'READ' },
+})
 
 interface EventMap {
   [key: string]: AdminBooking
@@ -49,11 +54,29 @@ const detailTarget = ref<AdminBooking | null>(null)
 const detailOpen = ref(false)
 const cancelling = ref(false)
 
-function toISODate(date: Date): string {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
+// Doctor filter & color coding
+const selectedDoctorFilter = ref<string>('')
+const selectedStatusFilter = ref<string>('')
+const hasActiveFilters = computed(() => !!selectedDoctorFilter.value || !!selectedStatusFilter.value)
+
+function clearFilters() {
+  selectedDoctorFilter.value = ''
+  selectedStatusFilter.value = ''
+}
+
+const DOCTOR_PALETTE = ['#7C3AED', '#2563EB', '#059669', '#D97706', '#DC2626', '#0891B2']
+
+const doctorColorMap = computed(() => {
+  const map = new Map<string, string>()
+  activeDoctors.value.forEach((d, idx) => {
+    map.set(d.id, DOCTOR_PALETTE[idx % DOCTOR_PALETTE.length])
+  })
+  return map
+})
+
+function getDoctorColor(doctorId: string | null): string {
+  if (!doctorId) return '#64748B'
+  return doctorColorMap.value.get(doctorId) || '#475569'
 }
 
 const isRTL = computed(() => typeof document !== 'undefined' && document.documentElement.dir === 'rtl')
@@ -71,20 +94,52 @@ function statusColorKey(status: string): string {
   }
 }
 
+const filteredBookings = computed(() =>
+  bookings.value.filter((b) => {
+    if (selectedDoctorFilter.value && b.doctorId !== selectedDoctorFilter.value) {
+      return false
+    }
+    if (selectedStatusFilter.value && b.status !== selectedStatusFilter.value) {
+      return false
+    }
+    return true
+  }),
+)
+
 const bookingEvents = computed(() =>
-  bookings.value.map((b) => ({
-    id: b.id,
-    title: `${b.patientName} — ${b.doctorName || 'Unassigned'}`,
-    start: `${b.date}T${b.startTime}`,
-    end: `${b.date}T${b.endTime}`,
-    display: 'block',
-    classNames: [`fc-tawasul-event-${statusColorKey(b.status)}`],
-    extendedProps: { status: b.status },
-  })),
+  filteredBookings.value.map((b) => {
+    const docColor = getDoctorColor(b.doctorId)
+    const isCancelled = b.status === 'CANCELLED'
+    const isPending = b.status === 'PENDING'
+
+    return {
+      id: b.id,
+      title: isCancelled
+        ? `[Cancelled] ${b.patientName} — ${b.doctorName || 'Unassigned'}`
+        : isPending
+          ? `[Pending] ${b.patientName} — ${b.doctorName || 'Unassigned'}`
+          : `${b.patientName} — ${b.doctorName || 'Unassigned'}`,
+      start: `${b.date}T${b.startTime}`,
+      end: `${b.date}T${b.endTime}`,
+      display: 'block',
+      backgroundColor: isCancelled ? '#94a3b8' : isPending ? '#dc2626' : docColor,
+      borderColor: isCancelled ? '#64748b' : isPending ? '#b91c1c' : docColor,
+      textColor: '#FFFFFF',
+      classNames: [
+        `fc-tawasul-event-${statusColorKey(b.status)}`,
+        isCancelled ? 'opacity-60 line-through' : '',
+      ].filter(Boolean),
+      extendedProps: {
+        status: b.status,
+        doctorId: b.doctorId,
+        doctorColor: docColor,
+      },
+    }
+  }),
 )
 
 const eventIndex = computed<EventMap>(() =>
-  bookings.value.reduce((acc, b) => {
+  filteredBookings.value.reduce((acc, b) => {
     acc[b.id] = b
     return acc
   }, {} as EventMap),
@@ -104,12 +159,6 @@ const calendarOptions = computed(() => ({
     if (booking) void openDetail(booking)
   },
 }))
-
-async function onDatesSet(info: { view: { currentStart: Date } }) {
-  const start = info.view.currentStart
-  currentMonth.value = start.getMonth() + 1
-  currentYear.value = start.getFullYear()
-}
 
 async function onMonthChange(dir: number) {
   const d = new Date(currentYear.value, currentMonth.value - 1 + dir, 1)
@@ -199,6 +248,7 @@ async function confirmDetailAssign() {
 
 onMounted(() => {
   void fetchAll()
+  void fetchActiveDoctors()
 })
 </script>
 
@@ -220,6 +270,61 @@ onMounted(() => {
       </TabsList>
 
       <TabsContent value="calendar" class="mt-4">
+        <!-- Filter Bar -->
+        <Card class="mb-4">
+          <CardContent class="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex items-center gap-2">
+                <Filter class="size-4 text-muted-foreground" />
+                <span class="text-xs font-medium text-muted-foreground">Filter:</span>
+              </div>
+
+              <!-- Doctor dropdown filter -->
+              <select
+                id="filter-doctor"
+                v-model="selectedDoctorFilter"
+                data-testid="calendar-doctor-filter"
+                aria-label="Filter by doctor"
+                class="rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+              >
+                <option value="">All Doctors</option>
+                <option v-for="doctor in activeDoctors" :key="doctor.id" :value="doctor.id">
+                  {{ doctor.name }}
+                </option>
+              </select>
+
+              <!-- Status dropdown filter -->
+              <select
+                id="filter-status"
+                v-model="selectedStatusFilter"
+                data-testid="calendar-status-filter"
+                aria-label="Filter by status"
+                class="rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+              >
+                <option value="">All Statuses</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="PENDING">Pending</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+
+              <!-- Clear button -->
+              <Button
+                v-if="hasActiveFilters"
+                variant="ghost"
+                size="sm"
+                data-testid="calendar-clear-filters"
+                @click="clearFilters"
+              >
+                Clear filters
+              </Button>
+            </div>
+
+            <p class="text-xs text-muted-foreground">
+              Showing {{ filteredBookings.length }} of {{ bookings.length }} appointments
+            </p>
+          </CardContent>
+        </Card>
+
         <Card class="w-full overflow-hidden">
           <CardContent class="p-3 sm:p-5">
             <div class="mb-3 flex items-center justify-between gap-2">
@@ -244,19 +349,53 @@ onMounted(() => {
               </template>
             </ClientOnly>
 
-            <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
-              <span class="inline-flex items-center gap-1.5">
-                <span class="size-2.5 rounded-full bg-green-600"></span>
-                Confirmed
-              </span>
-              <span class="inline-flex items-center gap-1.5">
-                <span class="size-2.5 rounded-full bg-red-600"></span>
-                Pending
-              </span>
-              <span class="inline-flex items-center gap-1.5">
-                <span class="size-2.5 rounded-full bg-slate-400"></span>
-                Cancelled / Completed
-              </span>
+            <p
+              v-if="filteredBookings.length === 0 && hasActiveFilters"
+              class="mt-4 rounded-lg bg-muted/50 p-4 text-center text-sm text-muted-foreground"
+              data-testid="calendar-empty-filter"
+            >
+              No appointments found for the selected filter criteria.
+            </p>
+
+            <!-- Color Palette & Status Legend -->
+            <div class="mt-6 border-t border-border pt-4 space-y-3">
+              <!-- Doctor color legend -->
+              <div v-if="activeDoctors.length > 0" class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+                <span class="font-medium text-muted-foreground">Doctors:</span>
+                <span
+                  v-for="doc in activeDoctors"
+                  :key="doc.id"
+                  class="inline-flex items-center gap-1.5"
+                  :data-testid="`legend-doctor-${doc.id}`"
+                >
+                  <span
+                    class="size-3 rounded-full"
+                    :style="{ backgroundColor: getDoctorColor(doc.id) }"
+                  ></span>
+                  <span :class="{ 'font-semibold': selectedDoctorFilter === doc.id }">{{ doc.name }}</span>
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-muted-foreground">
+                  <span class="size-3 rounded-full bg-slate-500"></span>
+                  Unassigned
+                </span>
+              </div>
+
+              <!-- Status legend -->
+              <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
+                <span class="font-medium">Status:</span>
+                <span class="inline-flex items-center gap-1.5">
+                  <span class="size-2.5 rounded-full bg-primary"></span>
+                  Confirmed (Doctor color)
+                </span>
+                <span class="inline-flex items-center gap-1.5">
+                  <span class="size-2.5 rounded-full bg-red-600"></span>
+                  Pending
+                </span>
+                <span class="inline-flex items-center gap-1.5">
+                  <span class="size-2.5 rounded-full bg-slate-400"></span>
+                  Cancelled (Faded / Strikethrough)
+                </span>
+              </div>
             </div>
           </CardContent>
         </Card>

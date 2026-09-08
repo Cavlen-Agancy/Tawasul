@@ -98,15 +98,18 @@ const isActive = (to: string) => route.path.startsWith(to)
         </nav>
 
         <div class="border-t border-border p-4">
-          <div class="mb-3 flex items-center gap-3">
-            <Avatar class="size-10 shrink-0">
-              <AvatarImage :src="user?.photo" :alt="user?.name" />
-              <AvatarFallback class="text-base">{{ user?.name?.slice(0, 1).toUpperCase() }}</AvatarFallback>
-            </Avatar>
-            <div class="min-w-0">
-              <p class="truncate text-sm font-semibold text-foreground">{{ user?.name }}</p>
-              <p class="truncate text-xs text-muted-foreground">{{ user?.email }}</p>
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <Avatar class="size-10 shrink-0">
+                <AvatarImage :src="user?.photo" :alt="user?.name" />
+                <AvatarFallback class="text-base">{{ user?.name?.slice(0, 1).toUpperCase() }}</AvatarFallback>
+              </Avatar>
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-foreground">{{ user?.name }}</p>
+                <p class="truncate text-xs text-muted-foreground">{{ user?.email }}</p>
+              </div>
             </div>
+            <ThemeToggle size="sm" />
           </div>
           <button
             type="button"
@@ -122,22 +125,25 @@ const isActive = (to: string) => route.path.startsWith(to)
     </aside>
 
     <main class="flex min-w-0 flex-1 flex-col overflow-auto">
-      <header class="flex h-16 shrink-0 items-center justify-between border-b border-border bg-white px-4 lg:hidden">
+      <header class="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-4 lg:hidden">
         <NuxtLink to="/" class="flex items-center text-lg font-semibold">
           Tawasul <span class="text-primary">Academy</span>
         </NuxtLink>
-        <button
-          type="button"
-          class="flex h-10 w-10 items-center justify-center rounded-2xl text-foreground transition-colors duration-150 hover:bg-secondary"
-          :aria-expanded="mobileNavOpen"
-          aria-label="Toggle admin navigation"
-          @click="mobileNavOpen = !mobileNavOpen"
-        >
-          <MenuIcon class="size-5" />
-        </button>
+        <div class="flex items-center gap-2">
+          <ThemeToggle size="sm" />
+          <button
+            type="button"
+            class="flex h-10 w-10 items-center justify-center rounded-2xl text-foreground transition-colors duration-150 hover:bg-secondary"
+            :aria-expanded="mobileNavOpen"
+            aria-label="Toggle admin navigation"
+            @click="mobileNavOpen = !mobileNavOpen"
+          >
+            <MenuIcon class="size-5" />
+          </button>
+        </div>
       </header>
 
-      <nav v-if="mobileNavOpen" class="flex flex-col gap-1 border-b border-border bg-white px-4 py-4 lg:hidden">
+      <nav v-if="mobileNavOpen" class="flex flex-col gap-1 border-b border-border bg-card px-4 py-4 lg:hidden">
         <NuxtLink
           v-for="item in visibleNavItems"
           :key="item.to"
@@ -165,7 +171,7 @@ const isActive = (to: string) => route.path.startsWith(to)
         <slot />
       </div>
 
-      <nav class="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-white py-2 lg:hidden">
+      <nav class="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-card/95 backdrop-blur py-2 lg:hidden">
         <NuxtLink
           v-for="item in visibleNavItems"
           :key="item.to"

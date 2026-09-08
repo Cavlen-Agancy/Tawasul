@@ -1,7 +1,8 @@
 import { defineEventHandler, readBody, createError, setResponseStatus } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requireAuth } from '~/server/utils/auth'
-import { getAdminAvailableSlots, serviceFor, timeToMinutes } from '~/server/utils/admin-availability'
+import { getAdminAvailableSlots, serviceFor } from '~/server/utils/admin-availability'
+import { timeToMinutes } from '~/server/utils/availability'
 import { createBookingSchema } from '~/server/utils/validation'
 
 export default defineEventHandler(async (event) => {
