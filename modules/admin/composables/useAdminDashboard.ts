@@ -201,6 +201,15 @@ export function useAdminDashboard() {
     if (data) activeDoctors.value = data.doctors ?? []
   }
 
+  async function fetchDoctorDayBookings(doctorId: string, date: string): Promise<AdminBooking[]> {
+    const data = await unwrap(() =>
+      $fetch<{ bookings: AdminBooking[] }>('/api/admin/bookings', {
+        query: { doctorId, start: date, end: date },
+      }),
+    )
+    return data?.bookings ?? []
+  }
+
   async function fetchDoctors() {
     const data = await unwrap(() => $fetch<{ doctors: AdminDoctor[] }>('/api/admin/doctors'))
     if (data) doctors.value = data.doctors ?? []
@@ -420,6 +429,7 @@ export function useAdminDashboard() {
     cancelBooking,
     assignDoctor,
     fetchActiveDoctors,
+    fetchDoctorDayBookings,
     fetchDoctors,
     fetchDoctor,
     createDoctor,
