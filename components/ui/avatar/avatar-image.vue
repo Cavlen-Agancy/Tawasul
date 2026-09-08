@@ -23,7 +23,7 @@ const failed = ref(false)
     v-if="props.src && !failed"
     :src="props.src"
     :alt="props.alt"
-    class="h-full w-full object-cover"
+    :class="cn('aspect-square h-full w-full rounded-full object-cover', props.class)"
     @error="failed = true"
   >
   <slot v-else />

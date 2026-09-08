@@ -214,18 +214,18 @@ async function save() {
       <!-- Left Column: Identity & Information -->
       <div class="space-y-6">
         <!-- Profile Identity Card -->
-        <Card class="overflow-hidden border-border/80 shadow-xs">
+        <Card class="overflow-hidden rounded-2xl border-border/80 p-6 shadow-soft">
           <!-- Decorative Cover -->
-          <div class="relative h-24 w-full bg-gradient-to-br from-primary/20 via-primary/10 to-teal-50/50">
+          <div class="relative -m-6 mb-0 h-24 w-[calc(100%+3rem)] bg-gradient-to-br from-primary/20 via-primary/10 to-teal-50/50">
             <div class="absolute -bottom-4 -right-4 size-20 rounded-full bg-primary/10 blur-xl" />
           </div>
 
-          <div class="relative -mt-12 flex flex-col items-center px-6 pb-6 text-center">
-            <!-- Avatar with interactive overlay -->
-            <div class="relative">
-              <Avatar class="size-24 ring-4 ring-white shadow-md transition-transform sm:size-28">
-                <AvatarImage :src="photo" alt="Profile photo" class="object-cover" />
-                <AvatarFallback class="bg-primary/10 text-2xl font-bold text-primary sm:text-3xl">
+          <div class="relative -mt-12 flex flex-col items-center px-6 pb-6 pt-0 text-center">
+            <!-- Avatar with interactive overlay: fixed circular size, centered -->
+            <div class="relative mx-auto size-32 shrink-0">
+              <Avatar class="size-32 shrink-0 rounded-full object-cover ring-4 ring-background shadow-md transition-transform dark:ring-card">
+                <AvatarImage :src="photo" alt="Profile photo" class="size-32 rounded-full object-cover" />
+                <AvatarFallback class="size-32 rounded-full bg-primary/10 text-2xl font-bold text-primary">
                   {{ (name || profile?.name || 'P').slice(0, 1).toUpperCase() }}
                 </AvatarFallback>
               </Avatar>

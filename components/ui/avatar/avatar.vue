@@ -2,13 +2,13 @@
 import type { HTMLAttributes } from 'vue'
 import { cn } from '~/lib/utils'
 
-defineProps<{
+const props = defineProps<{
   class?: HTMLAttributes['class']
 }>()
 </script>
 
 <template>
-  <div :class="cn('flex items-center justify-center overflow-hidden rounded-full bg-muted', $attrs.class)">
+  <div :class="cn('relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted', props.class)">
     <slot />
   </div>
 </template>
