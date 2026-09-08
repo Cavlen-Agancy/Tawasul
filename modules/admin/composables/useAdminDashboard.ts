@@ -382,6 +382,20 @@ export function useAdminDashboard() {
     return null
   }
 
+  async function updatePatient(id: string, input: { name?: string; phone?: string | null }): Promise<boolean> {
+    const data = await unwrap(() =>
+      $fetch<{ patient: AdminPatient }>(`/api/admin/patients/${id}`, { method: 'PATCH', body: input }),
+    )
+    if (data?.patient) {
+      patients.value = patients.value.map((p) => (p.id === id ? { ...p, ...data.patient } : p))
+      if (currentPatient.value?.id === id) {
+        currentPatient.value = { ...currentPatient.value, ...data.patient }
+      }
+      return true
+    }
+    return false
+  }
+
   async function fetchSettings(): Promise<AdminSettings | null> {
     const data = await unwrap(() => $fetch<AdminSettings>('/api/admin/settings'))
     if (data) {
@@ -465,6 +479,7 @@ export function useAdminDashboard() {
     currentPatient,
     fetchPatients,
     fetchPatient,
+    updatePatient,
     settings,
     fetchSettings,
     updateSettings,
