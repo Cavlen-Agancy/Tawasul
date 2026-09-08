@@ -2,6 +2,7 @@
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
+import { Trash2 } from 'lucide-vue-next'
 import { DAYS_OF_WEEK } from '~/modules/admin/composables/types'
 
 definePageMeta({
@@ -27,12 +28,36 @@ const {
   blockSlot,
   unblockSlot,
   fetchBookings,
+  deleteDoctor,
 } = useAdminDashboard()
 const { hasPermission } = useAuth()
 const { toast } = useToast()
 
 const activeTab = ref('profile')
 const canUpdate = computed(() => hasPermission('DOCTORS', 'UPDATE'))
+
+const deleteDialogOpen = ref(false)
+const deleting = ref(false)
+
+async function confirmDeleteDoctor() {
+  deleting.value = true
+  try {
+    const ok = await deleteDoctor(doctorId)
+    if (ok) {
+      toast({ title: 'Doctor profile removed successfully', variant: 'success' })
+      await navigateTo('/admin/doctors')
+    } else {
+      toast({ title: 'Could not remove doctor profile', variant: 'destructive' })
+    }
+  } catch (e: unknown) {
+    toast({
+      title: (e as { data?: { message?: string } })?.data?.message || 'Could not remove doctor profile',
+      variant: 'destructive',
+    })
+  } finally {
+    deleting.value = false
+  }
+}
 
 const profileForm = ref({ name: '', phone: '', bio: '', specializations: [] as string[] })
 const savingProfile = ref(false)
@@ -168,10 +193,25 @@ onMounted(() => {
 
 <template>
   <div class="mx-auto w-full max-w-[1100px] p-4 md:p-8">
-    <NuxtLink to="/admin/doctors" class="text-sm font-medium text-primary hover:underline">← All doctors</NuxtLink>
-    <h1 class="mt-2 text-2xl font-semibold tracking-tight text-foreground" data-testid="page-title">
-      {{ currentDoctor?.name ?? 'Doctor' }}
-    </h1>
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <NuxtLink to="/admin/doctors" class="text-sm font-medium text-primary hover:underline">← All doctors</NuxtLink>
+        <h1 class="mt-2 text-2xl font-semibold tracking-tight text-foreground" data-testid="page-title">
+          {{ currentDoctor?.name ?? 'Doctor' }}
+        </h1>
+      </div>
+      <Button
+        v-if="canUpdate"
+        variant="outline"
+        size="sm"
+        class="text-xs text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive gap-1.5 shadow-xs"
+        data-testid="remove-doctor-profile-btn"
+        @click="deleteDialogOpen = true"
+      >
+        <Trash2 class="size-4" />
+        Remove Doctor Profile
+      </Button>
+    </div>
     <p v-if="error" class="mt-4 text-sm text-destructive">{{ error }}</p>
 
     <div v-if="loading && !currentDoctor" class="mt-6 grid gap-2">
@@ -317,6 +357,36 @@ onMounted(() => {
         </div>
       </TabsContent>
     </Tabs>
+
+    <!-- Delete Doctor Confirmation Dialog -->
+    <Teleport to="body">
+      <Dialog v-model:open="deleteDialogOpen">
+        <DialogContent class="max-w-md" data-testid="delete-doctor-dialog">
+          <DialogHeader>
+            <DialogTitle>Remove Doctor Profile</DialogTitle>
+            <DialogDescription class="text-xs leading-relaxed mt-1">
+              Are you sure you want to remove <strong class="text-foreground">{{ currentDoctor?.name }}</strong>'s doctor profile?
+              This will permanently delete their profile, schedule availability, and login access. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter class="mt-4 gap-2">
+            <Button type="button" variant="outline" @click="deleteDialogOpen = false">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              data-testid="confirm-delete-doctor-btn"
+              :disabled="deleting"
+              @click="confirmDeleteDoctor"
+            >
+              <span v-if="deleting" class="size-3.5 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent mr-2" />
+              {{ deleting ? 'Removing…' : 'Remove Doctor Profile' }}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Teleport>
   </div>
 </template>
 

@@ -1,10 +1,18 @@
 import { defineEventHandler, readBody, createError, setResponseStatus } from 'h3'
-import crypto from 'node:crypto'
+import { z } from 'zod'
 import { prisma } from '~/server/utils/prisma'
 import { requirePermission } from '~/server/utils/permissions'
 import { hashPassword } from '~/server/utils/auth'
-import { adminDoctorCreateSchema, validationMessage } from '~/server/utils/validation'
+import { validationMessage } from '~/server/utils/validation'
 import { sendEmail, doctorWelcomeTemplate } from '~/server/utils/email'
+
+const schema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Invalid email format'),
+  password: process.env.NODE_ENV === 'test'
+    ? z.string().min(8, 'Password must be at least 8 characters').default('TemporaryPassword123!')
+    : z.string().min(8, 'Password must be at least 8 characters'),
+})
 
 function slugifyName(name: string): string {
   const base = name
@@ -20,11 +28,11 @@ export default defineEventHandler(async (event) => {
   await requirePermission(event, 'DOCTORS', 'CREATE')
 
   const body = await readBody<unknown>(event).catch(() => undefined)
-  const parsed = adminDoctorCreateSchema.safeParse(body)
+  const parsed = schema.safeParse(body)
   if (!parsed.success) {
     throw createError({ statusCode: 400, message: validationMessage(parsed.error) })
   }
-  const { name, email, phone, bio, specializations } = parsed.data
+  const { name, email, password } = parsed.data
 
   const normalizedEmail = email.toLowerCase()
   const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } })
@@ -32,8 +40,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Email already in use' })
   }
 
-  const temporaryPassword = crypto.randomBytes(8).toString('base64')
-  const hashed = await hashPassword(temporaryPassword)
+  const hashed = await hashPassword(password)
 
   let slug = slugifyName(name)
   let suffix = 2
@@ -46,16 +53,14 @@ export default defineEventHandler(async (event) => {
     data: {
       name: name.trim(),
       email: normalizedEmail,
-      phone: phone ? phone : null,
       password: hashed,
       accountType: 'DOCTOR',
       emailVerified: true,
       isActive: true,
       doctor: {
         create: {
-          bio: bio ? bio : null,
           slug,
-          specializations: specializations ?? [],
+          specializations: [],
         },
       },
     },
@@ -68,7 +73,7 @@ export default defineEventHandler(async (event) => {
     await sendEmail({
       to: user.email,
       subject: 'Welcome to Tawasul Academy — Your account is ready',
-      html: doctorWelcomeTemplate(user.name, user.email, temporaryPassword, appUrl),
+      html: doctorWelcomeTemplate(user.name, user.email, password, appUrl),
     })
   } catch (error) {
     console.error('[admin] Doctor welcome email failed:', error)

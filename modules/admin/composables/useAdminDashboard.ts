@@ -251,6 +251,20 @@ export function useAdminDashboard() {
     return false
   }
 
+  async function deleteDoctor(id: string): Promise<boolean> {
+    const data = await unwrap(() =>
+      $fetch<{ success: boolean }>(`/api/admin/doctors/${id}`, { method: 'DELETE' }),
+    )
+    if (data?.success) {
+      doctors.value = doctors.value.filter((d) => d.id !== id)
+      if (currentDoctor.value?.id === id) {
+        currentDoctor.value = null
+      }
+      return true
+    }
+    return false
+  }
+
   async function fetchAvailability(id: string) {
     const data = await unwrap(() =>
       $fetch<{ availability: AvailabilitySlot[]; blockedSlots: BlockedSlot[] }>(
@@ -434,6 +448,7 @@ export function useAdminDashboard() {
     fetchDoctor,
     createDoctor,
     updateDoctor,
+    deleteDoctor,
     fetchAvailability,
     updateAvailability,
     blockSlot,
