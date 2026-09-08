@@ -70,8 +70,22 @@ const navItems: NavItem[] = [
   },
 ]
 
+const canSeeOverview = computed(() => {
+  if (!user.value || user.value.accountType !== 'STAFF') return false
+  return (
+    hasPermission('STAFF', 'READ') ||
+    hasPermission('SETTINGS', 'READ') ||
+    (user.value.permissions ?? []).length >= 10
+  )
+})
+
 const visibleNavItems = computed(() =>
-  navItems.filter((item) => !item.resource || hasPermission(item.resource, 'READ')),
+  navItems.filter((item) => {
+    if (item.to === '/admin') {
+      return canSeeOverview.value
+    }
+    return !item.resource || hasPermission(item.resource, 'READ')
+  }),
 )
 
 const isActive = (to: string) => route.path.startsWith(to)

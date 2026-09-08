@@ -1,10 +1,25 @@
-import { defineEventHandler } from 'h3'
+import { defineEventHandler, createError } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requireAuth } from '~/server/utils/auth'
 import { formatDateUTC } from '~/server/utils/availability'
 
 export default defineEventHandler(async (event) => {
-  requireAuth(event, ['STAFF'])
+  const auth = requireAuth(event, ['STAFF'])
+
+  const permissions = await prisma.permission.findMany({
+    where: { userId: auth.userId },
+  })
+
+  const hasStaffPerm = permissions.some((p) => p.resource === 'STAFF')
+  const hasSettingsPerm = permissions.some((p) => p.resource === 'SETTINGS')
+  const isSuperAdmin = permissions.length >= 6
+
+  if (!hasStaffPerm && !hasSettingsPerm && !isSuperAdmin) {
+    throw createError({
+      statusCode: 403,
+      message: 'You do not have permission to view the admin overview',
+    })
+  }
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
