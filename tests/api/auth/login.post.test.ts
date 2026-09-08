@@ -114,4 +114,38 @@ describe('POST /api/auth/login', () => {
       expectApiError(e, 403, 'Your account has been deactivated')
     }
   })
+
+  it('logs in a STAFF user and returns permissions', async () => {
+    const user = await createTestUser({
+      emailVerified: true,
+      accountType: 'STAFF',
+      email: `login-staff-${Date.now()}@test.com`,
+      permissions: [
+        { resource: 'APPOINTMENTS', action: 'READ' },
+        { resource: 'DOCTORS', action: 'READ' },
+      ],
+    })
+    toDelete.push(user.id)
+
+    const event = createApiEvent({
+      method: 'POST',
+      url: '/api/auth/login',
+      body: { email: user.email, password: 'CorrectPass123!' },
+    })
+
+    const res = await handler(event) as {
+      id: string
+      accountType: string
+      permissions: Array<{ resource: string; action: string }>
+    }
+
+    expect(res.accountType).toBe('STAFF')
+    expect(res.permissions).toBeDefined()
+    expect(res.permissions).toEqual(
+      expect.arrayContaining([
+        { resource: 'APPOINTMENTS', action: 'READ' },
+        { resource: 'DOCTORS', action: 'READ' },
+      ]),
+    )
+  })
 })

@@ -331,7 +331,7 @@ export function useAdminDashboard() {
     if (data) staff.value = data.staff ?? []
   }
 
-  async function createStaff(input: { name: string; email: string; phone?: string; permissions?: Array<{ resource: string; action: string }> }): Promise<boolean> {
+  async function createStaff(input: { name: string; email: string; password?: string; phone?: string; permissions?: Array<{ resource: string; action: string }> }): Promise<boolean> {
     const data = await unwrap(() =>
       $fetch<{ id: string }>('/api/admin/staff', { method: 'POST', body: input }),
     )

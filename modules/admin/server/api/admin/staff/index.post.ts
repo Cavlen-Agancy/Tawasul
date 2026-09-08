@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   if (!parsed.success) {
     throw createError({ statusCode: 400, message: validationMessage(parsed.error) })
   }
-  const { name, email, phone, permissions } = parsed.data
+  const { name, email, phone, password, permissions } = parsed.data
 
   const normalizedEmail = email.toLowerCase()
   const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } })
@@ -31,8 +31,8 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  const temporaryPassword = crypto.randomBytes(8).toString('base64')
-  const hashed = await hashPassword(temporaryPassword)
+  const rawPassword = password || crypto.randomBytes(8).toString('base64')
+  const hashed = await hashPassword(rawPassword)
 
   const user = await prisma.user.create({
     data: {
@@ -59,7 +59,7 @@ export default defineEventHandler(async (event) => {
     await sendEmail({
       to: user.email,
       subject: 'Welcome to Tawasul Academy — Your account is ready',
-      html: doctorWelcomeTemplate(user.name, user.email, temporaryPassword, appUrl),
+      html: doctorWelcomeTemplate(user.name, user.email, rawPassword, appUrl),
     })
   } catch (error) {
     console.error('[admin] Staff welcome email failed:', error)

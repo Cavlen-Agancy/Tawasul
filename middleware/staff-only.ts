@@ -1,6 +1,6 @@
 export default defineNuxtRouteMiddleware(async (to) => {
   const { isLoggedIn, user, fetchMe, hasPermission } = useAuth()
-  if (!isLoggedIn.value) {
+  if (!isLoggedIn.value || (user.value?.accountType === 'STAFF' && !user.value?.permissions)) {
     await fetchMe()
   }
   if (!isLoggedIn.value) {

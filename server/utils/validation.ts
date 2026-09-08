@@ -125,6 +125,7 @@ const permissionItemSchema = z.object({
 export const staffCreateSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
   email: z.string().email('Invalid email format').max(255),
+  password: z.string().min(8, 'Password must be at least 8 characters').optional(),
   phone: z.string().max(30).optional().or(z.literal('')),
   permissions: z.array(permissionItemSchema).max(24).optional(),
 })

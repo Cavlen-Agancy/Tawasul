@@ -9,14 +9,28 @@ function safeUser(user: {
   email: string
   photo: string | null
   accountType: string
+  permissions?: { resource: string; action: string }[]
 }) {
-  return {
+  const res: {
+    id: string
+    name: string
+    email: string
+    photo?: string
+    accountType: string
+    permissions?: { resource: string; action: string }[]
+  } = {
     id: user.id,
     name: user.name,
     email: user.email,
     photo: user.photo ?? undefined,
     accountType: user.accountType,
   }
+
+  if (user.accountType === 'STAFF' && user.permissions) {
+    res.permissions = user.permissions.map((p) => ({ resource: p.resource, action: p.action }))
+  }
+
+  return res
 }
 
 export default defineEventHandler(async (event) => {
@@ -27,7 +41,15 @@ export default defineEventHandler(async (event) => {
   }
   const { email, password } = parsed.data
 
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } })
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+    include: {
+      permissions: {
+        select: { resource: true, action: true },
+      },
+    },
+  })
+
   if (!user) {
     throw createError({ statusCode: 401, message: 'Invalid credentials' })
   }

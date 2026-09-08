@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { CalendarDays, CreditCard, LayoutDashboard, LogOut, Menu as MenuIcon, Settings, Stethoscope, Users, UserCog } from 'lucide-vue-next'
 
-const { logout, user, hasPermission } = useAuth()
+const { logout, user, hasPermission, fetchMe } = useAuth()
 const route = useRoute()
 const mobileNavOpen = ref(false)
+
+onMounted(async () => {
+  if (user.value?.accountType === 'STAFF' && (!user.value.permissions || user.value.permissions.length === 0)) {
+    await fetchMe()
+  }
+})
 
 interface NavItem {
   label: string

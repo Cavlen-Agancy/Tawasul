@@ -62,8 +62,12 @@ export function useAuth() {
         body: { email, password },
       })
       user.value = loggedIn
-      await navigateTo(dashboardFor(loggedIn.accountType))
-      return loggedIn
+      if (loggedIn.accountType === 'STAFF' && (!loggedIn.permissions || loggedIn.permissions.length === 0)) {
+        const me = await fetchMe()
+        if (me) user.value = me
+      }
+      await navigateTo(dashboardFor(user.value?.accountType || loggedIn.accountType))
+      return user.value || loggedIn
     } finally {
       loading.value = false
     }
@@ -84,7 +88,12 @@ export function useAuth() {
 
   function hasPermission(resource: string, action: string): boolean {
     if (!user.value || user.value.accountType !== 'STAFF') return false
-    return (user.value.permissions ?? []).some((p) => p.resource === resource && p.action === action)
+    const perms = user.value.permissions ?? []
+    if (perms.some((p) => p.resource === resource && p.action === action)) return true
+    if (action === 'READ') {
+      return perms.some((p) => p.resource === resource)
+    }
+    return false
   }
 
   return {
