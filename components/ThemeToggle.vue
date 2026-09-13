@@ -30,8 +30,8 @@ onMounted(() => {
       props.size === 'sm' ? 'h-9 w-9' : 'h-10 w-10',
       props.showLabel ? 'w-auto px-3 gap-2' : '',
     ]"
-    :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
-    :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+    :title="isMounted ? (isDark ? 'Switch to light mode' : 'Switch to dark mode') : 'Switch to dark mode'"
+    :aria-label="isMounted ? (isDark ? 'Switch to light mode' : 'Switch to dark mode') : 'Switch to dark mode'"
     data-testid="theme-toggle"
     @click="toggleTheme"
   >

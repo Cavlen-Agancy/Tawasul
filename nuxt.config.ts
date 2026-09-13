@@ -19,7 +19,7 @@ function registerModulePages(pages: ModulePage[], dir: string, moduleName: strin
     if (!entry.name.endsWith('.vue')) continue
     const base = entry.name.replace(/\.vue$/, '')
     if (base.startsWith('_')) continue
-    const routePath = `/${prefix}${base}`
+    const routePath = `/${prefix}${base}`.replace(/\[(\w+)\]/g, ':$1')
     pages.push({
       name: `${moduleName}-${prefix.replace(/\//g, '-')}${base}`,
       path: routePath,

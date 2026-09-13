@@ -21,12 +21,18 @@ export default defineEventHandler(async (event) => {
       photo: true,
       accountType: true,
       createdAt: true,
-      bookings: {
-        include: {
-          doctor: { include: { user: { select: { name: true } } } },
+        bookings: {
+          include: {
+            doctor: { include: { user: { select: { name: true } } } },
+            doctorNotes: {
+              include: {
+                doctor: { include: { user: { select: { name: true } } } },
+              },
+              orderBy: { createdAt: 'desc' },
+            },
+          },
+          orderBy: { date: 'desc' },
         },
-        orderBy: { date: 'desc' },
-      },
     },
   })
 
@@ -62,6 +68,12 @@ export default defineEventHandler(async (event) => {
       endTime: b.endTime,
       service: b.service,
       status: b.status,
+      doctorNotes: b.doctorNotes.map((n) => ({
+        id: n.id,
+        content: n.content,
+        doctorName: n.doctor.user.name,
+        createdAt: n.createdAt,
+      })),
     })),
     payments: payments.map((p) => ({
       id: p.id,

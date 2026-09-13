@@ -5,6 +5,7 @@ import {
   Menu as MenuIcon,
   TriangleAlert,
   User,
+  Users,
 } from 'lucide-vue-next'
 
 const { logout, user } = useAuth()
@@ -15,6 +16,7 @@ const mobileNavOpen = ref(false)
 
 const navItems = [
   { label: 'My Calendar', to: '/doctor/calendar', icon: CalendarDays, dataTestId: 'nav-calendar' },
+  { label: 'My Patients', to: '/doctor/patients', icon: Users, dataTestId: 'nav-patients' },
   { label: 'My Profile', to: '/doctor/profile', icon: User, dataTestId: 'nav-profile' },
 ]
 

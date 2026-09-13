@@ -10,12 +10,32 @@ const patientId = String(route.params.id ?? '')
 
 const { currentPatient, loading, error, fetchPatient } = useAdminDashboard()
 
+interface BookingNote {
+  id: string
+  content: string
+  doctorName: string
+  createdAt: string
+}
+
+// Runtime field from GET /api/admin/patients/[id]; not yet on AdminPatientDetail.
+const bookingsWithNotes = computed(() =>
+  (currentPatient.value?.bookings ?? []).map((b) => ({
+    ...b,
+    doctorNotes: ((b as unknown as { doctorNotes?: BookingNote[] }).doctorNotes ?? []),
+  })),
+)
+
+const bookingsHavingNotes = computed(() => bookingsWithNotes.value.filter((b) => b.doctorNotes.length > 0))
+
 function formatDate(value: string | Date): string {
   return new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 onMounted(() => {
-  void fetchPatient(patientId)
+  void fetchPatient(patientId).then(() => {
+    // TEMP-DIAG: remove after verifying Doctor Notes visibility
+    console.log('bookingsHavingNotes', JSON.parse(JSON.stringify(bookingsHavingNotes.value)))
+  })
 })
 </script>
 
@@ -73,6 +93,32 @@ onMounted(() => {
                 </TableRow>
               </TableBody>
             </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card v-if="bookingsHavingNotes.length > 0">
+        <CardHeader>
+          <CardTitle>Doctor Notes</CardTitle>
+          <p class="mt-1 text-xs text-muted-foreground">Visible to doctors and admin only.</p>
+        </CardHeader>
+        <CardContent class="grid gap-5">
+          <div v-for="b in bookingsHavingNotes" :key="b.id">
+            <p class="text-sm font-semibold text-foreground">
+              {{ formatDate(b.date) }} · {{ b.startTime }} — {{ b.doctorName ?? 'Unassigned' }}
+            </p>
+            <div class="mt-2 grid gap-2.5">
+              <div
+                v-for="n in b.doctorNotes"
+                :key="n.id"
+                class="rounded-xl border border-border/70 bg-muted/20 p-3.5"
+                :data-testid="`admin-note-${n.id}`"
+              >
+                <p class="text-xs font-semibold text-foreground">{{ n.doctorName }}</p>
+                <p class="mt-0.5 text-[11px] text-muted-foreground">{{ formatDate(n.createdAt) }}</p>
+                <p class="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{{ n.content }}</p>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

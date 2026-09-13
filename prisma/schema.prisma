@@ -134,6 +134,7 @@ model Doctor {
   availability Availability[]
   blockedSlots BlockedSlot[]
   bookings     Booking[]     @relation("DoctorBookings")
+  doctorNotes  DoctorNote[]
 
   @@map("doctors")
 }
@@ -238,8 +239,27 @@ model Booking {
   doctor      Doctor?      @relation("DoctorBookings", fields: [doctorId], references: [id], onDelete: SetNull)
   payment     Payment?
   sessionRoom SessionRoom?
+  doctorNotes DoctorNote[]
 
   @@map("bookings")
+}
+
+// ─────────────────────────────────────────
+// DOCTOR NOTE (doctor-authored session notes; Booking.notes left untouched)
+// ─────────────────────────────────────────
+
+model DoctorNote {
+  id        String   @id @default(cuid())
+  content   String
+  bookingId String
+  doctorId  String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([bookingId, doctorId])
+  @@map("doctor_notes")
 }
 
 // ─────────────────────────────────────────
