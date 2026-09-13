@@ -28,6 +28,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, message: 'Forbidden' })
   }
 
+  if ((booking as { sessionType?: string }).sessionType === 'IN_CLINIC') {
+    throw createError({ statusCode: 400, message: 'This is an in-clinic session.' })
+  }
+
   const now = Date.now()
   if (!canJoinMeetingAt(booking, now)) {
     throw createError({ statusCode: 403, message: 'Session is not available at this time' })

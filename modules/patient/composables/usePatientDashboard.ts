@@ -15,6 +15,16 @@ export interface AvailableSlot {
   current?: boolean
 }
 
+export type BookingSessionType = 'ONLINE' | 'IN_CLINIC'
+
+export interface CreateBookingResult {
+  bookingId: string
+  amount: number
+  currency: string
+  sessionType: BookingSessionType
+  paymentUrl?: string
+}
+
 export function usePatientDashboard() {
   const profile = useState<PatientProfile | null>('patient-profile', () => null)
   const upcomingAppointments = useState<Appointment[]>('patient-upcoming-appointments', () => [])
@@ -27,6 +37,20 @@ export function usePatientDashboard() {
   const availableSlots = useState<AvailableSlot[]>('patient-available-slots', () => [])
   const selectedDate = useState<string | null>('patient-selected-date', () => null)
   const fetchError = useState<string | null>('patient-fetch-error', () => null)
+
+  // ── Booking creation flow (right slide-in panel, replaces the old /book page) ──
+  const bookingFlowOpen = useState<boolean>('patient-booking-flow-open', () => false)
+  const bookingStep = useState<number>('patient-booking-step', () => 1)
+  const bookingSessionType = useState<BookingSessionType>('patient-booking-session-type', () => 'ONLINE')
+  const bookingFlowDate = useState<string | null>('patient-booking-flow-date', () => null)
+  const bookingFlowSlots = useState<AvailableSlot[]>('patient-booking-flow-slots', () => [])
+  const bookingFlowTime = useState<string | null>('patient-booking-flow-time', () => null)
+  const bookingFlowLoading = useState<boolean>('patient-booking-flow-loading', () => false)
+  const bookingFlowError = useState<string | null>('patient-booking-flow-error', () => null)
+  const bookingFlowSuccess = useState<string | null>('patient-booking-flow-success', () => null)
+  const bookingFlowBookingId = useState<string | null>('patient-booking-flow-booking-id', () => null)
+  const bookingFlowAmount = useState<number>('patient-booking-flow-amount', () => 0)
+  const bookingFlowCurrency = useState<string>('patient-booking-flow-currency', () => 'EGP')
 
   function clearFetchError(): void {
     fetchError.value = null
@@ -239,6 +263,181 @@ export function usePatientDashboard() {
     }
   }
 
+  function openBookingFlow(prefillDate?: string | null): void {
+    bookingFlowOpen.value = true
+    bookingStep.value = 1
+    bookingFlowError.value = null
+    bookingFlowSuccess.value = null
+    bookingFlowTime.value = null
+    if (prefillDate) {
+      bookingFlowDate.value = prefillDate
+      void fetchBookingFlowSlots(prefillDate)
+    }
+  }
+
+  function closeBookingFlow(): void {
+    bookingFlowOpen.value = false
+    bookingStep.value = 1
+    bookingFlowError.value = null
+    bookingFlowSuccess.value = null
+    bookingFlowBookingId.value = null
+    bookingFlowTime.value = null
+    bookingFlowLoading.value = false
+  }
+
+  function setBookingSessionType(type: BookingSessionType): void {
+    bookingSessionType.value = type
+    bookingFlowError.value = null
+  }
+
+  function goBookingStep(step: number): void {
+    bookingStep.value = step
+    bookingFlowError.value = null
+  }
+
+  async function fetchBookingFlowSlots(date: string): Promise<AvailableSlot[]> {
+    bookingFlowDate.value = date
+    bookingFlowTime.value = null
+    bookingFlowLoading.value = true
+    bookingFlowError.value = null
+    try {
+      const data = await $fetch<{ slots: AvailableSlot[] }>('/api/booking/available-slots', {
+        query: { date },
+      })
+      bookingFlowSlots.value = data.slots
+      return data.slots
+    } catch (e) {
+      bookingFlowError.value = getApiMessage(e)
+      bookingFlowSlots.value = []
+      return []
+    } finally {
+      bookingFlowLoading.value = false
+    }
+  }
+
+  function selectBookingFlowTime(startTime: string): void {
+    bookingFlowTime.value = startTime
+    bookingFlowError.value = null
+  }
+
+  async function submitBookingFlow(): Promise<CreateBookingResult | null> {
+    if (!bookingFlowDate.value || !bookingFlowTime.value) {
+      bookingFlowError.value = 'Please select a date and time'
+      return null
+    }
+    bookingFlowLoading.value = true
+    bookingFlowError.value = null
+    try {
+      const created = await $fetch<{ bookingId: string; amount: number; currency: string }>(
+        '/api/booking/create',
+        {
+          method: 'POST',
+          body: {
+            date: bookingFlowDate.value,
+            startTime: bookingFlowTime.value,
+            sessionType: bookingSessionType.value,
+          },
+        },
+      )
+      bookingFlowAmount.value = created.amount
+      bookingFlowCurrency.value = created.currency
+      bookingFlowBookingId.value = created.bookingId
+
+      if (bookingSessionType.value === 'IN_CLINIC') {
+        bookingFlowSuccess.value = created.bookingId
+        await fetchAllBookings()
+        return {
+          bookingId: created.bookingId,
+          amount: created.amount,
+          currency: created.currency,
+          sessionType: 'IN_CLINIC',
+        }
+      }
+
+      const payment = await $fetch<{ paymentUrl?: string; clientSecret?: string }>(
+        '/api/payment/initiate',
+        {
+          method: 'POST',
+          body: { bookingId: created.bookingId },
+        },
+      )
+      if (payment.paymentUrl) {
+        window.location.href = payment.paymentUrl
+        return {
+          bookingId: created.bookingId,
+          amount: created.amount,
+          currency: created.currency,
+          sessionType: 'ONLINE',
+          paymentUrl: payment.paymentUrl,
+        }
+      }
+      bookingFlowSuccess.value = created.bookingId
+      await fetchAllBookings()
+      if (payment.clientSecret) {
+        bookingFlowError.value = 'Online checkout is not configured on this deployment. Your booking will remain pending.'
+      }
+      return {
+        bookingId: created.bookingId,
+        amount: created.amount,
+        currency: created.currency,
+        sessionType: 'ONLINE',
+      }
+    } catch (e) {
+      bookingFlowError.value = getApiMessage(e)
+      return null
+    } finally {
+      bookingFlowLoading.value = false
+    }
+  }
+
+  async function retryBookingPayment(bookingId: string): Promise<boolean> {
+    bookingFlowLoading.value = true
+    bookingFlowError.value = null
+    try {
+      const payment = await $fetch<{ paymentUrl?: string }>('/api/payment/initiate', {
+        method: 'POST',
+        body: { bookingId },
+      })
+      if (payment.paymentUrl) {
+        window.location.href = payment.paymentUrl
+        return true
+      }
+      return false
+    } catch (e) {
+      bookingFlowError.value = getApiMessage(e)
+      return false
+    } finally {
+      bookingFlowLoading.value = false
+    }
+  }
+
+  async function rescheduleBooking(bookingId: string, date: string, startTime: string): Promise<Appointment> {
+    error.value = null
+    try {
+      const updated = await $fetch<Appointment>(`/api/patient/appointments/${bookingId}/reschedule`, {
+        method: 'PATCH',
+        body: { date, startTime },
+      })
+      allBookings.value = allBookings.value.map((a) => (a.id === bookingId ? updated : a))
+      return updated
+    } catch (e) {
+      // Fallback to the existing same-day time-update endpoint when the
+      // reschedule endpoint is unavailable and the date is unchanged.
+      const current = allBookings.value.find((a) => a.id === bookingId)
+      const statusCode = (e as { response?: { status?: number } }).response?.status
+      if (current && current.date === date && (statusCode === 404 || statusCode === undefined)) {
+        try {
+          return await updateBookingTime(bookingId, startTime)
+        } catch (fallbackError) {
+          error.value = getApiMessage(fallbackError)
+          throw fallbackError
+        }
+      }
+      error.value = getApiMessage(e)
+      throw e
+    }
+  }
+
   function clear() {
     profile.value = null
     upcomingAppointments.value = []
@@ -249,6 +448,16 @@ export function usePatientDashboard() {
     availableSlots.value = []
     selectedDate.value = null
     error.value = null
+    bookingFlowOpen.value = false
+    bookingStep.value = 1
+    bookingSessionType.value = 'ONLINE'
+    bookingFlowDate.value = null
+    bookingFlowSlots.value = []
+    bookingFlowTime.value = null
+    bookingFlowLoading.value = false
+    bookingFlowError.value = null
+    bookingFlowSuccess.value = null
+    bookingFlowBookingId.value = null
   }
 
   return {
@@ -263,6 +472,18 @@ export function usePatientDashboard() {
     availableSlots,
     selectedDate,
     fetchError,
+    bookingFlowOpen,
+    bookingStep,
+    bookingSessionType,
+    bookingFlowDate,
+    bookingFlowSlots,
+    bookingFlowTime,
+    bookingFlowLoading,
+    bookingFlowError,
+    bookingFlowSuccess,
+    bookingFlowBookingId,
+    bookingFlowAmount,
+    bookingFlowCurrency,
     clearFetchError,
     isClosedDay,
     getClosedDayMessage,
@@ -274,12 +495,21 @@ export function usePatientDashboard() {
     cancelAppointment,
     fetchAllBookings,
     updateBookingTime,
+    rescheduleBooking,
     fetchAvailableDates,
     fetchAvailableSlots,
     fetchBookingsForDate,
     selectDate,
     fetchPayments,
     fetchSession,
+    openBookingFlow,
+    closeBookingFlow,
+    setBookingSessionType,
+    goBookingStep,
+    fetchBookingFlowSlots,
+    selectBookingFlowTime,
+    submitBookingFlow,
+    retryBookingPayment,
     clear,
   }
 }

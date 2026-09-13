@@ -35,6 +35,11 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum SessionType {
+  ONLINE
+  IN_CLINIC
+}
+
 // ─────────────────────────────────────────
 // PERMISSIONS
 // ─────────────────────────────────────────
@@ -214,15 +219,16 @@ model GlobalBlockedDate {
 // ─────────────────────────────────────────
 
 model Booking {
-  id        String        @id @default(cuid())
-  userId    String
-  doctorId  String?
-  date      DateTime      @db.Date
-  startTime String        // "10:00"
-  endTime   String        // "11:00"
-  service   String
-  status    BookingStatus @default(PENDING)
-  notes     String?
+  id          String        @id @default(cuid())
+  userId      String
+  doctorId    String?
+  date        DateTime      @db.Date
+  startTime   String        // "10:00"
+  endTime     String        // "11:00"
+  service     String
+  status      BookingStatus @default(PENDING)
+  sessionType SessionType   @default(ONLINE)
+  notes       String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

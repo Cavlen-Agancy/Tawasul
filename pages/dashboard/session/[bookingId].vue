@@ -13,7 +13,7 @@ const { user } = useAuth()
 
 const { toast } = useToast()
 
-const status = ref<'loading' | 'waiting' | 'ready' | 'error'>('loading')
+const status = ref<'loading' | 'lobby' | 'waiting' | 'ready' | 'error'>('loading')
 const message = ref('')
 const session = ref<SessionRoomResponse | null>(null)
 const leaveDialogOpen = ref(false)
@@ -22,15 +22,23 @@ const leaveDialogShown = ref(false)
 let jitsiApi: { dispose: () => void } | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let countdownInterval: ReturnType<typeof setInterval> | null = null
+let lobbyTimer: ReturnType<typeof setTimeout> | null = null
 
 async function checkSession() {
-  if (status.value === 'ready') return
+  if (status.value === 'ready' || status.value === 'lobby') return
   try {
     const data = await $fetch<SessionRoomResponse>(`/api/patient/session/${bookingId}`)
     session.value = data
-    status.value = 'ready'
+    // Lobby waiting room: show immediately, connect to Jitsi after 3 seconds.
+    // Jitsi handles the native "waiting for host" state once connected.
+    status.value = 'lobby'
     stopPolling()
-    window.setTimeout(() => initJitsi(data), 0)
+    if (lobbyTimer) clearTimeout(lobbyTimer)
+    lobbyTimer = setTimeout(() => {
+      if (status.value !== 'lobby') return
+      status.value = 'ready'
+      window.setTimeout(() => initJitsi(data), 0)
+    }, 3000)
   } catch (e) {
     const msg = (e as { data?: { message?: string } }).data?.message || 'Something went wrong'
     if (msg.includes('not available at this time')) {
@@ -53,6 +61,15 @@ function stopPolling() {
     clearInterval(countdownInterval)
     countdownInterval = null
   }
+}
+
+function leaveLobby() {
+  if (lobbyTimer) {
+    clearTimeout(lobbyTimer)
+    lobbyTimer = null
+  }
+  stopPolling()
+  navigateTo('/dashboard/appointments')
 }
 
 function loadJitsiScript(): Promise<unknown> {
@@ -123,6 +140,10 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  if (lobbyTimer) {
+    clearTimeout(lobbyTimer)
+    lobbyTimer = null
+  }
   stopPolling()
   if (jitsiApi) {
     jitsiApi.dispose()
@@ -136,6 +157,24 @@ onBeforeUnmount(() => {
     <div v-if="status === 'loading'" class="flex flex-col gap-4">
       <Skeleton class="h-16 w-full" />
       <Skeleton class="h-96 w-full" />
+    </div>
+
+    <div v-else-if="status === 'lobby'" class="flex flex-col items-center justify-center rounded-2xl border border-border p-10 text-center" data-testid="session-lobby" style="background: linear-gradient(180deg, #FCE4F3 0%, #FFFFFF 100%)">
+      <Avatar class="size-16 shrink-0">
+        <AvatarImage :src="user?.photo || undefined" :alt="user?.name || 'Patient'" />
+        <AvatarFallback class="text-xl">{{ (user?.name || 'P').slice(0, 1).toUpperCase() }}</AvatarFallback>
+      </Avatar>
+      <h2 class="mt-4 text-xl font-semibold text-foreground">Welcome, {{ user?.name || 'there' }}</h2>
+      <p class="mt-2 text-sm text-muted-foreground">Please wait while we connect you with your doctor.</p>
+      <div class="mt-4 flex items-center gap-1.5" aria-hidden="true">
+        <span class="lobby-dot size-2.5 rounded-full bg-primary"></span>
+        <span class="lobby-dot size-2.5 rounded-full bg-primary"></span>
+        <span class="lobby-dot size-2.5 rounded-full bg-primary"></span>
+      </div>
+      <p class="mt-4 text-xs text-muted-foreground">The doctor will admit you when they are ready.</p>
+      <Button variant="outline" class="mt-6" data-testid="leave-lobby" @click="leaveLobby">
+        Leave Lobby
+      </Button>
     </div>
 
     <div v-else-if="status === 'waiting'" class="flex flex-col items-center justify-center rounded-2xl border border-border bg-card p-10 text-center" data-testid="session-waiting">
@@ -180,3 +219,19 @@ onBeforeUnmount(() => {
     </Teleport>
   </div>
 </template>
+
+<style>
+.lobby-dot {
+  animation: lobby-pulse 1.2s ease-in-out infinite;
+}
+.lobby-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.lobby-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes lobby-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
+}
+</style>

@@ -1,11 +1,29 @@
 <script setup lang="ts">
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
+import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Video } from 'lucide-vue-next'
-import type { DateClickArg, DatesSetArg, DayCellContentArg } from '@fullcalendar/core'
+import {
+  Calendar as CalendarIcon,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  CreditCard,
+  Plus,
+  Stethoscope,
+  Video,
+  X,
+} from 'lucide-vue-next'
+import type {
+  DateClickArg,
+  DatesSetArg,
+  DayCellContentArg,
+  EventClickArg,
+  EventContentArg,
+} from '@fullcalendar/core'
 import type { Appointment } from '~/modules/patient/composables/types'
-import type { AvailableSlot } from '~/modules/patient/composables/usePatientDashboard'
+import type { AvailableSlot, BookingSessionType } from '~/modules/patient/composables/usePatientDashboard'
 
 definePageMeta({
   layout: 'patient-layout',
@@ -14,46 +32,69 @@ definePageMeta({
 
 const {
   allBookings,
-  availableDates,
   availableSlots,
-  selectedDate,
   isLoading,
   error,
   fetchAllBookings,
   fetchAvailableDates,
-  fetchBookingsForDate,
-  selectDate,
-  cancelAppointment,
-  updateBookingTime,
   fetchAvailableSlots,
-  fetchError,
-  clearFetchError,
-  isClosedDay,
-  getClosedDayMessage,
+  cancelAppointment,
+  rescheduleBooking,
+  openBookingFlow,
+  closeBookingFlow,
+  bookingFlowOpen,
+  bookingStep,
+  bookingSessionType,
+  bookingFlowDate,
+  bookingFlowSlots,
+  bookingFlowTime,
+  bookingFlowLoading,
+  bookingFlowError,
+  bookingFlowSuccess,
+  bookingFlowBookingId,
+  setBookingSessionType,
+  goBookingStep,
+  fetchBookingFlowSlots,
+  selectBookingFlowTime,
+  submitBookingFlow,
+  retryBookingPayment,
 } = usePatientDashboard()
 const { isHoliday } = useHolidays()
 const { toast } = useToast()
 
-const currentMonth = ref(new Date().getMonth() + 1)
-const currentYear = ref(new Date().getFullYear())
-const now = ref(Date.now())
+type MainView = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay'
+
+const currentView = ref<MainView>('dayGridMonth')
+const anchorDate = ref(new Date())
+const calendarRef = ref<InstanceType<typeof FullCalendar> | null>(null)
 const calendarKey = ref(0)
+const now = ref(Date.now())
 const loadedMonthKey = ref('')
+const knownAvailable = ref<Set<string>>(new Set())
 
-const selectedBookings = ref<Appointment[]>([])
-const panelLoading = ref(false)
+// Sidebar mini calendar month (0-11)
+const todayDate = new Date()
+const miniYear = ref(todayDate.getFullYear())
+const miniMonth = ref(todayDate.getMonth())
 
-const cancelTarget = ref<Appointment | null>(null)
-const cancelDialogOpen = ref(false)
+// Booking flow mini calendar month
+const flowYear = ref(todayDate.getFullYear())
+const flowMonth = ref(todayDate.getMonth())
+
+// Detail panel state
+const detailAppt = ref<Appointment | null>(null)
 const cancelling = ref(false)
+const cancelConfirm = ref(false)
+const rsOpen = ref(false)
+const rsDate = ref('')
+const rsSlots = ref<AvailableSlot[]>([])
+const rsTime = ref<string | null>(null)
+const rsLoading = ref(false)
+const rsError = ref<string | null>(null)
 
-const editTarget = ref<Appointment | null>(null)
-const editDialogOpen = ref(false)
-const editSlots = ref<AvailableSlot[]>([])
-const editSlotLoading = ref(false)
-const selectedEditTime = ref<string | null>(null)
-const editing = ref(false)
-const editError = ref<string | null>(null)
+let nowTimer: ReturnType<typeof setInterval> | null = null
+
+// ── helpers ──────────────────────────────────────────────
 
 function toISODate(date: Date): string {
   const y = date.getFullYear()
@@ -70,6 +111,10 @@ function isPastStr(dateStr: string): boolean {
   return dateStr < todayStr()
 }
 
+function sessionTypeOf(appt: Appointment): BookingSessionType {
+  return (appt as unknown as { sessionType?: BookingSessionType }).sessionType ?? 'ONLINE'
+}
+
 function parseDateTime(dateISO: string, time: string): Date {
   const [y, m, d] = dateISO.split('-').map((v) => parseInt(v, 10))
   const [hh, mm] = time.split(':').map((v) => parseInt(v, 10))
@@ -84,6 +129,10 @@ function sessionEnd(appt: Appointment): Date {
   return parseDateTime(appt.date, appt.endTime)
 }
 
+function sessionMinutes(appt: Appointment): number {
+  return Math.max(0, Math.round((sessionEnd(appt).getTime() - sessionStart(appt).getTime()) / 60000))
+}
+
 function canJoin(appt: Appointment): boolean {
   const t = now.value
   return (
@@ -92,108 +141,15 @@ function canJoin(appt: Appointment): boolean {
   )
 }
 
-function canCancel(appt: Appointment): boolean {
-  return now.value < sessionStart(appt).getTime() - 24 * 60 * 60 * 1000
+function canModify(appt: Appointment): boolean {
+  return appt.status !== 'CANCELLED' && now.value < sessionStart(appt).getTime() - 24 * 60 * 60 * 1000
 }
 
-function statusForDate(dateStr: string): 'confirmed' | 'pending' | null {
-  const day = allBookings.value.filter((a) => a.date === dateStr).map((a) => a.status)
-  if (day.includes('CONFIRMED')) return 'confirmed'
-  if (day.includes('PENDING')) return 'pending'
-  return null
-}
-
-function dayCellClass(info: DayCellContentArg): string[] {
-  const dateStr = toISODate(info.date)
-  if (isPastStr(dateStr)) return ['fc-past']
-  if (isHoliday(dateStr)) return ['fc-holiday']
-  const classes: string[] = []
-  const st = statusForDate(dateStr)
-  if (st === 'confirmed') classes.push('fc-dot-confirmed')
-  else if (st === 'pending') classes.push('fc-dot-pending')
-  else if (availableDates.value.includes(dateStr)) classes.push('fc-available')
-  return classes
-}
-
-async function loadMonth(month: number, year: number, remount = false) {
-  await fetchAvailableDates(month, year)
-  if (remount) calendarKey.value += 1
-  if (selectedDate.value) {
-    selectedBookings.value = fetchBookingsForDate(selectedDate.value)
-  }
-}
-
-async function onDatesSet(info: DatesSetArg) {
-  // NB: view.currentStart is the first *visible* day, which can belong to the
-  // previous month (week starts Saturday). Use the calendar anchor date so the
-  // month label and navigation stay on the month actually being viewed.
-  const anchor = info.view.calendar.getDate()
-  const month = anchor.getMonth() + 1
-  const year = anchor.getFullYear()
-  currentMonth.value = month
-  currentYear.value = year
-  const key = `${year}-${month}`
-  if (key === loadedMonthKey.value) return
-  loadedMonthKey.value = key
-  await loadMonth(month, year)
-  // Re-render once with the freshly fetched dates/bookings: FullCalendar does
-  // not re-evaluate dayCellClassNames when our async data arrives. The remount
-  // fires datesSet again, which returns early via loadedMonthKey (no loop).
-  calendarKey.value += 1
-}
-
-async function onDateClick(info: DateClickArg) {
-  const dateStr = toISODate(info.date)
-  if (info.date.getMonth() + 1 !== currentMonth.value) return
-  if (isPastStr(dateStr)) return
-  if (isHoliday(dateStr)) {
-    toast({ title: 'Clinic closed for a public holiday', variant: 'info' })
-    return
-  }
-  // Fridays stay clickable on purpose: the panel explains the clinic is closed.
-  panelLoading.value = true
-  try {
-    await selectDate(dateStr)
-    selectedBookings.value = fetchBookingsForDate(dateStr)
-  } finally {
-    panelLoading.value = false
-  }
-}
-
-async function retryLoad() {
-  clearFetchError()
-  panelLoading.value = true
-  try {
-    await loadMonth(currentMonth.value, currentYear.value)
-    if (selectedDate.value) {
-      await selectDate(selectedDate.value)
-      selectedBookings.value = fetchBookingsForDate(selectedDate.value)
-    }
-    calendarKey.value += 1
-  } finally {
-    panelLoading.value = false
-  }
-}
-
-function onMonthChange(dir: number) {
-  const d = new Date(currentYear.value, currentMonth.value - 1 + dir, 1)
-  currentMonth.value = d.getMonth() + 1
-  currentYear.value = d.getFullYear()
-  void loadMonth(currentMonth.value, currentYear.value, true)
-}
-
-function goToday() {
-  const t = new Date()
-  currentMonth.value = t.getMonth() + 1
-  currentYear.value = t.getFullYear()
-  void loadMonth(currentMonth.value, currentYear.value, true)
-}
-
-function formatMonthLabel(): string {
-  return new Date(currentYear.value, currentMonth.value - 1).toLocaleDateString('en-GB', {
-    month: 'long',
-    year: 'numeric',
-  })
+function formatTime(time: string): string {
+  const [hh, mm] = time.split(':').map((v) => parseInt(v, 10))
+  const period = (hh || 0) >= 12 ? 'PM' : 'AM'
+  const hour = (hh || 0) % 12 === 0 ? 12 : (hh || 0) % 12
+  return `${hour}:${String(mm).padStart(2, '0')} ${period}`
 }
 
 function formatDateLabel(dateStr: string): string {
@@ -205,45 +161,358 @@ function formatDateLabel(dateStr: string): string {
   })
 }
 
-function formatTime(time: string): string {
-  const [hh, mm] = time.split(':').map((v) => parseInt(v, 10))
-  const period = (hh || 0) >= 12 ? 'PM' : 'AM'
-  const hour = (hh || 0) % 12 === 0 ? 12 : (hh || 0) % 12
-  return `${hour}:${String(mm).padStart(2, '0')} ${period}`
+function formatShort(appt: Appointment): string {
+  const label = new Date(`${appt.date}T00:00:00`).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+  return `${label} · ${formatTime(appt.startTime)}`
 }
 
 function statusLabel(status: string): string {
   if (status === 'CONFIRMED') return 'Confirmed'
-  if (status === 'PENDING') return 'Under review'
+  if (status === 'PENDING') return 'Pending'
   return 'Cancelled'
 }
 
-function bookSlot(startTime: string) {
-  if (!selectedDate.value) return
-  navigateTo(`/book?date=${selectedDate.value}&time=${startTime}`)
+function mergeAvailable(dates: string[]) {
+  const next = new Set(knownAvailable.value)
+  for (const d of dates) next.add(d)
+  knownAvailable.value = next
+}
+
+// ── calendar events ──────────────────────────────────────
+
+function chipColors(appt: Appointment): { backgroundColor: string; borderColor: string; textColor: string; className: string } {
+  const type = sessionTypeOf(appt)
+  if (appt.status === 'CANCELLED') {
+    return { backgroundColor: '#F3F4F6', borderColor: '#F3F4F6', textColor: '#9CA3AF', className: 'fc-chip-cancelled' }
+  }
+  if (appt.status === 'PENDING') {
+    return { backgroundColor: '#FEF9C3', borderColor: '#F59E0B', textColor: '#854D0E', className: 'fc-chip-pending' }
+  }
+  if (type === 'IN_CLINIC') {
+    return { backgroundColor: '#FCE4F3', borderColor: '#E91E8C', textColor: '#E91E8C', className: 'fc-chip-clinic' }
+  }
+  return { backgroundColor: '#E91E8C', borderColor: '#E91E8C', textColor: '#FFFFFF', className: 'fc-chip-online' }
+}
+
+const calendarEvents = computed(() =>
+  allBookings.value.map((a) => {
+    const c = chipColors(a)
+    const label = sessionTypeOf(a) === 'IN_CLINIC' ? 'In-Clinic' : 'Online'
+    return {
+      id: a.id,
+      title: `${formatTime(a.startTime)} · ${label}`,
+      start: `${a.date}T${a.startTime}:00`,
+      end: `${a.date}T${a.endTime}:00`,
+      backgroundColor: c.backgroundColor,
+      borderColor: c.borderColor,
+      textColor: c.textColor,
+      classNames: [c.className],
+    }
+  }),
+)
+
+function renderEventContent(arg: EventContentArg) {
+  const cancelled = arg.event.classNames.includes('fc-chip-cancelled')
+  return {
+    html: `<div class="fc-chip${cancelled ? ' fc-chip-cancelled' : ''}"><span>${arg.event.title}</span></div>`,
+  }
+}
+
+function dayCellClass(info: DayCellContentArg): string[] {
+  const dateStr = toISODate(info.date)
+  const classes: string[] = []
+  if (isPastStr(dateStr)) classes.push('fc-past')
+  else if (knownAvailable.value.has(dateStr)) classes.push('fc-can-book')
+  return classes
+}
+
+// ── navigation / data loading ────────────────────────────
+
+function calendarApi() {
+  return (calendarRef.value as unknown as { getApi?: () => { prev: () => void; next: () => void; today: () => void; gotoDate: (d: string) => void; changeView: (v: string) => void; getDate: () => Date } } | null)?.getApi?.() ?? null
+}
+
+async function loadMonthDates(month: number, year: number) {
+  const dates = await fetchAvailableDates(month, year)
+  mergeAvailable(dates)
+}
+
+async function onDatesSet(info: DatesSetArg) {
+  const anchor = info.view.calendar.getDate()
+  anchorDate.value = anchor
+  if (currentView.value !== (info.view.type as MainView)) {
+    currentView.value = (info.view.type as MainView)
+  }
+  if (currentView.value === 'dayGridMonth') {
+    const key = `${anchor.getFullYear()}-${anchor.getMonth() + 1}`
+    if (key !== loadedMonthKey.value) {
+      loadedMonthKey.value = key
+      await loadMonthDates(anchor.getMonth() + 1, anchor.getFullYear())
+      calendarKey.value += 1
+    }
+  } else {
+    await fetchAvailableSlots(toISODate(anchor))
+  }
+}
+
+async function onDateClick(info: DateClickArg) {
+  const target = info.jsEvent?.target as HTMLElement | null
+  if (target && typeof target.closest === 'function' && target.closest('.fc-event')) return
+  const dateStr = toISODate(info.date)
+  if (isPastStr(dateStr)) return
+  if (isHoliday(dateStr)) {
+    toast({ title: 'Clinic closed for a public holiday', variant: 'info' })
+    return
+  }
+  anchorDate.value = info.date
+  closeDetail()
+  flowYear.value = info.date.getFullYear()
+  flowMonth.value = info.date.getMonth()
+  openBookingFlow(dateStr)
+}
+
+function onEventClick(info: EventClickArg) {
+  const found = allBookings.value.find((a) => a.id === info.event.id)
+  if (found) openDetail(found)
+}
+
+function changeView(view: MainView) {
+  currentView.value = view
+  calendarApi()?.changeView(view)
+}
+
+function onNav(dir: number) {
+  if (currentView.value === 'dayGridMonth') {
+    const d = new Date(anchorDate.value.getFullYear(), anchorDate.value.getMonth() + dir, 1)
+    anchorDate.value = d
+    calendarApi()?.gotoDate(toISODate(d))
+    const key = `${d.getFullYear()}-${d.getMonth() + 1}`
+    if (key !== loadedMonthKey.value) {
+      loadedMonthKey.value = key
+      void loadMonthDates(d.getMonth() + 1, d.getFullYear()).then(() => {
+        calendarKey.value += 1
+      })
+    }
+  } else if (dir === 0) {
+    goToday()
+  } else {
+    if (dir < 0) calendarApi()?.prev()
+    else calendarApi()?.next()
+  }
+}
+
+function goToday() {
+  const t = new Date()
+  anchorDate.value = t
+  calendarApi()?.today()
+  const key = `${t.getFullYear()}-${t.getMonth() + 1}`
+  if (currentView.value === 'dayGridMonth' && key !== loadedMonthKey.value) {
+    loadedMonthKey.value = key
+    void loadMonthDates(t.getMonth() + 1, t.getFullYear()).then(() => {
+      calendarKey.value += 1
+    })
+  }
+}
+
+const headerLabel = computed(() => {
+  const d = anchorDate.value
+  if (currentView.value === 'dayGridMonth') {
+    return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  }
+  if (currentView.value === 'timeGridWeek') {
+    const start = new Date(d)
+    const day = (start.getDay() + 6) % 7
+    start.setDate(start.getDate() - day)
+    const end = new Date(start)
+    end.setDate(end.getDate() + 6)
+    const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }
+    return `${start.toLocaleDateString('en-GB', opts)} – ${end.toLocaleDateString('en-GB', opts)} ${end.getFullYear()}`
+  }
+  return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+})
+
+// ── mini month grid builder (sidebar + flow share it) ────
+
+interface MiniCell {
+  dateStr: string
+  dayNum: number
+  isCurrentMonth: boolean
+  isToday: boolean
+  isSelected: boolean
+  hasBookings: boolean
+  isAvailable: boolean
+}
+
+function buildMonthCells(year: number, month: number, selected: string, withBookings: boolean): MiniCell[] {
+  const firstDow = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const daysInPrev = new Date(year, month, 0).getDate()
+  const today = todayStr()
+  const bookingSet = new Set(allBookings.value.map((a) => a.date))
+  const cells: MiniCell[] = []
+  for (let i = firstDow - 1; i >= 0; i--) {
+    const day = daysInPrev - i
+    const str = toISODate(new Date(year, month - 1, day))
+    cells.push({
+      dateStr: str,
+      dayNum: day,
+      isCurrentMonth: false,
+      isToday: str === today,
+      isSelected: str === selected,
+      hasBookings: withBookings && bookingSet.has(str),
+      isAvailable: knownAvailable.value.has(str),
+    })
+  }
+  for (let day = 1; day <= daysInMonth; day++) {
+    const str = toISODate(new Date(year, month, day))
+    cells.push({
+      dateStr: str,
+      dayNum: day,
+      isCurrentMonth: true,
+      isToday: str === today,
+      isSelected: str === selected,
+      hasBookings: withBookings && bookingSet.has(str),
+      isAvailable: knownAvailable.value.has(str),
+    })
+  }
+  while (cells.length % 7 !== 0) {
+    const day = cells.length - (firstDow + daysInMonth) + 1
+    const next = new Date(year, month + 1, day)
+    const str = toISODate(next)
+    cells.push({
+      dateStr: str,
+      dayNum: next.getDate(),
+      isCurrentMonth: false,
+      isToday: str === today,
+      isSelected: str === selected,
+      hasBookings: withBookings && bookingSet.has(str),
+      isAvailable: knownAvailable.value.has(str),
+    })
+  }
+  return cells
+}
+
+const miniWeekdays = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+const miniMonthLabel = computed(
+  () => new Date(miniYear.value, miniMonth.value, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+)
+const miniCells = computed(() => buildMonthCells(miniYear.value, miniMonth.value, toISODate(anchorDate.value), true))
+
+function miniNav(dir: number) {
+  const d = new Date(miniYear.value, miniMonth.value + dir, 1)
+  miniYear.value = d.getFullYear()
+  miniMonth.value = d.getMonth()
+  void loadMonthDates(d.getMonth() + 1, d.getFullYear())
+}
+
+function selectMiniDate(dateStr: string) {
+  if (isPastStr(dateStr)) return
+  const [y, m, d] = dateStr.split('-').map((v) => parseInt(v, 10))
+  const dt = new Date(y, (m || 1) - 1, d)
+  anchorDate.value = dt
+  miniYear.value = dt.getFullYear()
+  miniMonth.value = dt.getMonth()
+  calendarApi()?.gotoDate(dateStr)
+  if (currentView.value !== 'dayGridMonth') {
+    void fetchAvailableSlots(dateStr)
+  }
+}
+
+// ── upcoming sessions ────────────────────────────────────
+
+const upcomingThree = computed(() => {
+  const t = now.value
+  return allBookings.value
+    .filter((a) => a.status === 'CONFIRMED' && sessionStart(a).getTime() >= t - 60 * 60 * 1000)
+    .sort((a, b) => sessionStart(a).getTime() - sessionStart(b).getTime())
+    .slice(0, 3)
+})
+
+// ── detail panel ─────────────────────────────────────────
+
+function openDetail(appt: Appointment) {
+  detailAppt.value = appt
+  cancelConfirm.value = false
+  rsOpen.value = false
+  rsError.value = null
+  if (bookingFlowOpen.value) closeBookingFlow()
+}
+
+function closeDetail() {
+  detailAppt.value = null
+  cancelConfirm.value = false
+  rsOpen.value = false
+  rsError.value = null
 }
 
 function joinSession(appt: Appointment) {
   navigateTo(`/dashboard/session/${appt.id}`)
 }
 
-function openCancelDialog(appt: Appointment) {
-  cancelTarget.value = appt
-  cancelDialogOpen.value = true
+async function openReschedule() {
+  if (!detailAppt.value) return
+  rsOpen.value = true
+  rsError.value = null
+  rsDate.value = detailAppt.value.date
+  rsTime.value = null
+  rsLoading.value = true
+  try {
+    rsSlots.value = await fetchAvailableSlots(detailAppt.value.date)
+  } catch (e) {
+    rsError.value = (e as { data?: { message?: string } }).data?.message || 'Could not load available slots'
+    rsSlots.value = []
+  } finally {
+    rsLoading.value = false
+  }
+}
+
+async function onRsDateChange() {
+  if (!rsDate.value) return
+  rsTime.value = null
+  rsLoading.value = true
+  rsError.value = null
+  try {
+    rsSlots.value = await fetchAvailableSlots(rsDate.value)
+  } catch (e) {
+    rsError.value = (e as { data?: { message?: string } }).data?.message || 'Could not load available slots'
+    rsSlots.value = []
+  } finally {
+    rsLoading.value = false
+  }
+}
+
+async function submitReschedule() {
+  if (!detailAppt.value || !rsDate.value || !rsTime.value) return
+  rsLoading.value = true
+  rsError.value = null
+  try {
+    const prevType = sessionTypeOf(detailAppt.value)
+    const updated = await rescheduleBooking(detailAppt.value.id, rsDate.value, rsTime.value)
+    detailAppt.value = { ...updated, sessionType: (updated as unknown as { sessionType?: BookingSessionType }).sessionType ?? prevType } as Appointment
+    rsOpen.value = false
+    toast({ title: 'Appointment updated', variant: 'success' })
+    await fetchAllBookings()
+    calendarKey.value += 1
+  } catch (e) {
+    rsError.value = (e as { data?: { message?: string } }).data?.message || 'Could not update appointment'
+  } finally {
+    rsLoading.value = false
+  }
 }
 
 async function confirmCancel() {
-  if (!cancelTarget.value) return
+  if (!detailAppt.value) return
   cancelling.value = true
   try {
-    await cancelAppointment(cancelTarget.value.id)
+    await cancelAppointment(detailAppt.value.id)
+    detailAppt.value = { ...detailAppt.value, status: 'CANCELLED' }
+    cancelConfirm.value = false
     toast({ title: 'Appointment cancelled', variant: 'success' })
-    cancelDialogOpen.value = false
-    cancelTarget.value = null
     await fetchAllBookings()
-    if (selectedDate.value) {
-      selectedBookings.value = fetchBookingsForDate(selectedDate.value)
-    }
     calendarKey.value += 1
   } catch (e) {
     toast({
@@ -255,403 +524,725 @@ async function confirmCancel() {
   }
 }
 
-function canEdit(appt: Appointment): boolean {
-  return appt.status === 'PENDING' && now.value < sessionStart(appt).getTime()
-}
+// ── booking flow panel ───────────────────────────────────
 
-async function openEditModal(appt: Appointment) {
-  editTarget.value = appt
-  editError.value = null
-  editSlots.value = []
-  selectedEditTime.value = null
-  editDialogOpen.value = true
-  editSlotLoading.value = true
-  try {
-    const slots = await fetchAvailableSlots(appt.date)
-    // The patient's own (pending) slot is not counted as taken by the API, so it
-    // is already present; ensure we don't offer past times on today's sessions.
-    const currentHHMM = appt.startTime
-    const isToday = appt.date === todayStr()
-    const currentMinutes = isToday
-      ? new Date(now.value).getHours() * 60 + new Date(now.value).getMinutes()
-      : -1
-    const list = slots
-      .filter((s) => !(isToday && timeToMinutesNum(s.startTime) <= currentMinutes))
-      .sort((a, b) => a.startTime.localeCompare(b.startTime))
-    const flagCurrent = (s: AvailableSlot) => (s.startTime === currentHHMM ? { ...s, current: true } : s)
-    editSlots.value = list.map(flagCurrent)
-    if (!list.some((s) => s.startTime === currentHHMM)) {
-      editSlots.value.push({ startTime: currentHHMM, endTime: appt.endTime, sessionDuration: 60, current: true })
-    }
-    selectedEditTime.value = currentHHMM
-  } catch (e) {
-    editError.value = (e as { data?: { message?: string } }).data?.message || 'Could not load available slots'
-  } finally {
-    editSlotLoading.value = false
+async function bookSlot(dateStr: string, time?: string) {
+  closeDetail()
+  flowYear.value = parseInt(dateStr.slice(0, 4), 10)
+  flowMonth.value = parseInt(dateStr.slice(5, 7), 10) - 1
+  openBookingFlow(dateStr)
+  goBookingStep(2)
+  if (time) {
+    await fetchBookingFlowSlots(dateStr)
+    selectBookingFlowTime(time)
   }
 }
 
-function timeToMinutesNum(time: string): number {
-  const [h, m] = time.split(':').map((v) => parseInt(v, 10))
-  return (h || 0) * 60 + (m || 0)
+function openNewBooking() {
+  closeDetail()
+  const d = new Date()
+  flowYear.value = d.getFullYear()
+  flowMonth.value = d.getMonth()
+  openBookingFlow(toISODate(anchorDate.value) >= todayStr() ? toISODate(anchorDate.value) : todayStr())
 }
 
-function selectEditSlot(startTime: string) {
-  selectedEditTime.value = startTime
-  editError.value = null
+const flowMonthLabel = computed(
+  () => new Date(flowYear.value, flowMonth.value, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+)
+const flowCells = computed(() =>
+  buildMonthCells(flowYear.value, flowMonth.value, bookingFlowDate.value ?? '', false),
+)
+
+function flowNav(dir: number) {
+  const d = new Date(flowYear.value, flowMonth.value + dir, 1)
+  flowYear.value = d.getFullYear()
+  flowMonth.value = d.getMonth()
+  void loadMonthDates(d.getMonth() + 1, d.getFullYear())
 }
 
-async function confirmEdit() {
-  if (!editTarget.value || !selectedEditTime.value) return
-  editing.value = true
-  editError.value = null
-  try {
-    await updateBookingTime(editTarget.value.id, selectedEditTime.value)
-    toast({ title: 'Appointment updated', variant: 'success' })
-    editDialogOpen.value = false
-    editTarget.value = null
-    await fetchAllBookings()
-    await loadMonth(currentMonth.value, currentYear.value)
-    if (selectedDate.value) {
-      selectedBookings.value = fetchBookingsForDate(selectedDate.value)
-    }
+async function selectFlowDate(dateStr: string) {
+  if (isPastStr(dateStr)) return
+  if (!knownAvailable.value.has(dateStr) && !bookingFlowSlots.value.length) {
+    // Still allow selecting — the slot fetch will confirm availability.
+  }
+  await fetchBookingFlowSlots(dateStr)
+}
+
+const flowSelectedSlot = computed(
+  () => bookingFlowSlots.value.find((s) => s.startTime === bookingFlowTime.value) ?? null,
+)
+
+function flowEndTime(): string {
+  if (flowSelectedSlot.value) return flowSelectedSlot.value.endTime
+  if (!bookingFlowTime.value) return ''
+  const [h, m] = bookingFlowTime.value.split(':').map((v) => parseInt(v, 10))
+  const end = (h || 0) * 60 + (m || 0) + 60
+  return `${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`
+}
+
+function flowDuration(): number {
+  return flowSelectedSlot.value?.sessionDuration ?? 60
+}
+
+async function submitFlow() {
+  const result = await submitBookingFlow()
+  if (!result) return
+  if (result.sessionType === 'IN_CLINIC') {
+    // Success state renders inside the panel from bookingFlowSuccess.
     calendarKey.value += 1
-  } catch (e) {
-    editError.value = (e as { data?: { message?: string } }).data?.message || 'Could not update appointment'
-  } finally {
-    editing.value = false
   }
+}
+
+async function retryFlowPayment() {
+  if (!bookingFlowBookingId.value) return
+  await retryBookingPayment(bookingFlowBookingId.value)
+}
+
+function viewAppointments() {
+  closeBookingFlow()
+  void fetchAllBookings().then(() => {
+    calendarKey.value += 1
+  })
 }
 
 const calendarOptions = computed(() => ({
-  plugins: [dayGridPlugin, interactionPlugin],
-  initialView: 'dayGridMonth',
-  initialDate: new Date(currentYear.value, currentMonth.value - 1, 1),
+  plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
+  initialView: 'dayGridMonth' as MainView,
   headerToolbar: false,
   height: 'auto',
   firstDay: 6,
   weekends: true,
+  events: calendarEvents.value,
+  eventContent: renderEventContent,
   dayCellClassNames: dayCellClass,
   dateClick: onDateClick,
+  eventClick: onEventClick,
   datesSet: onDatesSet,
 }))
 
 onMounted(async () => {
   now.value = Date.now()
-  await Promise.all([
-    fetchAllBookings(),
-    loadMonth(currentMonth.value, currentYear.value),
-  ])
-  window.setInterval(() => {
+  nowTimer = setInterval(() => {
     now.value = Date.now()
   }, 60 * 1000)
+  const t = new Date()
+  const key = `${t.getFullYear()}-${t.getMonth() + 1}`
+  loadedMonthKey.value = key
+  await Promise.all([fetchAllBookings(), loadMonthDates(t.getMonth() + 1, t.getFullYear())])
+  calendarKey.value += 1
+})
+
+onBeforeUnmount(() => {
+  if (nowTimer) {
+    clearInterval(nowTimer)
+    nowTimer = null
+  }
 })
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-[1100px]" :data-testid="'available-dates-count-' + availableDates.length">
+  <div class="mx-auto w-full max-w-[1200px]">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="min-w-0">
         <h1 class="text-2xl font-semibold tracking-tight text-foreground" data-testid="page-title">
           My Appointments
         </h1>
-        <p class="mt-1 text-sm text-muted-foreground">Select a day to see your bookings or free times.</p>
+        <p class="mt-1 text-sm text-muted-foreground">Your bookings and open times, all in one calendar.</p>
       </div>
     </div>
 
     <p v-if="error" class="mt-4 text-sm text-destructive">{{ error }}</p>
 
-    <Card class="mt-6 w-full overflow-hidden">
-      <CardContent class="p-3 sm:p-5">
-        <div class="mb-3 flex items-center justify-between gap-2">
-          <Button variant="ghost" size="sm" aria-label="Previous month" @click="onMonthChange(-1)">
-            <ChevronLeft class="size-5" />
-          </Button>
-
-          <div class="flex items-center gap-2 text-base font-semibold text-foreground">
-            <CalendarIcon class="size-4 text-primary" />
-            <span data-testid="calendar-month">{{ formatMonthLabel() }}</span>
-          </div>
-
-          <div class="flex items-center gap-1">
-            <Button variant="ghost" size="sm" data-testid="calendar-today" @click="goToday">Today</Button>
-            <Button variant="ghost" size="sm" aria-label="Next month" @click="onMonthChange(1)">
-              <ChevronRight class="size-5" />
-            </Button>
-          </div>
-        </div>
-
-        <ClientOnly>
-          <FullCalendar :key="calendarKey" :options="calendarOptions" />
-          <template #fallback>
-            <div class="py-10 text-center text-sm text-muted-foreground">Loading calendar…</div>
-          </template>
-        </ClientOnly>
-
-        <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground" data-testid="calendar-legend">
-          <span class="inline-flex items-center gap-1.5">
-            <span class="size-2.5 rounded-full bg-green-600"></span>
-            Confirmed
-          </span>
-          <span class="inline-flex items-center gap-1.5">
-            <span class="size-2.5 rounded-full bg-yellow-500"></span>
-            Under review
-          </span>
-          <span class="inline-flex items-center gap-1.5">
-            <span class="size-2.5 rounded-full bg-[#e91e8c]" data-testid="legend-available-dot"></span>
-            Available day
-          </span>
-          <span class="inline-flex items-center gap-1.5">
-            <span class="size-3 rounded-sm bg-slate-200 dark:bg-muted"></span>
-            Holiday / Past
-          </span>
-        </div>
-      </CardContent>
-    </Card>
-
-    <div class="mt-6" data-testid="day-panel">
-      <div v-if="fetchError" class="rounded-2xl border border-destructive/40 bg-card p-6 text-center" data-testid="day-error">
-        <p class="text-sm font-medium text-destructive">{{ fetchError }}</p>
-        <Button variant="outline" class="mt-4" data-testid="day-retry" @click="retryLoad">Retry</Button>
-      </div>
-
-      <div v-else-if="!selectedDate">
-        <div v-if="isLoading || availableDates.length === 0" class="grid gap-3">
-          <Skeleton v-for="i in 2" :key="i" class="h-28 w-full" />
-        </div>
-        <div v-else class="rounded-2xl border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-          Select a date above to see your bookings or free times.
-        </div>
-      </div>
-
-      <div v-else>
-        <h2 class="mb-3 text-base font-semibold text-foreground" data-testid="panel-date">
-          {{ formatDateLabel(selectedDate) }}
-        </h2>
-
-        <div v-if="panelLoading" class="grid gap-3">
-          <Skeleton v-for="i in 2" :key="i" class="h-24 w-full" />
-        </div>
-
-        <div v-else-if="selectedDate && isClosedDay(selectedDate)" class="rounded-2xl border border-border bg-card p-10 text-center" data-testid="day-closed">
-          <p class="font-medium text-foreground">{{ getClosedDayMessage() }}</p>
-          <p class="mt-1 text-sm text-muted-foreground">Please choose another day to see bookings or free times.</p>
-        </div>
-
-        <div v-else>
-          <div v-if="selectedBookings.length > 0" class="grid gap-4">
-          <Card
-            v-for="appt in selectedBookings"
-            :key="appt.id"
-            class="overflow-hidden"
-            :data-testid="`booking-${appt.id}`"
-          >
-            <CardContent class="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
-              <Avatar class="size-14 shrink-0">
-                <AvatarImage :src="appt.doctorPhoto || undefined" :alt="appt.doctorName" />
-                <AvatarFallback class="text-lg">{{ (appt.doctorName || 'U').slice(0, 1).toUpperCase() }}</AvatarFallback>
-              </Avatar>
-              <div class="min-w-0 flex-1">
-                <p class="truncate text-base font-semibold text-foreground" :data-testid="`doctor-name-${appt.id}`">
-                  {{ appt.doctorId ? appt.doctorName : 'Unknown Doctor' }}
-                </p>
-                <p class="text-sm text-muted-foreground">{{ formatTime(appt.startTime) }} – {{ formatTime(appt.endTime) }}</p>
-                <p class="mt-1 text-sm text-muted-foreground">{{ appt.service }}</p>
-                <p
-                  v-if="appt.status === 'PENDING' && !appt.doctorId"
-                  class="mt-1 text-xs text-muted-foreground"
-                  :data-testid="`pending-note-${appt.id}`"
-                >
-                  Waiting for admin confirmation — you'll receive an email once confirmed.
-                </p>
+    <div class="mt-6 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <!-- ── Left sidebar ─────────────────────────────── -->
+      <aside class="flex flex-col gap-6">
+        <Card class="overflow-hidden">
+          <CardContent class="p-4">
+            <div class="mb-2 flex items-center justify-between">
+              <Button variant="ghost" size="sm" aria-label="Previous month" @click="miniNav(-1)">
+                <ChevronLeft class="size-4" />
+              </Button>
+              <p class="text-sm font-semibold text-foreground" data-testid="mini-month">{{ miniMonthLabel }}</p>
+              <Button variant="ghost" size="sm" aria-label="Next month" @click="miniNav(1)">
+                <ChevronRight class="size-4" />
+              </Button>
+            </div>
+            <div data-testid="mini-calendar">
+              <div class="grid grid-cols-7 text-center text-xs text-muted-foreground">
+                <span v-for="d in miniWeekdays" :key="d" class="py-1">{{ d }}</span>
               </div>
-              <div class="flex shrink-0 flex-col gap-2 sm:items-end">
-                <Badge
-                  :variant="appt.status === 'CONFIRMED' ? 'default' : 'secondary'"
-                  :class="appt.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-300' : appt.status === 'CANCELLED' ? 'bg-slate-200 text-slate-600 dark:bg-muted dark:text-muted-foreground' : ''"
-                  :data-testid="`status-${appt.id}`"
+              <div class="grid grid-cols-7 gap-0.5 text-center">
+                <button
+                  v-for="cell in miniCells"
+                  :key="cell.dateStr + (cell.isCurrentMonth ? '-m' : '-o')"
+                  type="button"
+                  class="relative flex flex-col items-center rounded-lg px-1 py-1.5 text-sm transition-all duration-150"
+                  :class="[
+                    cell.isSelected ? 'bg-primary/10 font-semibold text-primary' : '',
+                    !cell.isCurrentMonth ? 'text-muted-foreground/50' : 'text-foreground',
+                    cell.isToday && !cell.isSelected ? 'font-semibold text-primary' : '',
+                    cell.isAvailable && cell.isCurrentMonth ? 'ring-1 ring-primary/40' : '',
+                    isPastStr(cell.dateStr) ? 'opacity-50' : 'hover:bg-secondary',
+                  ]"
+                  :data-testid="`mini-day-${cell.dateStr}`"
+                  @click="selectMiniDate(cell.dateStr)"
                 >
-                  {{ statusLabel(appt.status) }}
-                </Badge>
-                <template v-if="appt.status === 'CONFIRMED'">
-                  <Button
-                    :variant="canJoin(appt) ? 'default' : 'secondary'"
-                    :disabled="!canJoin(appt)"
-                    :title="!canJoin(appt) ? 'Available 5 minutes before your session' : undefined"
-                    :data-testid="`join-${appt.id}`"
-                    @click="joinSession(appt)"
+                  <span
+                    class="flex size-6 items-center justify-center rounded-full"
+                    :class="cell.isToday ? 'bg-primary text-primary-foreground' : ''"
                   >
-                    Join Session
-                  </Button>
-                </template>
-                <template v-if="appt.status === 'PENDING'">
-                  <Button
-                    v-if="canEdit(appt)"
-                    variant="outline"
-                    :data-testid="`edit-${appt.id}`"
-                    @click="openEditModal(appt)"
+                    {{ cell.dayNum }}
+                  </span>
+                  <span v-if="cell.hasBookings" class="mt-0.5 size-1.5 rounded-full bg-primary" data-testid="mini-booking-dot"></span>
+                  <span v-else class="mt-0.5 size-1.5"></span>
+                </button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card class="overflow-hidden">
+          <CardContent class="p-4">
+            <h2 class="text-sm font-semibold text-foreground">Upcoming Sessions</h2>
+            <div v-if="upcomingThree.length > 0" class="mt-3 grid gap-2">
+              <button
+                v-for="appt in upcomingThree"
+                :key="appt.id"
+                type="button"
+                class="rounded-xl border border-border bg-card p-3 text-left transition-all duration-150 hover:shadow-md"
+                :data-testid="`upcoming-${appt.id}`"
+                @click="openDetail(appt)"
+              >
+                <p class="text-sm font-medium text-foreground">{{ formatShort(appt) }}</p>
+                <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <Badge variant="secondary" class="bg-primary/10 text-primary">
+                    {{ sessionTypeOf(appt) === 'IN_CLINIC' ? 'In-Clinic' : 'Online' }}
+                  </Badge>
+                  <Badge
+                    :class="appt.status === 'CONFIRMED'
+                      ? 'bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-300'
+                      : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-300'"
+                    :data-testid="`upcoming-status-${appt.id}`"
                   >
-                    Edit
-                  </Button>
-                </template>
+                    {{ statusLabel(appt.status) }}
+                  </Badge>
+                </div>
+              </button>
+            </div>
+            <p v-else class="mt-3 text-sm text-muted-foreground" data-testid="upcoming-empty">No upcoming sessions</p>
+          </CardContent>
+        </Card>
+
+        <Button class="w-full" data-testid="book-session" @click="openNewBooking">
+          <Plus class="size-4" />
+          Book a Session
+        </Button>
+      </aside>
+
+      <!-- ── Main calendar ────────────────────────────── -->
+      <section>
+        <Card class="overflow-hidden">
+          <CardContent class="p-3 sm:p-5">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-1">
+                <Button variant="ghost" size="sm" aria-label="Previous" @click="onNav(-1)">
+                  <ChevronLeft class="size-5" />
+                </Button>
+                <Button variant="ghost" size="sm" data-testid="calendar-today" @click="goToday">Today</Button>
+                <Button variant="ghost" size="sm" aria-label="Next" @click="onNav(1)">
+                  <ChevronRight class="size-5" />
+                </Button>
+                <div class="ml-1 flex items-center gap-2 text-base font-semibold text-foreground">
+                  <CalendarIcon class="size-4 text-primary" />
+                  <span data-testid="calendar-label">{{ headerLabel }}</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-1" role="group" aria-label="Calendar view">
                 <Button
-                  v-if="appt.status === 'PENDING' || (appt.status === 'CONFIRMED' && canCancel(appt))"
-                  variant="outline"
-                  :data-testid="`cancel-${appt.id}`"
-                  @click="openCancelDialog(appt)"
+                  variant="ghost"
+                  size="sm"
+                  data-testid="view-monthly"
+                  :class="currentView === 'dayGridMonth' ? 'bg-primary/10 font-semibold text-primary' : ''"
+                  @click="changeView('dayGridMonth')"
                 >
-                  Cancel
+                  Monthly
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  data-testid="view-weekly"
+                  :class="currentView === 'timeGridWeek' ? 'bg-primary/10 font-semibold text-primary' : ''"
+                  @click="changeView('timeGridWeek')"
+                >
+                  Weekly
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  data-testid="view-daily"
+                  :class="currentView === 'timeGridDay' ? 'bg-primary/10 font-semibold text-primary' : ''"
+                  @click="changeView('timeGridDay')"
+                >
+                  Daily
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
 
-        <div v-if="availableSlots.length > 0" class="rounded-2xl border border-border bg-card p-5" :class="{ 'mt-4': selectedBookings.length > 0 }">
-          <p class="mb-3 text-sm font-medium text-foreground">Other available times on this day:</p>
-          <div class="flex flex-wrap gap-2">
-            <Button
-              v-for="slot in availableSlots"
-              :key="slot.startTime"
-              variant="outline"
-              :data-testid="`slot-${slot.startTime}`"
-              @click="bookSlot(slot.startTime)"
-            >
-              {{ formatTime(slot.startTime) }}
-            </Button>
-          </div>
-        </div>
+            <div v-if="isLoading && allBookings.length === 0" class="grid gap-3">
+              <Skeleton v-for="i in 3" :key="i" class="h-24 w-full" />
+            </div>
+            <ClientOnly v-else>
+              <FullCalendar :key="calendarKey" ref="calendarRef" :options="calendarOptions" />
+              <template #fallback>
+                <div class="py-10 text-center text-sm text-muted-foreground">Loading calendar…</div>
+              </template>
+            </ClientOnly>
 
-        <div v-if="selectedBookings.length === 0 && availableSlots.length === 0" class="flex flex-col items-center rounded-2xl border border-border bg-card p-10 text-center" data-testid="day-empty">
-          <Video class="size-10 text-muted-foreground" />
-          <p class="mt-3 font-medium text-foreground">No appointments or available slots on this day. Select another date or book a new session.</p>
-          <Button as="a" href="/book" class="mt-4" data-testid="book-now-empty">Book Now</Button>
-        </div>
-        </div>
-      </div>
+            <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground" data-testid="calendar-legend">
+              <span class="inline-flex items-center gap-1.5">
+                <span class="size-2.5 rounded-full bg-primary"></span>
+                Online confirmed
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="size-2.5 rounded-sm bg-secondary text-primary"></span>
+                In-clinic confirmed
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="size-2.5 rounded-full bg-yellow-500"></span>
+                Pending
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="inline-flex size-2.5 items-center justify-center rounded-full border border-primary/50 text-[10px] leading-none text-primary">+</span>
+                Available — click to book
+              </span>
+            </div>
+
+            <!-- Available slot strip for week / day views -->
+            <div v-if="currentView !== 'dayGridMonth'" class="mt-4 rounded-2xl border border-dashed border-primary/40 bg-card p-4" data-testid="day-slots-strip">
+              <p class="text-sm font-medium text-foreground">
+                {{ currentView === 'timeGridDay' ? 'Available slots on this day' : `Available slots on ${formatDateLabel(toISODate(anchorDate))}` }}
+              </p>
+              <div v-if="availableSlots.length > 0" class="mt-3 flex flex-col gap-2">
+                <button
+                  v-for="slot in availableSlots"
+                  :key="slot.startTime"
+                  type="button"
+                  class="flex w-full items-center justify-between gap-2 rounded-xl border border-dashed border-primary/40 px-4 py-2.5 text-sm text-foreground transition-all duration-150 hover:bg-secondary"
+                  :data-testid="`day-slot-${slot.startTime}`"
+                  @click="bookSlot(toISODate(anchorDate), slot.startTime)"
+                >
+                  <span class="inline-flex items-center gap-2">
+                    <Plus class="size-4 text-primary" />
+                    {{ formatTime(slot.startTime) }} – {{ formatTime(slot.endTime) }}
+                  </span>
+                  <span class="text-xs text-muted-foreground">Available — Book this slot</span>
+                </button>
+              </div>
+              <p v-else class="mt-2 text-sm text-muted-foreground">No open times on this day. Try another date.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
     </div>
 
+    <!-- ── Right panel: booking detail ─────────────────── -->
     <Teleport to="body">
-      <Dialog v-model:open="cancelDialogOpen">
-        <DialogContent class="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Cancel appointment?</DialogTitle>
-            <DialogDescription>
-              This will cancel your appointment and refund your payment. This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" data-testid="cancel-dialog-cancel" @click="cancelDialogOpen = false">
-              Keep appointment
+      <div v-if="detailAppt" class="fixed inset-0 z-50" data-testid="booking-detail">
+        <div class="absolute inset-0 bg-black/30" @click="closeDetail"></div>
+        <div
+          class="absolute overflow-y-auto bg-card shadow-2xl inset-x-0 bottom-0 max-h-[92vh] rounded-t-[20px] p-5 sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-0 sm:h-full sm:max-h-none sm:w-[380px] sm:rounded-none sm:p-6"
+          role="dialog"
+          aria-label="Session details"
+        >
+          <div class="mb-4 flex items-start justify-between gap-2">
+            <div>
+              <h2 class="text-lg font-semibold text-foreground">Session Details</h2>
+              <Badge
+                class="mt-1.5"
+                :class="detailAppt.status === 'CONFIRMED'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-300'
+                  : detailAppt.status === 'PENDING'
+                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-300'
+                    : 'bg-slate-200 text-slate-600 dark:bg-muted dark:text-muted-foreground'"
+                :data-testid="`detail-status-${detailAppt.id}`"
+              >
+                {{ statusLabel(detailAppt.status) }}
+              </Badge>
+            </div>
+            <Button variant="ghost" size="sm" aria-label="Close details" data-testid="detail-close" @click="closeDetail">
+              <X class="size-5" />
             </Button>
-            <Button variant="destructive" data-testid="cancel-dialog-confirm" :disabled="cancelling" @click="confirmCancel">
-              {{ cancelling ? 'Cancelling…' : 'Confirm cancellation' }}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog v-model:open="editDialogOpen">
-        <DialogContent class="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reschedule appointment</DialogTitle>
-            <DialogDescription v-if="editTarget">
-              {{ formatDateLabel(editTarget.date) }} — currently {{ formatTime(editTarget.startTime) }} – {{ formatTime(editTarget.endTime) }}.
-              Choose a new time below.
-            </DialogDescription>
-          </DialogHeader>
-
-          <p v-if="editError" class="text-sm text-destructive" data-testid="edit-error">{{ editError }}</p>
-
-          <div v-if="editSlotLoading" class="grid gap-2 py-2">
-            <Skeleton v-for="i in 3" :key="i" class="h-10 w-full" />
           </div>
 
-          <div v-else-if="editSlots.length > 0" class="flex flex-wrap gap-2 py-2">
-            <Button
-              v-for="slot in editSlots"
-              :key="slot.startTime"
-              :variant="selectedEditTime === slot.startTime ? 'default' : 'outline'"
-              :data-testid="`edit-slot-${slot.startTime}`"
-              :aria-pressed="selectedEditTime === slot.startTime"
-              @click="selectEditSlot(slot.startTime)"
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Session info</p>
+          <div class="mt-2 grid gap-2.5 text-sm">
+            <p class="flex items-center gap-2.5 text-foreground">
+              <CalendarIcon class="size-4 shrink-0 text-primary" />
+              {{ formatDateLabel(detailAppt.date) }}
+            </p>
+            <p class="flex items-center gap-2.5 text-foreground">
+              <Clock class="size-4 shrink-0 text-primary" />
+              {{ formatTime(detailAppt.startTime) }} – {{ formatTime(detailAppt.endTime) }} ({{ sessionMinutes(detailAppt) }} min)
+            </p>
+            <p class="flex items-center gap-2.5 text-foreground">
+              <component :is="sessionTypeOf(detailAppt) === 'IN_CLINIC' ? Stethoscope : Video" class="size-4 shrink-0 text-primary" />
+              {{ sessionTypeOf(detailAppt) === 'IN_CLINIC' ? 'In-Clinic' : 'Online' }}
+            </p>
+            <p class="flex items-center gap-2.5 text-foreground">
+              <CreditCard class="size-4 shrink-0 text-primary" />
+              {{ sessionTypeOf(detailAppt) === 'IN_CLINIC' ? 'Cash at clinic' : 'Online payment' }}
+            </p>
+            <p v-if="detailAppt.doctorId" class="text-sm text-muted-foreground">{{ detailAppt.service }}</p>
+            <p
+              v-if="detailAppt.status === 'PENDING' && !detailAppt.doctorId"
+              class="text-xs text-muted-foreground"
             >
-              {{ formatTime(slot.startTime) }}
-              <span v-if="slot.current" class="ml-1 text-xs opacity-80">(current)</span>
-            </Button>
+              Waiting for admin confirmation — you'll receive an email once confirmed.
+            </p>
           </div>
 
-          <div v-else class="rounded-lg border border-border bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground" data-testid="edit-empty">
-            No other slots available on this day. You can keep your current time or cancel the booking.
-          </div>
+          <p class="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</p>
+          <p class="mt-1.5 flex items-center gap-2 text-sm text-foreground">
+            <span
+              class="size-2.5 rounded-full"
+              :class="detailAppt.status === 'CONFIRMED' ? 'bg-green-600' : detailAppt.status === 'PENDING' ? 'bg-yellow-500' : 'bg-slate-400'"
+            ></span>
+            {{ detailAppt.status === 'CONFIRMED' ? 'Confirmed' : detailAppt.status === 'PENDING' ? 'Pending review' : 'Cancelled' }}
+          </p>
 
-          <DialogFooter>
-            <Button variant="outline" @click="editDialogOpen = false">
-              Cancel
-            </Button>
+          <div class="my-4 border-t border-border"></div>
+
+          <div v-if="detailAppt.status === 'CONFIRMED' && sessionTypeOf(detailAppt) === 'ONLINE'">
             <Button
-              data-testid="edit-confirm"
-              :disabled="editing || !selectedEditTime || selectedEditTime === editTarget?.startTime"
-              @click="confirmEdit"
+              class="w-full"
+              :variant="canJoin(detailAppt) ? 'default' : 'secondary'"
+              :disabled="!canJoin(detailAppt)"
+              :title="!canJoin(detailAppt) ? 'Available 5 minutes before your session' : undefined"
+              :data-testid="`join-${detailAppt.id}`"
+              @click="joinSession(detailAppt!)"
             >
-              {{ editing ? 'Saving…' : 'Confirm' }}
+              <Video class="size-4" />
+              Join Session
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <p v-if="!canJoin(detailAppt)" class="mt-1.5 text-center text-xs text-muted-foreground">
+              Available 5 minutes before your session
+            </p>
+          </div>
+
+          <div class="my-4 border-t border-border"></div>
+
+          <div v-if="canModify(detailAppt)" class="grid grid-cols-2 gap-2">
+            <Button variant="outline" data-testid="detail-reschedule" @click="rsOpen ? (rsOpen = false) : openReschedule()">
+              Reschedule
+            </Button>
+            <Button variant="outline" data-testid="detail-cancel" @click="cancelConfirm = true">
+              Cancel Booking
+            </Button>
+          </div>
+
+          <!-- Inline reschedule picker -->
+          <div v-if="rsOpen && canModify(detailAppt)" class="mt-4 rounded-2xl border border-border p-4" data-testid="reschedule-box">
+            <p class="text-sm font-medium text-foreground">Pick a new date and time</p>
+            <label class="mt-3 block text-xs text-muted-foreground" for="rs-date">Date</label>
+            <input
+              id="rs-date"
+              v-model="rsDate"
+              type="date"
+              :min="todayStr()"
+              class="mt-1 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+              data-testid="reschedule-date"
+              @change="onRsDateChange"
+            />
+            <div v-if="rsLoading" class="mt-3 grid gap-2">
+              <Skeleton v-for="i in 3" :key="i" class="h-10 w-full" />
+            </div>
+            <div v-else-if="rsSlots.length > 0" class="mt-3 flex flex-wrap gap-2">
+              <Button
+                v-for="slot in rsSlots"
+                :key="slot.startTime"
+                :variant="rsTime === slot.startTime ? 'default' : 'outline'"
+                size="sm"
+                :data-testid="`reschedule-slot-${slot.startTime}`"
+                @click="rsTime = slot.startTime"
+              >
+                {{ formatTime(slot.startTime) }}
+              </Button>
+            </div>
+            <p v-else class="mt-3 text-sm text-muted-foreground">No open times on this day. Try another date.</p>
+            <p v-if="rsError" class="mt-2 text-sm text-destructive" data-testid="reschedule-error">{{ rsError }}</p>
+            <Button
+              class="mt-3 w-full"
+              :disabled="!rsTime || rsLoading"
+              data-testid="reschedule-confirm"
+              @click="submitReschedule"
+            >
+              {{ rsLoading ? 'Saving…' : 'Confirm new time' }}
+            </Button>
+          </div>
+
+          <!-- Inline cancel confirmation -->
+          <div v-if="cancelConfirm && canModify(detailAppt)" class="mt-4 rounded-2xl border border-destructive/40 p-4" data-testid="cancel-box">
+            <p class="text-sm font-medium text-foreground">Are you sure? This cannot be undone if within 24 hours.</p>
+            <div class="mt-3 grid grid-cols-2 gap-2">
+              <Button variant="outline" data-testid="cancel-keep" @click="cancelConfirm = false">
+                Keep
+              </Button>
+              <Button variant="destructive" :disabled="cancelling" :data-testid="`cancel-confirm-${detailAppt.id}`" @click="confirmCancel">
+                {{ cancelling ? 'Cancelling…' : 'Confirm' }}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ── Right panel: booking flow ───────────────────── -->
+    <Teleport to="body">
+      <div v-if="bookingFlowOpen" class="fixed inset-0 z-50" data-testid="booking-flow">
+        <div class="absolute inset-0 bg-black/30" @click="closeBookingFlow"></div>
+        <div
+          class="absolute overflow-y-auto bg-card shadow-2xl inset-x-0 bottom-0 max-h-[92vh] rounded-t-[20px] p-5 sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-0 sm:h-full sm:max-h-none sm:w-[380px] sm:rounded-none sm:p-6"
+          role="dialog"
+          aria-label="Book a session"
+        >
+          <div class="mb-4 flex items-start justify-between gap-2">
+            <h2 class="text-lg font-semibold text-foreground">Book a Session</h2>
+            <Button variant="ghost" size="sm" aria-label="Close booking" data-testid="flow-close" @click="closeBookingFlow">
+              <X class="size-5" />
+            </Button>
+          </div>
+
+          <!-- Success state (in-clinic / pending) -->
+          <div v-if="bookingFlowSuccess" class="flex flex-col items-center py-6 text-center" data-testid="flow-success">
+            <CheckCircle2 class="size-12 text-green-600" />
+            <h3 class="mt-4 text-lg font-semibold text-foreground">Booking Requested</h3>
+            <p class="mt-2 text-sm text-muted-foreground">
+              Your {{ bookingSessionType === 'IN_CLINIC' ? 'in-clinic visit' : 'session' }} has been requested for
+              {{ bookingFlowDate ? formatDateLabel(bookingFlowDate) : '' }}
+              {{ bookingFlowTime ? `at ${formatTime(bookingFlowTime)}` : '' }}.
+            </p>
+            <p class="mt-2 text-sm text-muted-foreground">
+              Our team will review and confirm your booking shortly.
+              You will receive a confirmation email once a doctor is assigned.
+            </p>
+            <Button class="mt-6 w-full" data-testid="flow-view-appointments" @click="viewAppointments">
+              View My Appointments
+            </Button>
+          </div>
+
+          <!-- Step 1: session type -->
+          <div v-else-if="bookingStep === 1" data-testid="flow-step-1">
+            <p class="text-sm text-muted-foreground">How would you like to meet?</p>
+            <div class="mt-3 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                class="rounded-2xl border-2 p-4 text-left transition-all duration-150"
+                :class="bookingSessionType === 'ONLINE' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'"
+                data-testid="flow-type-online"
+                @click="setBookingSessionType('ONLINE')"
+              >
+                <Video class="size-6 text-primary" />
+                <p class="mt-2 text-sm font-semibold text-foreground">Online Session</p>
+                <p class="mt-1 text-xs text-muted-foreground">Video call, online payment required</p>
+              </button>
+              <button
+                type="button"
+                class="rounded-2xl border-2 p-4 text-left transition-all duration-150"
+                :class="bookingSessionType === 'IN_CLINIC' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'"
+                data-testid="flow-type-inclinic"
+                @click="setBookingSessionType('IN_CLINIC')"
+              >
+                <Stethoscope class="size-6 text-primary" />
+                <p class="mt-2 text-sm font-semibold text-foreground">In-Clinic Visit</p>
+                <p class="mt-1 text-xs text-muted-foreground">Visit in person, cash payment at clinic</p>
+              </button>
+            </div>
+            <div class="mt-6 flex justify-end">
+              <Button data-testid="flow-next-1" @click="goBookingStep(2)">Next</Button>
+            </div>
+          </div>
+
+          <!-- Step 2: date and time -->
+          <div v-else-if="bookingStep === 2" data-testid="flow-step-2">
+            <p class="text-sm font-medium text-foreground">Select a date and time</p>
+            <div class="mt-3 flex items-center justify-between">
+              <Button variant="ghost" size="sm" aria-label="Previous month" @click="flowNav(-1)">
+                <ChevronLeft class="size-4" />
+              </Button>
+              <p class="text-sm font-semibold text-foreground">{{ flowMonthLabel }}</p>
+              <Button variant="ghost" size="sm" aria-label="Next month" @click="flowNav(1)">
+                <ChevronRight class="size-4" />
+              </Button>
+            </div>
+            <div class="mt-1 grid grid-cols-7 text-center text-xs text-muted-foreground">
+              <span v-for="d in miniWeekdays" :key="d" class="py-1">{{ d }}</span>
+            </div>
+            <div class="grid grid-cols-7 gap-0.5 text-center">
+              <button
+                v-for="cell in flowCells"
+                :key="cell.dateStr"
+                type="button"
+                :disabled="isPastStr(cell.dateStr) || !cell.isCurrentMonth"
+                class="flex flex-col items-center rounded-lg px-1 py-1.5 text-sm transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+                :class="[
+                  cell.dateStr === bookingFlowDate ? 'bg-primary/10 font-semibold text-primary' : 'text-foreground',
+                  cell.isAvailable && cell.isCurrentMonth ? 'ring-1 ring-primary/40' : '',
+                  !isPastStr(cell.dateStr) && cell.isCurrentMonth ? 'hover:bg-secondary' : '',
+                ]"
+                :data-testid="`flow-day-${cell.dateStr}`"
+                @click="selectFlowDate(cell.dateStr)"
+              >
+                {{ cell.dayNum }}
+              </button>
+            </div>
+
+            <div v-if="bookingFlowDate" class="mt-4">
+              <p class="text-sm text-muted-foreground">
+                Available times on {{ formatDateLabel(bookingFlowDate) }}:
+              </p>
+              <div v-if="bookingFlowLoading" class="mt-2 grid gap-2">
+                <Skeleton v-for="i in 3" :key="i" class="h-10 w-full" />
+              </div>
+              <div v-else-if="bookingFlowSlots.length > 0" class="mt-2 flex flex-wrap gap-2">
+                <Button
+                  v-for="slot in bookingFlowSlots"
+                  :key="slot.startTime"
+                  :variant="bookingFlowTime === slot.startTime ? 'default' : 'outline'"
+                  size="sm"
+                  :data-testid="`flow-slot-${slot.startTime}`"
+                  @click="selectBookingFlowTime(slot.startTime)"
+                >
+                  {{ formatTime(slot.startTime) }}
+                </Button>
+              </div>
+              <p v-else class="mt-2 text-sm text-muted-foreground">No open times on this day. Try another date.</p>
+            </div>
+
+            <p v-if="bookingFlowError" class="mt-3 text-sm text-destructive" data-testid="flow-error">{{ bookingFlowError }}</p>
+            <div class="mt-6 flex justify-between">
+              <Button variant="ghost" data-testid="flow-back-2" @click="goBookingStep(1)">Back</Button>
+              <Button :disabled="!bookingFlowTime" data-testid="flow-next-2" @click="goBookingStep(3)">Next</Button>
+            </div>
+          </div>
+
+          <!-- Step 3: review -->
+          <div v-else data-testid="flow-step-3">
+            <p class="text-sm font-medium text-foreground">Review your booking</p>
+            <div class="mt-3 grid gap-2.5 rounded-2xl border border-border p-4 text-sm">
+              <p class="flex justify-between gap-2">
+                <span class="text-muted-foreground">Session Type:</span>
+                <span class="font-medium text-foreground">{{ bookingSessionType === 'IN_CLINIC' ? 'In-Clinic' : 'Online' }}</span>
+              </p>
+              <p class="flex justify-between gap-2">
+                <span class="text-muted-foreground">Date:</span>
+                <span class="font-medium text-foreground">{{ bookingFlowDate ? formatDateLabel(bookingFlowDate) : '' }}</span>
+              </p>
+              <p class="flex justify-between gap-2">
+                <span class="text-muted-foreground">Time:</span>
+                <span class="font-medium text-foreground">
+                  {{ bookingFlowTime ? `${formatTime(bookingFlowTime)} – ${formatTime(flowEndTime())}` : '' }}
+                </span>
+              </p>
+              <p class="flex justify-between gap-2">
+                <span class="text-muted-foreground">Duration:</span>
+                <span class="font-medium text-foreground">{{ flowDuration() }} minutes</span>
+              </p>
+              <p class="flex justify-between gap-2">
+                <span class="text-muted-foreground">Payment:</span>
+                <span class="font-medium text-foreground">
+                  {{ bookingSessionType === 'IN_CLINIC' ? 'Cash at clinic' : 'Pay online' }}
+                </span>
+              </p>
+            </div>
+            <p class="mt-3 text-xs text-muted-foreground">
+              Note: Your booking will be reviewed by our team.
+              You will receive a confirmation once a doctor is assigned.
+            </p>
+            <p v-if="bookingFlowError" class="mt-3 text-sm text-destructive" data-testid="flow-error">
+              {{ bookingFlowError }}
+              <button
+                v-if="bookingFlowBookingId && bookingSessionType === 'ONLINE'"
+                type="button"
+                class="ml-1 underline"
+                data-testid="flow-retry-payment"
+                @click="retryFlowPayment"
+              >
+                Retry payment
+              </button>
+            </p>
+            <div class="mt-6 flex justify-between">
+              <Button variant="ghost" data-testid="flow-back-3" @click="goBookingStep(2)">Back</Button>
+              <Button :disabled="bookingFlowLoading" data-testid="flow-confirm" @click="submitFlow">
+                {{ bookingFlowLoading ? 'Processing…' : bookingSessionType === 'IN_CLINIC' ? 'Request Booking' : 'Confirm & Pay' }}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
     </Teleport>
   </div>
 </template>
 
 <style>
-.fc-day-other .fc-daygrid-day-frame {
-  cursor: not-allowed;
-}
-.fc-day-other .fc-daygrid-day-number {
-  color: #cbd5e1;
-  opacity: 0.7;
-}
-.fc-holiday .fc-daygrid-day-frame {
-  background-color: #f1f5f9;
-  cursor: not-allowed;
-}
-.fc-holiday .fc-daygrid-day-number {
-  color: #94a3b8;
-  text-decoration: line-through;
-}
 .fc-past {
-  opacity: 0.6;
-  cursor: not-allowed;
+  opacity: 0.55;
 }
 .fc-past .fc-daygrid-day-frame {
-  pointer-events: none;
+  background-color: #fafafa;
 }
-.fc-available .fc-daygrid-day-frame {
+.fc-can-book .fc-daygrid-day-frame {
   cursor: pointer;
 }
-.fc-dot-confirmed .fc-daygrid-day-number::after,
-.fc-dot-pending .fc-daygrid-day-number::after,
-.fc-available .fc-daygrid-day-number::after {
-  content: '';
-  display: block;
-  width: 0.5rem;
-  height: 0.5rem;
-  margin: 1px auto 0;
+.fc-can-book .fc-daygrid-day-top {
+  position: relative;
+}
+.fc-can-book .fc-daygrid-day-top::after {
+  content: '+';
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid rgba(233, 30, 140, 0.5);
   border-radius: 9999px;
+  color: #e91e8c;
+  font-size: 0.7rem;
+  line-height: 1;
 }
-.fc-dot-confirmed .fc-daygrid-day-number::after {
-  background-color: #16a34a;
+.fc-chip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 8px;
+  border-left-width: 3px;
+  border-left-style: solid;
 }
-.fc-dot-pending .fc-daygrid-day-number::after {
-  background-color: #eab308;
+.fc-chip-online {
+  border-left-color: #c4157a;
 }
-.fc-available .fc-daygrid-day-number::after {
-  background-color: #e91e8c;
+.fc-chip-clinic {
+  border-left-color: #e91e8c;
+}
+.fc-chip-pending {
+  border-left-color: #f59e0b;
+}
+.fc-chip-cancelled {
+  text-decoration: line-through;
+  border-left-color: #9ca3af;
 }
 @media (max-width: 640px) {
   .fc .fc-daygrid-day-number {
     font-size: 0.75rem;
     padding: 2px;
+  }
+  .fc .fc-toolbar-title {
+    font-size: 1rem;
   }
 }
 </style>

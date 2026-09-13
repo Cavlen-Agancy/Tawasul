@@ -14,6 +14,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Invalid request' })
   }
   const { date, startTime } = parsed.data
+  const rawSessionType = (body as { sessionType?: unknown } | undefined)?.sessionType
+  const sessionType: 'ONLINE' | 'IN_CLINIC' = rawSessionType === 'IN_CLINIC' ? 'IN_CLINIC' : 'ONLINE'
 
   // Re-validate the slot is still available (single source of truth).
   const availableSlots = await getAdminAvailableSlots(date)
@@ -37,6 +39,7 @@ export default defineEventHandler(async (event) => {
   const service = serviceFor()
 
   // The booking is created WITHOUT a doctor and stays PENDING until an admin assigns one (Phase 6).
+  // In-Clinic bookings skip payment entirely — created as PENDING with no Payment record.
   const booking = await prisma.booking.create({
     data: {
       userId: auth.userId,
@@ -46,8 +49,19 @@ export default defineEventHandler(async (event) => {
       endTime,
       service,
       status: 'PENDING',
+      sessionType,
     },
   })
+
+  if (sessionType === 'IN_CLINIC') {
+    setResponseStatus(event, 201)
+    return {
+      bookingId: booking.id,
+      amount: 0,
+      currency,
+      sessionType,
+    }
+  }
 
   await prisma.payment.create({
     data: {
@@ -63,6 +77,7 @@ export default defineEventHandler(async (event) => {
     bookingId: booking.id,
     amount,
     currency,
+    sessionType,
   }
 })
 
