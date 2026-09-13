@@ -1,5 +1,6 @@
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED'
 export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED'
+export type SessionType = 'ONLINE' | 'IN_CLINIC'
 
 export interface PatientProfile {
   id: string
@@ -19,6 +20,7 @@ export interface Appointment {
   endTime: string // "11:00"
   service: string
   status: BookingStatus
+  sessionType?: SessionType
   sessionRoom?: {
     roomName: string
   }

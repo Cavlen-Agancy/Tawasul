@@ -48,7 +48,7 @@ export default defineEventHandler(async (event) => {
     endTime: b.endTime,
     service: b.service,
     status: b.status,
-    sessionType: (b as { sessionType?: string }).sessionType ?? 'ONLINE',
+    sessionType: b.sessionType,
     sessionRoom: b.sessionRoom ? { roomName: b.sessionRoom.roomName } : undefined,
   }))
 

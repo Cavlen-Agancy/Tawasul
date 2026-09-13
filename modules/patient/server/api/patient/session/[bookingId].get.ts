@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, message: 'Forbidden' })
   }
 
-  if ((booking as { sessionType?: string }).sessionType === 'IN_CLINIC') {
+  if (booking.sessionType === 'IN_CLINIC') {
     throw createError({ statusCode: 400, message: 'This is an in-clinic session.' })
   }
 

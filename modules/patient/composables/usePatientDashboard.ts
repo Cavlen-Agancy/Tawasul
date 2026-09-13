@@ -5,6 +5,7 @@ import type {
   PaymentsResponse,
   PaymentRecord,
   SessionRoomResponse,
+  SessionType,
 } from './types'
 import { getApiMessage } from '~/lib/api'
 
@@ -15,7 +16,7 @@ export interface AvailableSlot {
   current?: boolean
 }
 
-export type BookingSessionType = 'ONLINE' | 'IN_CLINIC'
+export type BookingSessionType = SessionType
 
 export interface CreateBookingResult {
   bookingId: string
