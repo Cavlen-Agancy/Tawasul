@@ -9,7 +9,6 @@ export interface MeetingLobbyResponse {
   startTime: string
   endTime: string
   service: string
-  jitsiDomain?: string
   roomName?: string
 }
 

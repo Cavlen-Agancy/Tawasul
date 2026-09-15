@@ -63,7 +63,6 @@ export default defineEventHandler(async (event) => {
     startTime: booking.startTime,
     endTime: booking.endTime,
     service: booking.service,
-    jitsiDomain: booking.sessionRoom?.roomName ? undefined : (await getJitsiDomain()),
     roomName: booking.sessionRoom?.roomName,
   }
 })
@@ -75,7 +74,3 @@ function formatDateLocal(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
-async function getJitsiDomain(): Promise<string> {
-  const setting = await prisma.settings.findUnique({ where: { id: 'singleton' } })
-  return (setting?.jitsiDomain ?? process.env.JITSI_DOMAIN) || 'meet.jit.si'
-}

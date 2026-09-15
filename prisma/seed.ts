@@ -17,7 +17,6 @@ async function main() {
     defaultSessionDuration: 60,
     defaultWorkingStart: '09:00',
     defaultWorkingEnd: '17:00',
-    jitsiDomain: 'meet.jit.si',
   }
 
   await prisma.settings.upsert({

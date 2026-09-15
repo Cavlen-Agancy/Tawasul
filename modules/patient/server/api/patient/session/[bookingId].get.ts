@@ -2,6 +2,7 @@ import { defineEventHandler, getRouterParam, createError } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requireAuth } from '~/server/utils/auth'
 import { canJoinMeetingAt, meetingWindow } from '~/server/utils/meeting'
+import { generateLiveKitToken } from '~/server/utils/livekit-token'
 
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event, ['PATIENT'])
@@ -13,7 +14,7 @@ export default defineEventHandler(async (event) => {
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { sessionRoom: true },
+    include: { sessionRoom: true, user: true },
   })
 
   if (!booking) {
@@ -24,7 +25,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, message: 'Forbidden' })
   }
 
-  if (booking.status !== 'CONFIRMED') {
+  
+  const sessionTestMode = process.env.NODE_ENV === 'development' && process.env.NUXT_PUBLIC_ENABLE_SESSION_TEST_MODE === 'true'
+
+  if (!sessionTestMode && booking.status !== 'CONFIRMED') {
     throw createError({ statusCode: 403, message: 'Forbidden' })
   }
 
@@ -33,12 +37,9 @@ export default defineEventHandler(async (event) => {
   }
 
   const now = Date.now()
-  if (!canJoinMeetingAt(booking, now)) {
+  if (!sessionTestMode && !canJoinMeetingAt(booking, now)) {
     throw createError({ statusCode: 403, message: 'Session is not available at this time' })
   }
-
-  const jitsiDomain = (await getJitsiDomain()) || 'meet.jit.si'
-
   let room = booking.sessionRoom
   if (!room) {
     const { closeAt } = meetingWindow(booking)
@@ -51,10 +52,12 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return { roomName: room.roomName, jitsiDomain }
-})
+  const liveKitToken = await generateLiveKitToken({
+    roomName: room.roomName,
+    userName: booking.user.name,
+    userId: booking.user.id,
+    role: 'member',
+  })
 
-async function getJitsiDomain(): Promise<string> {
-  const setting = await prisma.settings.findUnique({ where: { id: 'singleton' } })
-  return (setting?.jitsiDomain ?? process.env.JITSI_DOMAIN) || 'meet.jit.si'
-}
+  return { roomName: room.roomName, liveKitToken }
+})

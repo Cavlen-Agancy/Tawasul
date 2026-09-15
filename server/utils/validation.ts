@@ -149,7 +149,6 @@ export const settingsPatchSchema = z.object({
   defaultSessionDuration: z.number().int().refine((n) => [30, 45, 60].includes(n), 'defaultSessionDuration must be 30, 45, or 60').optional(),
   defaultWorkingStart: z.string().regex(timeRegex, 'Invalid time format').optional(),
   defaultWorkingEnd: z.string().regex(timeRegex, 'Invalid time format').optional(),
-  jitsiDomain: z.string().max(255).optional(),
 }).passthrough()
 
 /**

@@ -144,7 +144,7 @@ onBeforeUnmount(stopPolling)
         </dl>
 
         <div class="mt-8 flex flex-col items-center gap-3">
-          <!-- Video provider seam: replace onJoin with real Jitsi/WebRTC integration. -->
+          <!-- Video provider seam: replace onJoin with real LiveKit/WebRTC integration. -->
           <Button
             size="lg"
             data-testid="join-meeting"

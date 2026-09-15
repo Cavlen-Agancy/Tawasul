@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeAll, afterAll } from 'vitest'
 import handler from '~/modules/patient/server/api/patient/session/[bookingId].get'
 import { createApiEvent, expectApiError } from '../../helpers'
 import { createPatient, createBookedFixture, deletePatientBookingFixture, deletePatient } from '../helpers'
@@ -27,10 +27,19 @@ function useFixedNow() {
 
 interface RoomResponse {
   roomName: string
-  jitsiDomain: string
+  liveKitToken: string
 }
 
 describe('GET /api/patient/session/:bookingId', () => {
+  const originalTestMode = process.env.NUXT_PUBLIC_ENABLE_SESSION_TEST_MODE
+  
+  beforeAll(() => {
+    process.env.NUXT_PUBLIC_ENABLE_SESSION_TEST_MODE = 'false'
+  })
+
+  afterAll(() => {
+    process.env.NUXT_PUBLIC_ENABLE_SESSION_TEST_MODE = originalTestMode
+  })
   it('returns a room within the time window', async () => {
     const mockedNow = useFixedNow()
     const patient = await createPatient({ email: `sess-ok-${Date.now()}@test.com` })
@@ -56,7 +65,7 @@ describe('GET /api/patient/session/:bookingId', () => {
       })
       const res = await handler(event) as RoomResponse
       expect(res.roomName).toBe(`tawasul-${fixture.bookingId}`)
-      expect(res.jitsiDomain).toBeTruthy()
+      expect(res.liveKitToken).toBeTruthy()
 
       const room = await prisma.sessionRoom.findUnique({ where: { bookingId: fixture.bookingId } })
       expect(room?.roomName).toBe(`tawasul-${fixture.bookingId}`)

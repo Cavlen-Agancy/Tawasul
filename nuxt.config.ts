@@ -65,8 +65,6 @@ export default defineNuxtConfig({
     paymobHmacSecret: process.env.PAYMOB_HMAC_SECRET,
     stripeSecretKey: process.env.STRIPE_SECRET_KEY,
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-    jitsiAppId: process.env.JITSI_APP_ID,
-    jitsiAppSecret: process.env.JITSI_APP_SECRET,
     seedAdminEmail: process.env.SEED_ADMIN_EMAIL,
     seedAdminPassword: process.env.SEED_ADMIN_PASSWORD,
     seedAdminName: process.env.SEED_ADMIN_NAME,
@@ -74,7 +72,8 @@ export default defineNuxtConfig({
     // Public (safe to expose to the browser)
     public: {
       appUrl: process.env.APP_URL || 'http://localhost:3000',
-      jitsiDomain: process.env.JITSI_DOMAIN || 'meet.jit.si',
+      liveKitUrl: process.env.LIVEKIT_URL || 'ws://localhost:7880',
+      enableSessionTestMode: process.env.NUXT_PUBLIC_ENABLE_SESSION_TEST_MODE === 'true',
       stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
     },
   },

@@ -2,6 +2,7 @@ import { defineEventHandler, getRouterParam, createError } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requireAuth } from '~/server/utils/auth'
 import { canJoinMeetingAt, meetingWindow } from '~/server/utils/meeting'
+import { generateLiveKitToken } from '~/server/utils/livekit-token'
 
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event, ['DOCTOR'])
@@ -11,7 +12,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Booking ID is required' })
   }
 
-  const doctor = await prisma.doctor.findUnique({ where: { userId: auth.userId } })
+  const doctor = await prisma.doctor.findUnique({
+    where: { userId: auth.userId },
+    include: { user: true },
+  })
   if (!doctor) {
     throw createError({ statusCode: 404, message: 'Doctor profile not found' })
   }
@@ -29,18 +33,17 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, message: 'Forbidden' })
   }
 
-  if (booking.status !== 'CONFIRMED') {
+  
+  const sessionTestMode = process.env.NODE_ENV === 'development' && process.env.NUXT_PUBLIC_ENABLE_SESSION_TEST_MODE === 'true'
+
+  if (!sessionTestMode && booking.status !== 'CONFIRMED') {
     throw createError({ statusCode: 403, message: 'Forbidden' })
   }
 
   const now = Date.now()
-  if (!canJoinMeetingAt(booking, now)) {
+  if (!sessionTestMode && !canJoinMeetingAt(booking, now)) {
     throw createError({ statusCode: 403, message: 'Session is not available' })
   }
-
-  const setting = await prisma.settings.findUnique({ where: { id: 'singleton' } })
-  const jitsiDomain = (setting?.jitsiDomain ?? process.env.JITSI_DOMAIN) || 'meet.jit.si'
-
   let room = booking.sessionRoom
   if (!room) {
     const { closeAt } = meetingWindow(booking)
@@ -53,5 +56,12 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return { roomName: room.roomName, jitsiDomain }
+  const liveKitToken = await generateLiveKitToken({
+    roomName: room.roomName,
+    userName: doctor.user.name,
+    userId: doctor.user.id,
+    role: 'moderator',
+  })
+
+  return { roomName: room.roomName, liveKitToken }
 })

@@ -32,6 +32,13 @@ definePageMeta({
   middleware: ['auth', 'patient-only'],
 })
 
+const config = useRuntimeConfig()
+const sessionTestMode = import.meta.dev && config.public.enableSessionTestMode === true
+
+if (sessionTestMode) {
+  console.warn('[DEV] Session test mode enabled: time/status UI restrictions are bypassed.')
+}
+
 const {
   allBookings,
   availableSlots,
@@ -177,6 +184,7 @@ function sessionMinutes(appt: Appointment): number {
 }
 
 function canJoin(appt: Appointment): boolean {
+  if (sessionTestMode) return true
   const t = now.value
   return (
     t >= sessionStart(appt).getTime() - 5 * 60 * 1000 &&
@@ -1124,7 +1132,8 @@ onBeforeUnmount(() => {
 
           <div class="my-4 border-t border-border"></div>
 
-          <div v-if="detailAppt.status === 'CONFIRMED' && sessionTypeOf(detailAppt) === 'ONLINE'">
+          <div v-if="(sessionTestMode || detailAppt.status === 'CONFIRMED') && sessionTypeOf(detailAppt) === 'ONLINE'">
+            <div v-if="sessionTestMode" class="mb-2 text-center text-xs font-bold text-amber-500 bg-amber-500/10 py-1 rounded">وضع الاختبار مفعّل</div>
             <Button
               class="w-full"
               :variant="canJoin(detailAppt) ? 'default' : 'secondary'"

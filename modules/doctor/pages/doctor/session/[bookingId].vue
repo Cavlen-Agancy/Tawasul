@@ -1,173 +1,368 @@
 <script setup lang="ts">
-import { LogOut, Video } from 'lucide-vue-next'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { Room, RoomEvent, Track, RemoteTrack, LocalVideoTrack, LocalAudioTrack, createLocalTracks, RemoteParticipant } from 'livekit-client'
+import type { RemoteTrackPublication } from 'livekit-client'
+
+interface SessionTokenResponse {
+  roomName: string
+  liveKitToken: string
+}
+
+interface AttachableMediaTrack {
+  attach(element: HTMLMediaElement): HTMLMediaElement
+  detach(): HTMLMediaElement[]
+}
 
 definePageMeta({
   layout: 'doctor-layout',
   middleware: ['auth', 'doctor-only'],
+  pageTransition: false,
+  layoutTransition: false,
 })
-
-interface DoctorSessionResponse {
-  roomName: string
-  jitsiDomain: string
-}
 
 const route = useRoute()
 const bookingId = String(route.params.bookingId ?? '')
-const { user } = useAuth()
 
-const status = ref<'loading' | 'waiting' | 'ready' | 'error'>('loading')
-const message = ref('')
-const session = ref<DoctorSessionResponse | null>(null)
-const leaveDialogOpen = ref(false)
+const { data } = await useFetch<SessionTokenResponse>(`/api/doctor/session/${bookingId}`)
+const token = computed(() => data.value?.liveKitToken)
+const serverUrl = String(useRuntimeConfig().public.liveKitUrl || 'ws://localhost:7880')
 
-let jitsiApi: { dispose: () => void } | null = null
-let pollTimer: ReturnType<typeof setInterval> | null = null
+const room = new Room()
 
-async function checkSession() {
-  if (status.value === 'ready') return
-  try {
-    const data = await $fetch<DoctorSessionResponse>(`/api/doctor/session/${bookingId}`)
-    session.value = data
-    status.value = 'ready'
-    stopPolling()
-    window.setTimeout(() => initJitsi(data), 0)
-  } catch (e) {
-    const msg = (e as { data?: { message?: string } }).data?.message || 'Something went wrong'
-    if (msg.includes('Session is not available')) {
-      status.value = 'waiting'
-      message.value = msg
-    } else {
-      status.value = 'error'
-      message.value = msg
-      stopPolling()
+const remoteVideoTracks = ref<{ sid: string; track: AttachableMediaTrack; participantName: string }[]>([])
+const remoteAudioTracks = ref<{ sid: string; track: AttachableMediaTrack }[]>([])
+const waitingList = ref<{ identity: string; name: string }[]>([])
+
+const isPatientPresent = ref(false)
+
+const micEnabled = ref(false)
+const camEnabled = ref(false)
+
+const localVideoContainer = ref<HTMLDivElement | null>(null)
+let localVideoTrack: LocalVideoTrack | null = null
+let localAudioTrack: LocalAudioTrack | null = null
+
+room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, _publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+  console.log('[doctor] TrackSubscribed:', track.kind, 'from', participant?.identity)
+  isPatientPresent.value = true
+  if (track.kind === Track.Kind.Video) {
+    if (!remoteVideoTracks.value.some(t => t.sid === track.sid)) {
+      remoteVideoTracks.value.push({ sid: track.sid!, track: track, participantName: participant.name || 'Patient' })
+    }
+  } else if (track.kind === Track.Kind.Audio) {
+    if (!remoteAudioTracks.value.some(t => t.sid === track.sid)) {
+      remoteAudioTracks.value.push({ sid: track.sid!, track: track })
     }
   }
-}
+})
 
-function stopPolling() {
-  if (pollTimer) {
-    clearInterval(pollTimer)
-    pollTimer = null
+room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+  if (track.kind === Track.Kind.Video) {
+    const entry = remoteVideoTracks.value.find(t => t.sid === track.sid)
+    entry?.track.detach()
+    remoteVideoTracks.value = remoteVideoTracks.value.filter(t => t.sid !== track.sid)
+  } else if (track.kind === Track.Kind.Audio) {
+    const entry = remoteAudioTracks.value.find(t => t.sid === track.sid)
+    entry?.track.detach()
+    remoteAudioTracks.value = remoteAudioTracks.value.filter(t => t.sid !== track.sid)
   }
-}
+})
 
-function loadJitsiScript(): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    if ((window as unknown as Record<string, unknown>).JitsiMeetExternalAPI) {
-      resolve((window as unknown as Record<string, unknown>).JitsiMeetExternalAPI)
-      return
+room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
+  if (!participant.permissions?.canPublish) {
+    if (!waitingList.value.some(p => p.identity === participant.identity)) {
+      waitingList.value.push({ identity: participant.identity, name: participant.name || 'Patient' })
     }
-    const existing = document.querySelector('script[data-jitsi]')
-    if (existing) {
-      existing.addEventListener('load', () => resolve((window as unknown as Record<string, unknown>).JitsiMeetExternalAPI))
-      return
-    }
-    const script = document.createElement('script')
-    script.src = 'https://meet.jit.si/external_api.js'
-    script.async = true
-    script.dataset.jitsi = 'true'
-    script.onload = () => resolve((window as unknown as Record<string, unknown>).JitsiMeetExternalAPI)
-    script.onerror = () => reject(new Error('Failed to load Jitsi'))
-    document.head.appendChild(script)
+  } else {
+    isPatientPresent.value = true
+  }
+})
+
+room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
+  waitingList.value = waitingList.value.filter(p => p.identity !== participant.identity)
+  if (participant.permissions?.canPublish) {
+    checkPatientPresence()
+  }
+})
+
+room.on(RoomEvent.ParticipantPermissionsChanged, (prevPermissions: any, participant: any) => {
+  if (participant && participant.permissions?.canPublish) {
+    waitingList.value = waitingList.value.filter(p => p.identity !== participant.identity)
+    isPatientPresent.value = true
+  } else if (participant && !participant.permissions?.canPublish) {
+    checkPatientPresence()
+  }
+})
+
+function checkPatientPresence() {
+  let present = false
+  room.remoteParticipants.forEach(p => {
+    if (p.permissions?.canPublish) present = true
   })
+  isPatientPresent.value = present
 }
 
-async function initJitsi(data: DoctorSessionResponse) {
-  const container = document.getElementById('jitsi-container')
-  if (!container) return
+room.on(RoomEvent.Disconnected, () => {
+  navigateTo('/doctor/calendar')
+})
+
+const admittingId = ref<string | null>(null)
+const admitError = ref('')
+
+async function admit(identity: string) {
+  admittingId.value = identity
+  admitError.value = ''
   try {
-    await loadJitsiScript()
-    const JitsiMeetExternalAPI = (window as unknown as Record<string, unknown>).JitsiMeetExternalAPI as new (
-      domain: string,
-      options: Record<string, unknown>,
-    ) => { dispose: () => void }
-    jitsiApi = new JitsiMeetExternalAPI(data.jitsiDomain, {
-      roomName: data.roomName,
-      width: '100%',
-      height: '100%',
-      parentNode: container,
-      userInfo: { displayName: user?.name || 'Doctor' },
-      configOverwrite: {
-        prejoinPageEnabled: false,
-        startWithAudioMuted: true,
-        startWithVideoMuted: true,
-      },
+    console.log('[doctor] admitting participant:', identity)
+    await $fetch(`/api/doctor/session/${bookingId}/admit`, {
+      method: 'POST',
+      body: { identity }
     })
-  } catch {
-    status.value = 'error'
-    message.value = 'Could not load the video session. Please try again.'
+    waitingList.value = waitingList.value.filter(p => p.identity !== identity)
+    // isPatientPresent flips automatically when the admitted patient's track arrives (TrackSubscribed)
+  } catch (e) {
+    console.error('Failed to admit participant', e)
+    admitError.value = 'تعذر قبول المريض. حاول مرة أخرى.'
+  } finally {
+    admittingId.value = null
+  }
+}
+
+async function initLocalTracks() {
+  try {
+    const tracks = await createLocalTracks({
+      audio: true,
+      video: true,
+    })
+    for (const track of tracks) {
+      if (track.kind === Track.Kind.Video) {
+        localVideoTrack = track as LocalVideoTrack
+        if (localVideoContainer.value) {
+          const el = localVideoTrack.attach()
+          el.style.width = '100%'
+          el.style.height = '100%'
+          el.style.objectFit = 'cover'
+          localVideoContainer.value.appendChild(el)
+        }
+      } else if (track.kind === Track.Kind.Audio) {
+        localAudioTrack = track as LocalAudioTrack
+      }
+    }
+  } catch (e) {
+    console.error('Failed to access camera or microphone', e)
+  }
+}
+
+async function toggleMic() {
+  micEnabled.value = !micEnabled.value
+  if (localAudioTrack) {
+    if (micEnabled.value) {
+      await room.localParticipant.publishTrack(localAudioTrack)
+    } else {
+      await room.localParticipant.unpublishTrack(localAudioTrack)
+    }
+  }
+}
+
+async function toggleCam() {
+  camEnabled.value = !camEnabled.value
+  if (localVideoTrack) {
+    if (camEnabled.value) {
+      await room.localParticipant.publishTrack(localVideoTrack)
+    } else {
+      await room.localParticipant.unpublishTrack(localVideoTrack)
+    }
+  }
+}
+
+onMounted(async () => {
+  await initLocalTracks()
+  if (token.value) {
+    await room.connect(serverUrl, token.value)
+    if (localVideoTrack && camEnabled.value) await room.localParticipant.publishTrack(localVideoTrack)
+    if (localAudioTrack && micEnabled.value) await room.localParticipant.publishTrack(localAudioTrack)
+    
+    // Check for participants already in room
+    room.remoteParticipants.forEach(participant => {
+      if (!participant.permissions?.canPublish) {
+        if (!waitingList.value.some(p => p.identity === participant.identity)) {
+          waitingList.value.push({ identity: participant.identity, name: participant.name || 'Patient' })
+        }
+      } else {
+        isPatientPresent.value = true
+      }
+    })
+  }
+})
+
+onUnmounted(() => {
+  if (localVideoTrack) {
+    localVideoTrack.stop()
+    localVideoTrack.detach()
+  }
+  if (localAudioTrack) {
+    localAudioTrack.stop()
+    localAudioTrack.detach()
+  }
+  if (room.state === 'connected' || room.state === 'connecting') {
+    room.disconnect()
+  }
+})
+
+function attachVideo(el: unknown, track: AttachableMediaTrack) {
+  if (el instanceof HTMLVideoElement && !el.srcObject) {
+    track.attach(el)
+  }
+}
+
+function attachAudio(el: unknown, track: AttachableMediaTrack) {
+  if (el instanceof HTMLAudioElement && !el.srcObject) {
+    track.attach(el)
   }
 }
 
 function leaveSession() {
-  if (jitsiApi) {
-    jitsiApi.dispose()
-    jitsiApi = null
-  }
-  stopPolling()
-  navigateTo('/doctor/calendar')
+  room.disconnect()
 }
-
-onMounted(() => {
-  checkSession()
-  pollTimer = setInterval(checkSession, 30 * 1000)
-})
-
-onBeforeUnmount(() => {
-  stopPolling()
-  if (jitsiApi) {
-    jitsiApi.dispose()
-    jitsiApi = null
-  }
-})
 </script>
 
 <template>
-  <div>
-    <div v-if="status === 'loading'" class="flex flex-col gap-4">
-      <Skeleton class="h-16 w-full" />
-      <Skeleton class="h-96 w-full" />
-    </div>
-
-    <div v-else-if="status === 'waiting'" class="flex flex-col items-center justify-center rounded-2xl border border-border bg-card p-10 text-center" data-testid="session-waiting">
-      <Video class="size-12 text-primary" />
-      <h2 class="mt-4 text-xl font-semibold text-foreground">Your session starts soon</h2>
-      <p class="mt-2 text-sm text-muted-foreground">This page will refresh automatically when your session is ready to join.</p>
-      <p class="mt-4 text-xs text-muted-foreground">{{ message }}</p>
-    </div>
-
-    <div v-else-if="status === 'error'" class="flex flex-col items-center justify-center rounded-2xl border border-border bg-card p-10 text-center" data-testid="session-error">
-      <h2 class="text-xl font-semibold text-destructive">Session unavailable</h2>
-      <p class="mt-2 text-sm text-muted-foreground">{{ message }}</p>
-    </div>
-
-    <div v-else class="relative flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-border bg-card">
-      <div class="absolute right-4 top-4 z-10">
-        <Button variant="destructive" data-testid="leave-session" @click="leaveDialogOpen = true">
-          <LogOut class="size-4" />
-          Leave Session
-        </Button>
+  <div class="session-layout">
+    <!-- Admit notification -->
+    <div v-if="waitingList.length" class="admit-bar">
+      <div v-for="p in waitingList" :key="p.identity" class="flex items-center justify-between w-full max-w-md bg-card p-3 rounded-lg border border-border shadow-lg mx-auto mb-2">
+        <span class="text-white text-sm font-medium">{{ p.name }} ينتظر في الغرفة</span>
+        <button class="bg-primary text-white px-4 py-1.5 rounded-md text-sm font-bold disabled:opacity-50" :disabled="admittingId === p.identity" @click="admit(p.identity)">{{ admittingId === p.identity ? '...' : 'قبول' }}</button>
       </div>
-      <div id="jitsi-container" class="h-full w-full" data-testid="jitsi-container" />
+      <p v-if="admitError" class="text-center text-sm text-red-400">{{ admitError }}</p>
     </div>
 
-    <Teleport to="body">
-      <Dialog v-model:open="leaveDialogOpen">
-        <DialogContent class="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Leave session?</DialogTitle>
-            <DialogDescription>You will be disconnected from the video session and returned to your calendar.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" data-testid="leave-cancel" @click="leaveDialogOpen = false">
-              Stay
-            </Button>
-            <Button variant="destructive" data-testid="leave-confirm" @click="leaveSession">
-              Leave
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Teleport>
+    <!-- Main video — المريض -->
+    <div class="main-video">
+      <div v-if="!isPatientPresent" class="flex h-full items-center justify-center text-white">
+        في انتظار انضمام المريض...
+      </div>
+      <div v-for="t in remoteVideoTracks" :key="t.sid" class="w-full h-full relative">
+        <video class="w-full h-full object-cover" autoplay playsinline :ref="el => attachVideo(el, t.track)" />
+        <span class="participant-name">{{ t.participantName }}</span>
+      </div>
+    </div>
+
+    <!-- Strip سفلي — الدكتور نفسه -->
+    <div class="participants-strip">
+      <div class="participant-tile" ref="localVideoContainer">
+        <span class="absolute bottom-2 left-2 z-10 text-white text-xs bg-black/50 px-2 py-1 rounded">أنت</span>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls-bar">
+      <button @click="toggleMic" :class="{'bg-primary': micEnabled}">🎤</button>
+      <button @click="toggleCam" :class="{'bg-primary': camEnabled}">📷</button>
+      <button class="leave-btn" @click="leaveSession">مغادرة</button>
+    </div>
+
+    <!-- Remote Audios (hidden) -->
+    <div v-for="t in remoteAudioTracks" :key="t.sid" class="hidden">
+      <audio autoplay playsinline :ref="el => attachAudio(el, t.track)" />
+    </div>
   </div>
 </template>
+
+<style scoped>
+.session-layout {
+  background: #0f1117;
+  height: calc(100vh - 4rem);
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.admit-bar {
+  position: absolute;
+  top: 16px;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.main-video {
+  flex: 1;
+  position: relative;
+  background: #1a1d27;
+  border-radius: 12px;
+  margin: 16px;
+  overflow: hidden;
+}
+
+.participant-name {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.participants-strip {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px;
+  height: 120px;
+  flex-shrink: 0;
+}
+
+.participant-tile {
+  width: 160px;
+  background: #1a1d27;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.controls-bar {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px;
+  background: #1a1d27;
+  flex-shrink: 0;
+}
+
+.controls-bar button {
+  background: #2a2d37;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.controls-bar button:hover {
+  background: #3a3d47;
+}
+
+.controls-bar button.bg-primary {
+  background: #e91e8c;
+}
+
+.leave-btn {
+  background: #ef4444 !important;
+}
+
+.leave-btn:hover {
+  background: #dc2626 !important;
+}
+</style>

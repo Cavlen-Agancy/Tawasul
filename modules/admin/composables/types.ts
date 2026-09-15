@@ -155,7 +155,6 @@ export interface AdminSettings {
   defaultSessionDuration: number
   defaultWorkingStart: string
   defaultWorkingEnd: string
-  jitsiDomain: string
 }
 
 export interface AdminOverview {

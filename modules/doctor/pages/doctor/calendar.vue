@@ -24,6 +24,13 @@ definePageMeta({
   middleware: ['auth', 'doctor-only'],
 })
 
+const config = useRuntimeConfig()
+const sessionTestMode = import.meta.dev && config.public.enableSessionTestMode === true
+
+if (sessionTestMode) {
+  console.warn('[DEV] Session test mode enabled: time/status UI restrictions are bypassed.')
+}
+
 const { bookings, error, fetchBookings } = useDoctorDashboard()
 
 const detailOpen = ref(false)
@@ -283,6 +290,7 @@ function formatDateLong(dateISO: string): string {
 }
 
 function canJoinBooking(b: { date: string; startTime: string; endTime: string }): boolean {
+  if (sessionTestMode) return true
   const t = now.value
   const open = parseDateTime(b.date, b.startTime).getTime() - 5 * 60 * 1000
   const close = parseDateTime(b.date, b.endTime).getTime() + 15 * 60 * 1000
@@ -909,6 +917,7 @@ onBeforeUnmount(() => {
 
               <!-- Join Session -->
               <div>
+                <div v-if="sessionTestMode" class="mb-2 text-center text-xs font-bold text-amber-500 bg-amber-500/10 py-1 rounded">وضع الاختبار مفعّل</div>
                 <Button
                   class="w-full"
                   data-testid="join-session"

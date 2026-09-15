@@ -1,17 +1,13 @@
 # Tawasul Academy — Docker Compose (Development)
 #
 # Development architecture:
-#   Docker: PostgreSQL (+ pgAdmin for browsing)
-#   Host:   Nuxt app via `npm run dev` (uses DATABASE_URL @ localhost:5433)
-#
-# The Nuxt app is NOT run as a container during local development, so no
-# container ever writes to the host's .nuxt/ directory (avoids permission
-# conflicts). Production uses docker-compose.prod.yml.
+#   Docker: PostgreSQL (+ pgAdmin) + LiveKit
+#   Host:   Nuxt app via `npm run dev`
 
 services:
 
   # ─────────────────────────────────────────
-  # PostgreSQL Database
+  # PostgreSQL Database (unchanged)
   # ─────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
@@ -22,7 +18,6 @@ services:
       POSTGRES_USER: tawasul
       POSTGRES_PASSWORD: tawasul_pass
     ports:
-      # 5433 on host because the default host port 5432 is occupied by another container
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -35,7 +30,7 @@ services:
       - tawasul_network
 
   # ─────────────────────────────────────────
-  # pgAdmin (Development Only)
+  # pgAdmin (Development Only, unchanged)
   # ─────────────────────────────────────────
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -51,6 +46,30 @@ services:
         condition: service_healthy
     networks:
       - tawasul_network
+
+  # ─────────────────────────────────────────
+
+  # ─────────────────────────────────────────
+  # LiveKit Server
+  # ─────────────────────────────────────────
+  livekit:
+    image: livekit/livekit-server:v1.13.7
+    container_name: tawasul_livekit
+    environment:
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    ports:
+      - "7880:7880"      # HTTP/WebSocket
+      - "7881:7881"      # RTC TCP
+      - "7882:7882/udp"  # RTC UDP
+      - "50000-50100:50000-50100/udp"  # ICE UDP range (must match livekit.yaml rtc.port_range_*)
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml
+    command: --config /etc/livekit.yaml
+    networks:
+      - tawasul_network
+    restart: unless-stopped
 
 # ─────────────────────────────────────────
 # Volumes

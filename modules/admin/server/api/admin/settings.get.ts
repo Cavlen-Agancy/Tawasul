@@ -28,6 +28,5 @@ export default defineEventHandler(async (event) => {
     defaultSessionDuration: settings.defaultSessionDuration,
     defaultWorkingStart: settings.defaultWorkingStart,
     defaultWorkingEnd: settings.defaultWorkingEnd,
-    jitsiDomain: settings.jitsiDomain,
   }
 })

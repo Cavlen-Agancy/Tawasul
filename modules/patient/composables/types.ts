@@ -49,5 +49,5 @@ export interface PaymentsResponse {
 
 export interface SessionRoomResponse {
   roomName: string
-  jitsiDomain: string
+  liveKitToken: string
 }

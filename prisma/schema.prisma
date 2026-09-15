@@ -284,13 +284,12 @@ model Payment {
 }
 
 // ─────────────────────────────────────────
-// SESSION ROOM (Jitsi)
 // ─────────────────────────────────────────
 
 model SessionRoom {
   id        String   @id @default(cuid())
   bookingId String   @unique
-  roomName  String   @unique // Jitsi room name — used to construct the meeting URL
+  roomName  String   @unique
   expiresAt DateTime
 
   createdAt DateTime @default(now())
@@ -322,8 +321,6 @@ model Settings {
   defaultWorkingStart    String  @default("09:00")
   defaultWorkingEnd      String  @default("17:00")
 
-  // Jitsi config
-  jitsiDomain String @default("meet.jit.si") // use meet.jit.si for MVP, self-hosted later
 
   updatedAt DateTime @updatedAt
 
