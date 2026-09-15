@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { sessionRoom: true },
+    include: { sessionRoom: true, user: true },
   })
 
   if (!booking) {
@@ -63,5 +63,16 @@ export default defineEventHandler(async (event) => {
     role: 'moderator',
   })
 
-  return { roomName: room.roomName, liveKitToken }
+  return {
+    roomName: room.roomName,
+    liveKitToken,
+    sessionInfo: {
+      doctorName: doctor.user.name,
+      patientName: booking.user.name,
+      date: booking.date,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      service: booking.service,
+    },
+  }
 })
