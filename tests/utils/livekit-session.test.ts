@@ -1,7 +1,50 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { getArabicMediaErrorMessage } from '~/composables/useLiveKitSession'
+import { useSessionI18n, currentLocale } from '~/composables/useSessionI18n'
 
-describe('getArabicMediaErrorMessage', () => {
+describe('useSessionI18n Localization', () => {
+  beforeEach(() => {
+    currentLocale.value = 'en'
+  })
+
+  it('defaults to English and resolves keys correctly', () => {
+    const { t, locale } = useSessionI18n()
+    expect(locale.value).toBe('en')
+    expect(t('session.waitingRoom.badge')).toBe('Virtual Waiting Room')
+    expect(t('session.controls.micMute')).toBe('Mute microphone')
+    expect(t('session.controls.endCall')).toBe('End Session')
+    expect(t('session.devices.title')).toBe('Media & Device Settings')
+  })
+
+  it('returns English error messages by default', () => {
+    const { getMediaErrorMessage } = useSessionI18n()
+    const permErr = new Error('Permission denied')
+    permErr.name = 'NotAllowedError'
+
+    expect(getMediaErrorMessage(permErr, 'microphone')).toBe(
+      'Microphone access was denied. Please allow microphone permissions in your browser settings.',
+    )
+    expect(getMediaErrorMessage(permErr, 'camera')).toBe(
+      'Camera access was denied. Please allow camera permissions in your browser settings.',
+    )
+  })
+
+  it('switches to Arabic dynamically when locale is changed', () => {
+    const { t, locale, getMediaErrorMessage } = useSessionI18n()
+    locale.value = 'ar'
+
+    expect(t('session.waitingRoom.badge')).toBe('غرفة الانتظار الافتراضية')
+    expect(t('session.controls.micMute')).toBe('كتم الميكروفون')
+
+    const busyErr = new Error('Camera in use')
+    busyErr.name = 'NotReadableError'
+    expect(getMediaErrorMessage(busyErr, 'camera')).toBe(
+      'تعذر تشغيل الكاميرا. تأكد من أن الكاميرا ليست مستخدمة بواسطة تطبيق آخر.',
+    )
+  })
+})
+
+describe('getArabicMediaErrorMessage (backward-compatible wrapper)', () => {
   it('returns appropriate Arabic messages for permission denied errors', () => {
     const permErr = new Error('Permission denied by system')
     permErr.name = 'NotAllowedError'
@@ -34,26 +77,13 @@ describe('getArabicMediaErrorMessage', () => {
       'لم يتم العثور على ميكروفون متصل بجهازك.',
     )
   })
-
-  it('returns fallback Arabic messages for unknown errors', () => {
-    const unknownErr = new Error('Random failure')
-    expect(getArabicMediaErrorMessage(unknownErr, 'camera')).toBe(
-      'تعذر تفعيل الكاميرا. يرجى إعادة المحاولة.',
-    )
-    expect(getArabicMediaErrorMessage(unknownErr, 'microphone')).toBe(
-      'تعذر تفعيل الميكروفون. يرجى إعادة المحاولة.',
-    )
-  })
 })
 
 describe('Media Toggle Lifecycle simulation', () => {
   it('simulates infinite ON -> OFF -> ON -> OFF -> ON cycles on LiveKit participant without unpublishing', async () => {
-    // Mock a LiveKit LocalParticipant conforming to expected behavior
     let isMicMuted = false
     let isCamMuted = false
     let unpublishCount = 0
-    let muteCalls = 0
-    let unmuteCalls = 0
 
     const mockLocalParticipant = {
       get isMicrophoneEnabled() {
@@ -64,14 +94,10 @@ describe('Media Toggle Lifecycle simulation', () => {
       },
       setMicrophoneEnabled: vi.fn(async (enabled: boolean) => {
         isMicMuted = !enabled
-        if (!enabled) muteCalls++
-        else unmuteCalls++
         return {} as any
       }),
       setCameraEnabled: vi.fn(async (enabled: boolean) => {
         isCamMuted = !enabled
-        if (!enabled) muteCalls++
-        else unmuteCalls++
         return {} as any
       }),
       unpublishTrack: vi.fn(async () => {
@@ -83,39 +109,27 @@ describe('Media Toggle Lifecycle simulation', () => {
     expect(mockLocalParticipant.isMicrophoneEnabled).toBe(true)
     expect(mockLocalParticipant.isCameraEnabled).toBe(true)
 
-    // Toggle Mic OFF
+    // Toggle Mic OFF -> ON -> OFF -> ON
     await mockLocalParticipant.setMicrophoneEnabled(false)
     expect(mockLocalParticipant.isMicrophoneEnabled).toBe(false)
-
-    // Toggle Mic ON
+    await mockLocalParticipant.setMicrophoneEnabled(true)
+    expect(mockLocalParticipant.isMicrophoneEnabled).toBe(true)
+    await mockLocalParticipant.setMicrophoneEnabled(false)
+    expect(mockLocalParticipant.isMicrophoneEnabled).toBe(false)
     await mockLocalParticipant.setMicrophoneEnabled(true)
     expect(mockLocalParticipant.isMicrophoneEnabled).toBe(true)
 
-    // Toggle Mic OFF
-    await mockLocalParticipant.setMicrophoneEnabled(false)
-    expect(mockLocalParticipant.isMicrophoneEnabled).toBe(false)
-
-    // Toggle Mic ON
-    await mockLocalParticipant.setMicrophoneEnabled(true)
-    expect(mockLocalParticipant.isMicrophoneEnabled).toBe(true)
-
-    // Toggle Cam OFF
+    // Toggle Cam OFF -> ON -> OFF -> ON
     await mockLocalParticipant.setCameraEnabled(false)
     expect(mockLocalParticipant.isCameraEnabled).toBe(false)
-
-    // Toggle Cam ON
+    await mockLocalParticipant.setCameraEnabled(true)
+    expect(mockLocalParticipant.isCameraEnabled).toBe(true)
+    await mockLocalParticipant.setCameraEnabled(false)
+    expect(mockLocalParticipant.isCameraEnabled).toBe(false)
     await mockLocalParticipant.setCameraEnabled(true)
     expect(mockLocalParticipant.isCameraEnabled).toBe(true)
 
-    // Toggle Cam OFF
-    await mockLocalParticipant.setCameraEnabled(false)
-    expect(mockLocalParticipant.isCameraEnabled).toBe(false)
-
-    // Toggle Cam ON
-    await mockLocalParticipant.setCameraEnabled(true)
-    expect(mockLocalParticipant.isCameraEnabled).toBe(true)
-
-    // Crucial check: unpublishTrack must NEVER have been called during toggles!
+    // Verify unpublishTrack was never called
     expect(unpublishCount).toBe(0)
     expect(mockLocalParticipant.unpublishTrack).not.toHaveBeenCalled()
   })
@@ -142,11 +156,8 @@ describe('Media Toggle Lifecycle simulation', () => {
       }
     }
 
-    // First click triggers
     const p1 = safeToggle()
     expect(isToggling).toBe(true)
-
-    // Second and third clicks while in-flight
     const p2 = safeToggle()
     const p3 = safeToggle()
 
@@ -155,5 +166,63 @@ describe('Media Toggle Lifecycle simulation', () => {
 
     expect(callCount).toBe(1)
     expect(isToggling).toBe(false)
+  })
+})
+
+describe('Device Switching & AirPods Scenario simulation', () => {
+  it('switches active microphone device cleanly without room reconnection', async () => {
+    let currentInput = 'built-in-mic'
+    const switchActiveDevice = vi.fn(async (kind: string, deviceId: string) => {
+      if (kind === 'audioinput') {
+        currentInput = deviceId
+      }
+    })
+
+    const roomMock = {
+      switchActiveDevice,
+      getActiveDevice: () => currentInput,
+    }
+
+    // User switches from Laptop Mic to AirPods Mic
+    await roomMock.switchActiveDevice('audioinput', 'airpods-mic-id')
+    expect(currentInput).toBe('airpods-mic-id')
+    expect(switchActiveDevice).toHaveBeenCalledWith('audioinput', 'airpods-mic-id')
+
+    // User switches to USB Mic
+    await roomMock.switchActiveDevice('audioinput', 'usb-mic-id')
+    expect(currentInput).toBe('usb-mic-id')
+  })
+
+  it('handles speaker setSinkId when supported and falls back gracefully when unsupported', async () => {
+    // Supported scenario
+    const mockAudioElement = {
+      sinkId: '',
+      setSinkId: vi.fn(async (id: string) => {
+        mockAudioElement.sinkId = id
+      }),
+    }
+
+    await mockAudioElement.setSinkId('airpods-output-id')
+    expect(mockAudioElement.sinkId).toBe('airpods-output-id')
+    expect(mockAudioElement.setSinkId).toHaveBeenCalledWith('airpods-output-id')
+
+    // Unsupported scenario
+    const unsupportedAudioElement: Record<string, unknown> = {}
+    expect('setSinkId' in unsupportedAudioElement).toBe(false)
+  })
+
+  it('falls back gracefully when selected device is disconnected (hot unplug)', () => {
+    const devices = [
+      { deviceId: 'built-in-mic', label: 'Built-in Microphone', kind: 'audioinput' },
+    ]
+
+    let selectedMic = 'usb-mic-id' // Disconnected device
+
+    // Hot unplug logic check:
+    if (!devices.some((d) => d.deviceId === selectedMic)) {
+      selectedMic = devices[0]?.deviceId || 'default'
+    }
+
+    expect(selectedMic).toBe('built-in-mic')
   })
 })

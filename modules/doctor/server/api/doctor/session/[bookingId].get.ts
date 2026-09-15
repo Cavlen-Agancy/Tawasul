@@ -72,7 +72,7 @@ export default defineEventHandler(async (event) => {
       date: booking.date,
       startTime: booking.startTime,
       endTime: booking.endTime,
-      service: booking.service,
+      service: booking.service || 'Online Consultation',
     },
   }
 })

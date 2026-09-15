@@ -11,9 +11,9 @@ import {
   LocalVideoTrack,
   LocalAudioTrack,
   createLocalTracks,
-  ParticipantEvent,
   type TrackPublication,
 } from 'livekit-client'
+import { useSessionI18n } from './useSessionI18n'
 
 export interface RemoteParticipantTrack {
   sid: string
@@ -37,48 +37,40 @@ export interface SessionInfo {
   service?: string
 }
 
+export type SessionLoadingStage =
+  | 'idle'
+  | 'fetching_token'
+  | 'connecting'
+  | 'initializing_media'
+  | 'ready'
+  | 'failed'
+
 export interface UseLiveKitSessionOptions {
   serverUrl: string
-  token: Ref<string | undefined> | ComputedRef<string | undefined>
+  token?: Ref<string | undefined> | ComputedRef<string | undefined>
   isModerator?: boolean
   onDisconnected?: () => void
 }
 
+/** Backward-compatible export for existing tests */
 export function getArabicMediaErrorMessage(err: unknown, deviceType: 'camera' | 'microphone'): string {
-  const name = err instanceof Error ? err.name : String(err)
-  const message = (err instanceof Error ? err.message : '').toLowerCase()
-
-  if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || message.includes('denied') || message.includes('permission')) {
-    return deviceType === 'camera'
-      ? 'لم نتمكن من تشغيل الكاميرا. تأكد من السماح للمتصفح باستخدام الكاميرا من إعدادات الموقع.'
-      : 'لم نتمكن من تشغيل الميكروفون. تأكد من السماح للمتصفح باستخدام الميكروفون من إعدادات الموقع.'
-  }
-
-  if (name === 'NotFoundError' || name === 'DevicesNotFoundError' || message.includes('not found')) {
-    return deviceType === 'camera'
-      ? 'لم يتم العثور على كاميرا متصلة بجهازك.'
-      : 'لم يتم العثور على ميكروفون متصل بجهازك.'
-  }
-
-  if (name === 'NotReadableError' || name === 'TrackStartError' || message.includes('in use') || message.includes('busy')) {
-    return deviceType === 'camera'
-      ? 'تعذر تشغيل الكاميرا. تأكد من أن الكاميرا ليست مستخدمة بواسطة تطبيق آخر.'
-      : 'تعذر تشغيل الميكروفون. تأكد من أن الميكروفون ليس مستخدمًا بواسطة تطبيق آخر.'
-  }
-
-  if (name === 'OverconstrainedError') {
-    return deviceType === 'camera'
-      ? 'دقة الكاميرا المطلوبة غير مدعومة بجهازك.'
-      : 'إعدادات الميكروفون المطلوبة غير مدعومة بجهازك.'
-  }
-
-  return deviceType === 'camera'
-    ? 'تعذر تفعيل الكاميرا. يرجى إعادة المحاولة.'
-    : 'تعذر تفعيل الميكروفون. يرجى إعادة المحاولة.'
+  const { getMediaErrorMessage, locale } = useSessionI18n()
+  const prevLocale = locale.value
+  locale.value = 'ar'
+  const msg = getMediaErrorMessage(err, deviceType)
+  locale.value = prevLocale
+  return msg
 }
 
 export function useLiveKitSession(options: UseLiveKitSessionOptions) {
   const isModerator = !!options.isModerator
+  const rolePrefix = isModerator ? '[Doctor][Session]' : '[Patient][Session]'
+  const { t, getMediaErrorMessage } = useSessionI18n()
+  // Development-only verbose logging; errors/warnings always surface.
+  const devLog = (...args: unknown[]) => {
+    if (import.meta.dev) console.log(...args)
+  }
+
   const room = new Room({
     adaptiveStream: true,
     dynacast: true,
@@ -91,6 +83,10 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
   const isPatientPresent = ref(false)
   const waitingList = ref<WaitingParticipant[]>([])
 
+  // Loading state machine
+  const loadingStage = ref<SessionLoadingStage>('idle')
+  const isConnecting = ref(false)
+
   // Single source of truth for media controls
   const isMicEnabled = ref(false)
   const isCamEnabled = ref(false)
@@ -99,11 +95,11 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
   // In-flight mutex protection
   const isTogglingMic = ref(false)
   const isTogglingCam = ref(false)
-  const isConnecting = ref(false)
 
   // Feedback & errors
   const mediaError = ref<string>('')
   const connectionError = ref<string>('')
+  const deviceNotification = ref<string>('')
 
   // Local tracks
   const localVideoTrack = shallowRef<LocalVideoTrack | null>(null)
@@ -112,6 +108,19 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
   // Remote tracks
   const remoteVideoTracks = ref<RemoteParticipantTrack[]>([])
   const remoteAudioTracks = ref<RemoteParticipantTrack[]>([])
+
+  // Media Devices
+  const audioInputDevices = ref<MediaDeviceInfo[]>([])
+  const audioOutputDevices = ref<MediaDeviceInfo[]>([])
+  const videoInputDevices = ref<MediaDeviceInfo[]>([])
+
+  const selectedAudioInputId = ref<string>('')
+  const selectedAudioOutputId = ref<string>('')
+  const selectedVideoInputId = ref<string>('')
+
+  const isSpeakerOutputSupported = ref<boolean>(
+    typeof HTMLMediaElement !== 'undefined' && 'setSinkId' in HTMLMediaElement.prototype,
+  )
 
   let permCheckTimer: ReturnType<typeof setInterval> | null = null
 
@@ -124,7 +133,6 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
 
   function checkParticipantsPresence() {
     if (isModerator) {
-      // Doctor checks if any patient with canPublish is present
       let present = false
       room.remoteParticipants.forEach((p) => {
         if (p.permissions?.canPublish) {
@@ -133,12 +141,81 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
       })
       isPatientPresent.value = present
     } else {
-      // Patient checks if doctor is present
       isDoctorPresent.value = room.remoteParticipants.size > 0
     }
   }
 
-  // Set up room event listeners
+  // Device Enumeration
+  async function enumerateDevices() {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) return
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const aInputs = devices.filter((d) => d.kind === 'audioinput')
+      const aOutputs = devices.filter((d) => d.kind === 'audiooutput')
+      const vInputs = devices.filter((d) => d.kind === 'videoinput')
+
+      audioInputDevices.value = aInputs
+      audioOutputDevices.value = aOutputs
+      videoInputDevices.value = vInputs
+
+      // Sync selected mic
+      const activeMic = room.getActiveDevice('audioinput')
+      if (activeMic && aInputs.some((d) => d.deviceId === activeMic)) {
+        selectedAudioInputId.value = activeMic
+      } else if (!selectedAudioInputId.value || !aInputs.some((d) => d.deviceId === selectedAudioInputId.value)) {
+        selectedAudioInputId.value = aInputs[0]?.deviceId || ''
+      }
+
+      // Sync selected cam
+      const activeCam = room.getActiveDevice('videoinput')
+      if (activeCam && vInputs.some((d) => d.deviceId === activeCam)) {
+        selectedVideoInputId.value = activeCam
+      } else if (!selectedVideoInputId.value || !vInputs.some((d) => d.deviceId === selectedVideoInputId.value)) {
+        selectedVideoInputId.value = vInputs[0]?.deviceId || ''
+      }
+
+      // Sync selected speaker
+      const activeSpeaker = room.getActiveDevice('audiooutput')
+      if (activeSpeaker && aOutputs.some((d) => d.deviceId === activeSpeaker)) {
+        selectedAudioOutputId.value = activeSpeaker
+      } else if (!selectedAudioOutputId.value || !aOutputs.some((d) => d.deviceId === selectedAudioOutputId.value)) {
+        selectedAudioOutputId.value = aOutputs[0]?.deviceId || ''
+      }
+    } catch (err) {
+      console.warn(`${rolePrefix} Failed to enumerate devices:`, err)
+    }
+  }
+
+  // Hot device change listener
+  async function handleDeviceChange() {
+    devLog(`${rolePrefix} Device change detected, updating device list...`)
+    await enumerateDevices()
+
+    // If current mic is gone, fallback
+    if (selectedAudioInputId.value && !audioInputDevices.value.some((d) => d.deviceId === selectedAudioInputId.value)) {
+      const fallback = audioInputDevices.value[0]?.deviceId || 'default'
+      await switchMicrophone(fallback)
+    }
+
+    // If current cam is gone, fallback
+    if (selectedVideoInputId.value && !videoInputDevices.value.some((d) => d.deviceId === selectedVideoInputId.value)) {
+      const fallback = videoInputDevices.value[0]?.deviceId || 'default'
+      await switchCamera(fallback)
+    }
+
+    // If current speaker is gone, fallback
+    if (selectedAudioOutputId.value && !audioOutputDevices.value.some((d) => d.deviceId === selectedAudioOutputId.value)) {
+      const fallback = audioOutputDevices.value[0]?.deviceId || 'default'
+      await switchSpeaker(fallback)
+    }
+
+    deviceNotification.value = t('session.devices.deviceChanged')
+    setTimeout(() => {
+      deviceNotification.value = ''
+    }, 4000)
+  }
+
+  // Room event listeners
   room.on(RoomEvent.ConnectionStateChanged, (state: ConnectionState) => {
     connectionState.value = state
     if (state === ConnectionState.Connected) {
@@ -147,13 +224,14 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
   })
 
   room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+    devLog(`${rolePrefix} TrackSubscribed: ${track.kind} from ${participant.identity}`)
     if (track.kind === Track.Kind.Video) {
       const idx = remoteVideoTracks.value.findIndex((t) => t.sid === track.sid)
       const entry: RemoteParticipantTrack = {
         sid: track.sid || Math.random().toString(),
         track,
         participantIdentity: participant.identity,
-        participantName: participant.name || (isModerator ? 'المريض' : 'الطبيب'),
+        participantName: participant.name || (isModerator ? t('session.doctor.waitingBadge') : t('session.waitingRoom.doctorAssigned')),
         isMuted: publication.isMuted,
       }
       if (idx !== -1) {
@@ -169,7 +247,7 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
         sid: track.sid || Math.random().toString(),
         track,
         participantIdentity: participant.identity,
-        participantName: participant.name || (isModerator ? 'المريض' : 'الطبيب'),
+        participantName: participant.name || (isModerator ? t('session.doctor.waitingBadge') : t('session.waitingRoom.doctorAssigned')),
         isMuted: publication.isMuted,
       }
       if (idx !== -1) {
@@ -234,10 +312,11 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
   })
 
   room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
+    devLog(`${rolePrefix} ParticipantConnected: ${participant.identity}`)
     if (isModerator) {
       if (!participant.permissions?.canPublish) {
         if (!waitingList.value.some((p) => p.identity === participant.identity)) {
-          waitingList.value.push({ identity: participant.identity, name: participant.name || 'المريض' })
+          waitingList.value.push({ identity: participant.identity, name: participant.name || t('session.doctor.waitingPatient') })
         }
       } else {
         isPatientPresent.value = true
@@ -249,6 +328,7 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
   })
 
   room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
+    devLog(`${rolePrefix} ParticipantDisconnected: ${participant.identity}`)
     if (isModerator) {
       waitingList.value = waitingList.value.filter((p) => p.identity !== participant.identity)
     }
@@ -271,7 +351,10 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
     }
   })
 
+  room.on(RoomEvent.MediaDevicesChanged, handleDeviceChange)
+
   room.on(RoomEvent.Disconnected, () => {
+    devLog(`${rolePrefix} room disconnected`)
     connectionState.value = ConnectionState.Disconnected
     if (options.onDisconnected) {
       options.onDisconnected()
@@ -281,14 +364,15 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
   // Patient admission transition handler
   async function handlePatientAdmitted() {
     if (!isWaiting.value) return
+    devLog(`${rolePrefix} patient admitted by doctor, preparing session active`)
     isWaiting.value = false
+    loadingStage.value = 'initializing_media'
     if (permCheckTimer) {
       clearInterval(permCheckTimer)
       permCheckTimer = null
     }
 
     try {
-      // Publish local preview tracks to the room
       if (localVideoTrack.value) {
         await room.localParticipant.publishTrack(localVideoTrack.value)
         if (!isCamEnabled.value) {
@@ -308,18 +392,24 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
       }
 
       syncMediaStateFromLiveKit()
+      devLog(`${rolePrefix} media ready`)
+      devLog(`${rolePrefix} session active`)
+      loadingStage.value = 'ready'
+      enumerateDevices().catch(() => {})
     } catch (err) {
-      console.error('[LiveKit] Failed to publish admitted tracks:', err)
+      console.error(`${rolePrefix} Failed to publish admitted tracks:`, err)
+      loadingStage.value = 'ready'
     }
   }
 
   // Pre-session local tracks acquisition (e.g. for Waiting Room preview)
   async function initLocalPreview(preferredCam = true, preferredMic = true): Promise<boolean> {
     mediaError.value = ''
+    devLog(`${rolePrefix} initializing media preview`)
     try {
       const tracks = await createLocalTracks({
-        audio: true,
-        video: true,
+        audio: selectedAudioInputId.value ? { deviceId: { exact: selectedAudioInputId.value } } : true,
+        video: selectedVideoInputId.value ? { deviceId: { exact: selectedVideoInputId.value } } : true,
       })
       for (const track of tracks) {
         if (track.kind === Track.Kind.Video) {
@@ -336,50 +426,80 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
       }
       isCamEnabled.value = preferredCam
       isMicEnabled.value = preferredMic
+      devLog(`${rolePrefix} media preview ready`)
+
+      enumerateDevices().catch(() => {})
       return true
     } catch (err) {
-      console.error('[LiveKit] Failed to access camera or microphone:', err)
-      mediaError.value = getArabicMediaErrorMessage(err, 'camera')
+      console.error(`${rolePrefix} Failed to access camera or microphone preview:`, err)
+      mediaError.value = getMediaErrorMessage(err, 'camera')
       return false
     }
   }
 
   // Connect to LiveKit room
-  async function connectRoom() {
-    const tokenVal = options.token.value
-    if (!tokenVal || isConnecting.value) return
+  async function connectRoom(providedToken?: string) {
+    const tokenVal = providedToken || options.token?.value
+    if (!tokenVal) {
+      console.warn(`${rolePrefix} connectRoom called without token`)
+      return
+    }
 
+    loadingStage.value = 'connecting'
     isConnecting.value = true
     connectionError.value = ''
+    devLog(`${rolePrefix} connecting to LiveKit`)
 
     try {
-      await room.connect(options.serverUrl, tokenVal)
+      // Timeout protection (15 seconds)
+      const connectPromise = room.connect(options.serverUrl, tokenVal)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('CONNECT_TIMEOUT')), 15000),
+      )
+      await Promise.race([connectPromise, timeoutPromise])
+
       connectionState.value = room.state
+      devLog(`${rolePrefix} LiveKit connected`)
 
       if (isModerator) {
         isWaiting.value = false
-        // Doctor enables cam and mic directly
-        await room.localParticipant.setCameraEnabled(true)
-        await room.localParticipant.setMicrophoneEnabled(true)
-        syncMediaStateFromLiveKit()
+        loadingStage.value = 'initializing_media'
+        devLog(`${rolePrefix} initializing media`)
 
-        // Populate initial waiting list if any participants are already waiting
+        try {
+          await room.localParticipant.setCameraEnabled(true)
+          await room.localParticipant.setMicrophoneEnabled(true)
+          syncMediaStateFromLiveKit()
+          devLog(`${rolePrefix} media ready`)
+        } catch (mediaErr) {
+          console.warn(`${rolePrefix} Doctor initial media error (continuing):`, mediaErr)
+          mediaError.value = getMediaErrorMessage(mediaErr, 'camera')
+        }
+
+        loadingStage.value = 'ready'
+        devLog(`${rolePrefix} session active`)
+
         room.remoteParticipants.forEach((participant) => {
           if (!participant.permissions?.canPublish) {
             if (!waitingList.value.some((p) => p.identity === participant.identity)) {
-              waitingList.value.push({ identity: participant.identity, name: participant.name || 'المريض' })
+              waitingList.value.push({
+                identity: participant.identity,
+                name: participant.name || t('session.doctor.waitingPatient'),
+              })
             }
           } else {
             isPatientPresent.value = true
           }
         })
       } else {
-        // Patient checks initial permissions
         if (room.localParticipant.permissions?.canPublish) {
+          devLog(`${rolePrefix} patient already has publish permissions`)
           await handlePatientAdmitted()
         } else {
           isWaiting.value = true
-          // Fallback interval check for admission
+          loadingStage.value = 'ready'
+          devLog(`${rolePrefix} patient entered waiting room`)
+          if (permCheckTimer) clearInterval(permCheckTimer)
           permCheckTimer = setInterval(() => {
             if (room.localParticipant.permissions?.canPublish && isWaiting.value) {
               handlePatientAdmitted()
@@ -388,9 +508,15 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
         }
       }
       checkParticipantsPresence()
+      enumerateDevices().catch(() => {})
     } catch (err: unknown) {
-      console.error('[LiveKit] Room connect failed:', err)
-      connectionError.value = 'تعذر الاتصال بخادم الجلسة. يرجى التحقق من اتصال الإنترنت.'
+      console.error(`${rolePrefix} LiveKit connection failed:`, err)
+      loadingStage.value = 'failed'
+      if (err instanceof Error && err.message === 'CONNECT_TIMEOUT') {
+        connectionError.value = t('session.loading.timeout')
+      } else {
+        connectionError.value = t('session.state.connectError')
+      }
     } finally {
       isConnecting.value = false
     }
@@ -405,7 +531,6 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
     try {
       const target = !isMicEnabled.value
       if (isWaiting.value) {
-        // In waiting room: control local track directly
         if (localAudioTrack.value) {
           if (target) {
             await localAudioTrack.value.unmute()
@@ -414,18 +539,20 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
           }
           isMicEnabled.value = target
         } else if (target) {
-          const tracks = await createLocalTracks({ audio: true, video: false })
+          const tracks = await createLocalTracks({
+            audio: selectedAudioInputId.value ? { deviceId: { exact: selectedAudioInputId.value } } : true,
+            video: false,
+          })
           localAudioTrack.value = tracks[0] as LocalAudioTrack
           isMicEnabled.value = true
         }
       } else {
-        // In active session: call LiveKit
         await room.localParticipant.setMicrophoneEnabled(target)
         syncMediaStateFromLiveKit()
       }
     } catch (err) {
-      console.error('[LiveKit][Microphone] toggle failed:', err)
-      mediaError.value = getArabicMediaErrorMessage(err, 'microphone')
+      console.error(`${rolePrefix}[Microphone] toggle failed:`, err)
+      mediaError.value = getMediaErrorMessage(err, 'microphone')
       if (!isWaiting.value) {
         syncMediaStateFromLiveKit()
       }
@@ -443,7 +570,6 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
     try {
       const target = !isCamEnabled.value
       if (isWaiting.value) {
-        // In waiting room: control local track directly
         if (localVideoTrack.value) {
           if (target) {
             await localVideoTrack.value.unmute()
@@ -452,18 +578,20 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
           }
           isCamEnabled.value = target
         } else if (target) {
-          const tracks = await createLocalTracks({ video: true, audio: false })
+          const tracks = await createLocalTracks({
+            video: selectedVideoInputId.value ? { deviceId: { exact: selectedVideoInputId.value } } : true,
+            audio: false,
+          })
           localVideoTrack.value = tracks[0] as LocalVideoTrack
           isCamEnabled.value = true
         }
       } else {
-        // In active session: call LiveKit
         await room.localParticipant.setCameraEnabled(target)
         syncMediaStateFromLiveKit()
       }
     } catch (err) {
-      console.error('[LiveKit][Camera] toggle failed:', err)
-      mediaError.value = getArabicMediaErrorMessage(err, 'camera')
+      console.error(`${rolePrefix}[Camera] toggle failed:`, err)
+      mediaError.value = getMediaErrorMessage(err, 'camera')
       if (!isWaiting.value) {
         syncMediaStateFromLiveKit()
       }
@@ -475,6 +603,74 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
   // Toggle Speaker / Output Audio
   function toggleSpeaker() {
     isSpeakerMuted.value = !isSpeakerMuted.value
+  }
+
+  // Device Switching (Microphone)
+  async function switchMicrophone(deviceId: string) {
+    if (!deviceId) return
+    selectedAudioInputId.value = deviceId
+    mediaError.value = ''
+    try {
+      if (isWaiting.value) {
+        if (localAudioTrack.value) {
+          await localAudioTrack.value.setDeviceId(deviceId)
+        }
+      } else {
+        await room.switchActiveDevice('audioinput', deviceId)
+        const pub = room.localParticipant.getTrackPublication(Track.Source.Microphone)
+        if (pub?.audioTrack) {
+          localAudioTrack.value = pub.audioTrack as LocalAudioTrack
+        }
+      }
+    } catch (err) {
+      console.error(`${rolePrefix}[Microphone] device switch failed:`, err)
+      mediaError.value = getMediaErrorMessage(err, 'microphone')
+    }
+  }
+
+  // Device Switching (Camera)
+  async function switchCamera(deviceId: string) {
+    if (!deviceId) return
+    selectedVideoInputId.value = deviceId
+    mediaError.value = ''
+    try {
+      if (isWaiting.value) {
+        if (localVideoTrack.value) {
+          await localVideoTrack.value.setDeviceId(deviceId)
+        }
+      } else {
+        await room.switchActiveDevice('videoinput', deviceId)
+        const pub = room.localParticipant.getTrackPublication(Track.Source.Camera)
+        if (pub?.videoTrack) {
+          localVideoTrack.value = pub.videoTrack as LocalVideoTrack
+        }
+      }
+    } catch (err) {
+      console.error(`${rolePrefix}[Camera] device switch failed:`, err)
+      mediaError.value = getMediaErrorMessage(err, 'camera')
+    }
+  }
+
+  // Device Switching (Speaker)
+  async function switchSpeaker(deviceId: string) {
+    if (!deviceId) return
+    selectedAudioOutputId.value = deviceId
+    if (!isSpeakerOutputSupported.value) return
+
+    try {
+      await room.switchActiveDevice('audiooutput', deviceId)
+      for (const remoteAudio of remoteAudioTracks.value) {
+        if (remoteAudio.track?.attachedElements) {
+          for (const el of remoteAudio.track.attachedElements) {
+            if ('setSinkId' in el) {
+              await (el as any).setSinkId(deviceId)
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`${rolePrefix}[Speaker] device switch failed:`, err)
+    }
   }
 
   // Safe DOM attachment helpers
@@ -507,14 +703,24 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
     if (!el || !track) return
     if (!track.attachedElements.includes(el)) {
       track.attach(el)
+      if (selectedAudioOutputId.value && 'setSinkId' in el) {
+        ;(el as any).setSinkId(selectedAudioOutputId.value).catch((err: any) => {
+          console.warn(`${rolePrefix} setSinkId failed on newly attached audio element:`, err)
+        })
+      }
     }
   }
 
   // Disconnect & Cleanup
   function leaveSession() {
+    devLog(`${rolePrefix} leaving`)
     if (permCheckTimer) {
       clearInterval(permCheckTimer)
       permCheckTimer = null
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.removeEventListener) {
+      navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
     }
 
     if (localVideoTrack.value) {
@@ -532,6 +738,8 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
     if (room.state === ConnectionState.Connected || room.state === ConnectionState.Connecting) {
       room.disconnect()
     }
+    loadingStage.value = 'idle'
+    devLog(`${rolePrefix} cleanup complete`)
   }
 
   onUnmounted(() => {
@@ -545,18 +753,31 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
     isDoctorPresent,
     isPatientPresent,
     waitingList,
+    loadingStage,
+    isConnecting,
     isMicEnabled,
     isCamEnabled,
     isSpeakerMuted,
     isTogglingMic,
     isTogglingCam,
-    isConnecting,
     mediaError,
     connectionError,
+    deviceNotification,
     localVideoTrack,
     localAudioTrack,
     remoteVideoTracks,
     remoteAudioTracks,
+    audioInputDevices,
+    audioOutputDevices,
+    videoInputDevices,
+    selectedAudioInputId,
+    selectedAudioOutputId,
+    selectedVideoInputId,
+    isSpeakerOutputSupported,
+    enumerateDevices,
+    switchMicrophone,
+    switchCamera,
+    switchSpeaker,
     initLocalPreview,
     connectRoom,
     toggleMicrophone,

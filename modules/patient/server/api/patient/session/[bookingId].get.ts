@@ -71,12 +71,12 @@ export default defineEventHandler(async (event) => {
     roomName: room.roomName,
     liveKitToken,
     sessionInfo: {
-      doctorName: booking.doctor?.user?.name || 'الطبيب المعالج',
+      doctorName: booking.doctor?.user?.name || 'Healthcare Provider',
       patientName: booking.user.name,
       date: booking.date,
       startTime: booking.startTime,
       endTime: booking.endTime,
-      service: booking.service,
+      service: booking.service || 'Online Consultation',
     },
   }
 })

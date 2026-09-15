@@ -16,9 +16,12 @@ import {
   User,
   Sparkles,
   Stethoscope,
-  Wifi,
   ChevronLeft,
+  Settings,
+  X,
+  Check,
 } from 'lucide-vue-next'
+import { useSessionI18n } from '~/composables/useSessionI18n'
 
 interface SessionInfo {
   doctorName?: string
@@ -36,7 +39,7 @@ interface SessionTokenResponse {
 }
 
 definePageMeta({
-  layout: 'patient-layout',
+  layout: 'session',
   middleware: ['auth', 'patient-only'],
   pageTransition: false,
   layoutTransition: false,
@@ -48,17 +51,43 @@ const bookingId = String(route.params.bookingId ?? '')
 const config = useRuntimeConfig()
 const serverUrl = String(config.public.liveKitUrl || 'ws://localhost:7880')
 
-// Fetch session token
-const { data, error, refresh } = await useFetch<SessionTokenResponse>(`/api/patient/session/${bookingId}`)
+const { t, formatDeviceLabel, locale } = useSessionI18n()
 
-const token = computed(() => data.value?.liveKitToken)
-const sessionInfo = computed(() => data.value?.sessionInfo)
+// ── Non-blocking token fetch ─────────────────────────────
+// NOTE: never top-level `await` here — that suspends route navigation
+// (Nuxt <Suspense>) and freezes the UI on "In Session" click.
+const tokenData = ref<SessionTokenResponse | null>(null)
+const tokenError = ref<{ statusCode?: number; data?: { message?: string }; message?: string } | null>(null)
+const isFetchingToken = ref(true)
 
-// Determine if we're outside join window or in a waiting state
+async function fetchToken() {
+  if (import.meta.dev) console.log('[Patient][Session] route mounted, fetching token')
+  isFetchingToken.value = true
+  tokenError.value = null
+  try {
+    const res = await $fetch<SessionTokenResponse>(`/api/patient/session/${bookingId}`)
+    tokenData.value = res
+    if (import.meta.dev) console.log('[Patient][Session] token received')
+  } catch (e: unknown) {
+    tokenError.value = e as typeof tokenError.value
+  } finally {
+    isFetchingToken.value = false
+  }
+}
+
+const token = computed(() => tokenData.value?.liveKitToken)
+const sessionInfo = computed(() => tokenData.value?.sessionInfo)
+const error = tokenError
+
+function refresh() {
+  bootSession()
+}
+
+// Determine if we're outside join window
 const isOutsideJoinWindow = computed(() => {
-  if (!error.value) return false
-  const status = error.value.statusCode
-  const msg = error.value.data?.message || error.value.message || ''
+  if (!tokenError.value) return false
+  const status = tokenError.value.statusCode
+  const msg = tokenError.value.data?.message || tokenError.value.message || ''
   return status === 403 && (msg.includes('not available') || msg.includes('window') || msg.includes('time'))
 })
 
@@ -76,9 +105,21 @@ const {
   isConnecting,
   mediaError,
   connectionError,
+  deviceNotification,
   localVideoTrack,
   remoteVideoTracks,
   remoteAudioTracks,
+  audioInputDevices,
+  audioOutputDevices,
+  videoInputDevices,
+  selectedAudioInputId,
+  selectedAudioOutputId,
+  selectedVideoInputId,
+  isSpeakerOutputSupported,
+  switchMicrophone,
+  switchCamera,
+  switchSpeaker,
+  loadingStage,
   initLocalPreview,
   connectRoom,
   toggleMicrophone,
@@ -101,6 +142,7 @@ const {
 const waitingVideoRef = ref<HTMLVideoElement | null>(null)
 const sessionLocalVideoRef = ref<HTMLVideoElement | null>(null)
 const showLeaveModal = ref(false)
+const showSettingsMenu = ref(false)
 
 // Session Timer (starts when admitted into session)
 const sessionDuration = ref(0)
@@ -156,40 +198,94 @@ watch(isCamEnabled, (enabled) => {
 // First remote video (primary doctor stage)
 const primaryRemoteVideo = computed(() => remoteVideoTracks.value[0] || null)
 
-onMounted(async () => {
-  if (isOutsideJoinWindow.value) return
+const confirmedExit = ref(false)
+let bootInFlight = false
 
-  // 1. Ask for media permissions once and start local preview in waiting room
-  await initLocalPreview(true, true)
-  if (waitingVideoRef.value && isCamEnabled.value) {
-    attachLocalVideo(waitingVideoRef.value)
-  }
+// ── Staged, non-blocking boot ────────────────────────────
+// Route mounts instantly -> shell UI -> token -> connect -> media.
+// No single `await` here is allowed to freeze the page: each stage
+// has its own visible state and connectRoom carries a 15s timeout.
+async function bootSession() {
+  if (bootInFlight) return
+  bootInFlight = true
+  try {
+    await fetchToken()
+    if (tokenError.value || !token.value) return
 
-  // 2. Connect to LiveKit room
-  if (token.value) {
-    await connectRoom()
+    // Fire-and-forget media preview: must never block room connect.
+    // A denied/slow camera must not freeze session entry.
+    initLocalPreview(true, true)
+      .then((ok) => {
+        if (ok && waitingVideoRef.value && isCamEnabled.value) {
+          attachLocalVideo(waitingVideoRef.value)
+        }
+      })
+      .catch(() => {})
+
+    // Room connect runs after preview *started* (not after it finished).
+    if (import.meta.dev) console.log('[Patient][Session] connecting to LiveKit')
+    await connectRoom(token.value)
+  } finally {
+    bootInFlight = false
   }
+}
+
+function retryBoot() {
+  bootSession()
+}
+
+onMounted(() => {
+  bootSession()
 })
 
 onUnmounted(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
   if (sessionTimerInterval) {
     clearInterval(sessionTimerInterval)
     sessionTimerInterval = null
   }
+  if (import.meta.dev) console.log('[Patient][Session] cleanup complete')
   leaveSession()
 })
 
+// Guard against accidental loss of an active session.
+onBeforeRouteLeave(() => {
+  if (confirmedExit.value) return true
+  const active = !isFetchingToken.value && !tokenError.value && loadingStage.value !== 'failed'
+  if (!active) return true
+  showLeaveModal.value = true
+  return false
+})
+
+function handleBeforeUnload(e: BeforeUnloadEvent) {
+  const active = !isFetchingToken.value && !tokenError.value && loadingStage.value !== 'failed'
+  if (active && !confirmedExit.value) {
+    e.preventDefault()
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', handleBeforeUnload)
+}
+
 function onConfirmLeave() {
+  confirmedExit.value = true
   showLeaveModal.value = false
+  if (import.meta.dev) console.log('[Patient][Session] leaving')
   leaveSession()
   router.push('/dashboard/appointments')
 }
 
 function formatDate(val: string | Date | undefined) {
-  if (!val) return 'اليوم'
+  if (!val) return 'Today'
   try {
     const d = new Date(val)
-    return d.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    return d.toLocaleDateString(locale.value === 'ar' ? 'ar-EG' : 'en-US', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
   } catch {
     return String(val)
   }
@@ -197,10 +293,58 @@ function formatDate(val: string | Date | undefined) {
 </script>
 
 <template>
-  <div dir="rtl" class="session-root min-h-[calc(100vh-5rem)] flex flex-col font-sans text-foreground">
+  <div :dir="locale === 'ar' ? 'rtl' : 'ltr'" class="session-root flex h-[100dvh] w-full flex-col overflow-hidden font-sans text-foreground">
+    <!-- Boot shell: route mounted instantly, token/connect in flight (never blank) -->
+    <div
+      v-if="isFetchingToken"
+      class="flex flex-1 flex-col items-center justify-center bg-slate-950 p-6 text-center text-white"
+      data-testid="session-connecting"
+    >
+      <div class="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-8 shadow-2xl">
+        <div class="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+          <Loader2 class="size-7 animate-spin" />
+        </div>
+        <h2 class="text-lg font-bold">{{ t('session.loading.fetchingToken') }}</h2>
+        <p class="mt-2 text-xs text-slate-400">{{ t('session.loading.connecting') }}</p>
+      </div>
+    </div>
+
+    <!-- Connection failed: explicit error state with Retry / Exit (no reload loops) -->
+    <div
+      v-else-if="loadingStage === 'failed'"
+      class="flex flex-1 flex-col items-center justify-center bg-slate-950 p-6 text-center text-white"
+      data-testid="session-error"
+    >
+      <div class="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-8 shadow-2xl">
+        <div class="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-400">
+          <AlertCircle class="size-8" />
+        </div>
+        <h2 class="text-lg font-bold">{{ t('session.state.loadErrorTitle') }}</h2>
+        <p class="mt-2 text-xs text-slate-400">{{ connectionError || t('session.state.connectError') }}</p>
+        <div class="mt-6 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            class="flex-1 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white hover:bg-primary/90 transition"
+            data-testid="session-retry"
+            @click="retryBoot"
+          >
+            {{ t('session.state.retry') }}
+          </button>
+          <button
+            type="button"
+            class="flex-1 rounded-xl bg-white/10 py-2.5 text-sm font-medium text-white hover:bg-white/20 transition"
+            data-testid="session-exit"
+            @click="onConfirmLeave"
+          >
+            {{ t('session.state.backToAppointments') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- State 0: Outside Join Window (E2E & Safety Fallback) -->
     <div
-      v-if="isOutsideJoinWindow"
+      v-else-if="isOutsideJoinWindow"
       class="flex flex-1 flex-col items-center justify-center p-6 text-center"
       data-testid="session-waiting"
     >
@@ -208,10 +352,9 @@ function formatDate(val: string | Date | undefined) {
         <div class="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
           <Clock class="size-8" />
         </div>
-        <h2 class="text-2xl font-bold tracking-tight text-foreground">Your session starts soon</h2>
-        <p class="mt-2 text-base font-semibold text-primary">تبدأ الجلسة قريباً</p>
+        <h2 class="text-2xl font-bold tracking-tight text-foreground">{{ t('session.state.startsSoonTitle') }}</h2>
         <p class="mt-3 text-sm text-muted-foreground leading-relaxed">
-          تفتح غرفة الجلسة قبل موعدها المحدد بـ 5 دقائق. يرجى العودة في الوقت المحدد للانضمام.
+          {{ t('session.state.startsSoonDesc') }}
         </p>
         <div class="mt-8 flex justify-center">
           <NuxtLink
@@ -219,7 +362,7 @@ function formatDate(val: string | Date | undefined) {
             class="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-primary/90"
           >
             <ChevronLeft class="size-4" />
-            العودة للمواعيد
+            {{ t('session.state.backToAppointments') }}
           </NuxtLink>
         </div>
       </div>
@@ -234,47 +377,56 @@ function formatDate(val: string | Date | undefined) {
         <div class="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
           <AlertCircle class="size-8" />
         </div>
-        <h3 class="text-xl font-bold text-foreground">تعذر فتح الجلسة</h3>
+        <h3 class="text-xl font-bold text-foreground">{{ t('session.state.loadErrorTitle') }}</h3>
         <p class="mt-2 text-sm text-muted-foreground">
-          {{ error.data?.message || error.message || 'حدث خطأ أثناء تحميل بيانات الجلسة.' }}
+          {{ error.data?.message || error.message || t('session.state.loadErrorTitle') }}
         </p>
         <div class="mt-6 flex justify-center gap-3">
           <button
             class="rounded-xl bg-secondary px-5 py-2.5 text-sm font-medium hover:bg-secondary/80"
             @click="() => refresh()"
           >
-            إعادة المحاولة
+            {{ t('session.state.retry') }}
           </button>
           <NuxtLink
             to="/dashboard/appointments"
             class="rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-primary/90"
           >
-            العودة للمواعيد
+            {{ t('session.state.backToAppointments') }}
           </NuxtLink>
         </div>
       </div>
     </div>
 
     <!-- State 2: Patient Virtual Waiting Room (Phase 5) -->
-    <div v-else-if="isWaiting" class="waiting-room-wrapper flex-1 flex flex-col justify-between p-4 md:p-6 lg:p-8">
+    <div v-else-if="isWaiting" class="waiting-room-wrapper flex-1 flex flex-col overflow-y-auto bg-background p-4 md:p-6 lg:p-8">
+      <!-- Transient connecting badge: room connect / media init in flight -->
+      <div
+        v-if="loadingStage === 'connecting' || loadingStage === 'initializing_media'"
+        class="mb-4 flex items-center justify-center gap-2 rounded-2xl border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-medium text-primary"
+        data-testid="session-connecting"
+      >
+        <Loader2 class="size-4 animate-spin" />
+        <span>{{ loadingStage === 'connecting' ? t('session.loading.connecting') : t('session.loading.initMedia') }}</span>
+      </div>
       <!-- Waiting Room Header -->
       <header class="flex items-center justify-between border-b border-border/40 pb-4 mb-6">
         <div class="flex items-center gap-3">
           <div class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary font-bold">
-            ت
+            T
           </div>
           <div>
             <h1 class="text-lg font-bold text-foreground flex items-center gap-2">
-              تواصل <span class="text-primary">أكاديمي</span>
+              {{ t('session.waitingRoom.brand') }}
             </h1>
-            <p class="text-xs text-muted-foreground">عيادة الاستشارات النفسية والصحية</p>
+            <p class="text-xs text-muted-foreground">{{ t('session.waitingRoom.subBrand') }}</p>
           </div>
         </div>
 
         <div class="flex items-center gap-3">
           <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/80 border border-border text-xs text-muted-foreground">
             <span class="size-2 rounded-full bg-amber-500 animate-pulse"></span>
-            غرفة الانتظار الافتراضية
+            {{ t('session.waitingRoom.badge') }}
           </div>
           <button
             type="button"
@@ -283,26 +435,34 @@ function formatDate(val: string | Date | undefined) {
             @click="showLeaveModal = true"
           >
             <PhoneOff class="size-4" />
-            <span class="hidden sm:inline">مغادرة الغرفة</span>
+            <span class="hidden sm:inline">{{ t('session.waitingRoom.leaveBtn') }}</span>
           </button>
         </div>
       </header>
 
-      <!-- Media Error Alert if any -->
+      <!-- Notifications & Alerts -->
+      <div
+        v-if="deviceNotification"
+        class="mb-4 flex items-center gap-2.5 rounded-2xl border border-primary/30 bg-primary/10 p-3.5 text-xs text-primary transition animate-fade-in"
+      >
+        <Sparkles class="size-4 shrink-0" />
+        <span>{{ deviceNotification }}</span>
+      </div>
+
       <div
         v-if="mediaError"
-        class="mb-4 flex items-start gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300"
+        class="mb-4 flex items-start gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-600 dark:text-rose-300"
       >
-        <AlertCircle class="size-5 shrink-0 text-rose-400 mt-0.5" />
+        <AlertCircle class="size-5 shrink-0 text-rose-500 mt-0.5" />
         <div class="flex-1">
-          <p class="font-medium text-rose-200">تنبيه بالوسائط</p>
-          <p class="mt-0.5 text-xs text-rose-300/90">{{ mediaError }}</p>
+          <p class="font-medium text-rose-700 dark:text-rose-200">{{ t('session.media.alertTitle') }}</p>
+          <p class="mt-0.5 text-xs text-rose-600/90 dark:text-rose-300/90">{{ mediaError }}</p>
         </div>
       </div>
 
       <!-- Main Waiting Room Content (2-Column Grid on Desktop) -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-center">
-        <!-- Right Column: Camera Preview & Local Controls -->
+        <!-- Column 1: Camera Preview & Local Controls -->
         <div class="lg:col-span-7 flex flex-col items-center justify-center">
           <div class="w-full max-w-xl">
             <!-- Preview Box -->
@@ -328,22 +488,22 @@ function formatDate(val: string | Date | undefined) {
                     <VideoOff class="size-3.5" />
                   </span>
                 </div>
-                <h4 class="text-base font-semibold text-white">الكاميرا متوقفة حاليًا</h4>
+                <h4 class="text-base font-semibold text-white">{{ t('session.waitingRoom.cameraOffTitle') }}</h4>
                 <p class="mt-1 text-xs text-slate-400 max-w-xs">
-                  يمكنك تفعيل الكاميرا للتحقق من مظهرك وإضاءتك قبل بدء الجلسة مع الطبيب.
+                  {{ t('session.waitingRoom.cameraOffDesc') }}
                 </p>
               </div>
 
               <!-- Top Overlay Badge -->
-              <div class="absolute top-3 right-3 flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-3 py-1 text-xs text-white border border-white/10">
+              <div class="absolute top-3 left-3 flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-3 py-1 text-xs text-white border border-white/10">
                 <span class="size-2 rounded-full" :class="isCamEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'"></span>
-                {{ isCamEnabled ? 'معاينة الكاميرا نشطة' : 'الكاميرا مغلقة' }}
+                {{ isCamEnabled ? t('session.waitingRoom.cameraActive') : t('session.waitingRoom.cameraOff') }}
               </div>
 
               <!-- Bottom Overlay Badge: Mic state -->
-              <div class="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-3 py-1 text-xs text-white border border-white/10">
+              <div class="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-3 py-1 text-xs text-white border border-white/10">
                 <component :is="isMicEnabled ? Mic : MicOff" class="size-3.5" :class="isMicEnabled ? 'text-emerald-400' : 'text-rose-400'" />
-                {{ isMicEnabled ? 'الميكروفون جاهز' : 'الميكروفون مكتوم' }}
+                {{ isMicEnabled ? t('session.waitingRoom.micReady') : t('session.waitingRoom.micMuted') }}
               </div>
             </div>
 
@@ -358,12 +518,12 @@ function formatDate(val: string | Date | undefined) {
                   ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/20 dark:text-emerald-400'
                   : 'bg-rose-500/10 text-rose-600 border-rose-500/30 hover:bg-rose-500/20 dark:text-rose-400'"
                 data-testid="toggle-mic"
-                aria-label="تبديل الميكروفون"
+                :aria-label="t('session.controls.microphone')"
                 @click="toggleMicrophone"
               >
                 <Loader2 v-if="isTogglingMic" class="size-4 animate-spin" />
                 <component :is="isMicEnabled ? Mic : MicOff" v-else class="size-4" />
-                <span>{{ isMicEnabled ? 'الميكروفون مفعّل' : 'الميكروفون مكتوم' }}</span>
+                <span>{{ isMicEnabled ? t('session.waitingRoom.micOnLabel') : t('session.waitingRoom.micOffLabel') }}</span>
               </button>
 
               <!-- Cam Button -->
@@ -375,18 +535,105 @@ function formatDate(val: string | Date | undefined) {
                   ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/20 dark:text-emerald-400'
                   : 'bg-rose-500/10 text-rose-600 border-rose-500/30 hover:bg-rose-500/20 dark:text-rose-400'"
                 data-testid="toggle-cam"
-                aria-label="تبديل الكاميرا"
+                :aria-label="t('session.controls.camera')"
                 @click="toggleCamera"
               >
                 <Loader2 v-if="isTogglingCam" class="size-4 animate-spin" />
                 <component :is="isCamEnabled ? Video : VideoOff" v-else class="size-4" />
-                <span>{{ isCamEnabled ? 'الكاميرا مفعّلة' : 'الكاميرا متوقفة' }}</span>
+                <span>{{ isCamEnabled ? t('session.waitingRoom.camOnLabel') : t('session.waitingRoom.camOffLabel') }}</span>
               </button>
+            </div>
+
+            <!-- Media Device Selectors in Waiting Room (Section 7) -->
+            <div class="mt-5 rounded-2xl border border-border/80 bg-card/60 p-4 space-y-3.5 shadow-sm">
+              <h5 class="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Settings class="size-3.5 text-primary" />
+                {{ t('session.devices.title') }}
+              </h5>
+
+              <!-- Microphone Selector -->
+              <div class="space-y-1">
+                <label class="text-xs font-medium text-foreground flex items-center gap-1.5">
+                  <Mic class="size-3 text-muted-foreground" />
+                  {{ t('session.devices.microphone') }}
+                </label>
+                <select
+                  v-model="selectedAudioInputId"
+                  class="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  data-testid="waiting-select-mic"
+                  @change="switchMicrophone(selectedAudioInputId)"
+                >
+                  <option v-if="audioInputDevices.length === 0" value="">
+                    {{ t('session.devices.defaultMic') }}
+                  </option>
+                  <option
+                    v-for="(dev, idx) in audioInputDevices"
+                    :key="dev.deviceId"
+                    :value="dev.deviceId"
+                  >
+                    {{ formatDeviceLabel(dev, idx, 'audioinput') }}
+                  </option>
+                </select>
+              </div>
+
+              <!-- Speaker Selector -->
+              <div class="space-y-1">
+                <label class="text-xs font-medium text-foreground flex items-center gap-1.5">
+                  <Volume2 class="size-3 text-muted-foreground" />
+                  {{ t('session.devices.speaker') }}
+                </label>
+                <select
+                  v-model="selectedAudioOutputId"
+                  :disabled="!isSpeakerOutputSupported"
+                  class="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                  data-testid="waiting-select-speaker"
+                  @change="switchSpeaker(selectedAudioOutputId)"
+                >
+                  <option v-if="audioOutputDevices.length === 0 || !isSpeakerOutputSupported" value="">
+                    {{ isSpeakerOutputSupported ? t('session.devices.defaultSpeaker') : t('session.devices.speakerNotSupported') }}
+                  </option>
+                  <option
+                    v-for="(dev, idx) in audioOutputDevices"
+                    :key="dev.deviceId"
+                    :value="dev.deviceId"
+                  >
+                    {{ formatDeviceLabel(dev, idx, 'audiooutput') }}
+                  </option>
+                </select>
+                <p v-if="!isSpeakerOutputSupported" class="text-[10px] text-muted-foreground">
+                  {{ t('session.devices.speakerNotSupported') }}
+                </p>
+              </div>
+
+              <!-- Camera Selector -->
+              <div class="space-y-1">
+                <label class="text-xs font-medium text-foreground flex items-center gap-1.5">
+                  <Video class="size-3 text-muted-foreground" />
+                  {{ t('session.devices.camera') }}
+                </label>
+                <select
+                  v-model="selectedVideoInputId"
+                  class="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  data-testid="waiting-select-cam"
+                  @change="switchCamera(selectedVideoInputId)"
+                >
+                  <option v-if="videoInputDevices.length === 0" value="">
+                    {{ t('session.devices.defaultCam') }}
+                  </option>
+                  <option
+                    v-for="(dev, idx) in videoInputDevices"
+                    :key="dev.deviceId"
+                    :value="dev.deviceId"
+                  >
+                    {{ formatDeviceLabel(dev, idx, 'videoinput') }}
+                  </option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Left Column: Session Details & Doctor Approval State -->
+        <!-- Column 2: Session Details & Doctor Approval State -->
         <div class="lg:col-span-5 flex flex-col justify-center">
           <div class="rounded-3xl border border-border/80 bg-card p-6 md:p-8 shadow-lg">
             <!-- Doctor Header -->
@@ -396,10 +643,10 @@ function formatDate(val: string | Date | undefined) {
               </div>
               <div class="min-w-0 flex-1">
                 <span class="inline-block text-xs font-semibold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full mb-1">
-                  {{ sessionInfo?.service || 'جلسة استشارة طبية' }}
+                  {{ sessionInfo?.service || t('session.active.service') }}
                 </span>
                 <h3 class="text-xl font-bold text-foreground truncate">
-                  {{ sessionInfo?.doctorName ? `د. ${sessionInfo.doctorName}` : 'الطبيب المعالج' }}
+                  {{ sessionInfo?.doctorName ? `Dr. ${sessionInfo.doctorName}` : t('session.waitingRoom.doctorAssigned') }}
                 </h3>
                 <p class="text-xs text-muted-foreground mt-0.5">
                   {{ formatDate(sessionInfo?.date) }} {{ sessionInfo?.startTime ? `• ${sessionInfo.startTime}` : '' }}
@@ -421,13 +668,13 @@ function formatDate(val: string | Date | undefined) {
                   </div>
                 </div>
                 <h4 class="text-base font-bold text-amber-900 dark:text-amber-200">
-                  الطبيب متواجد حالياً
+                  {{ t('session.waitingRoom.doctorPresentTitle') }}
                 </h4>
                 <p class="mt-1 text-sm text-amber-800/90 dark:text-amber-300 font-medium">
-                  بانتظار موافقة الطبيب للانضمام إلى الجلسة
+                  {{ t('session.waitingRoom.waitingForApproval') }}
                 </p>
                 <p class="mt-2 text-xs text-amber-700/80 dark:text-amber-300/70">
-                  ستنتقل للشاشة الرئيسية للمكالمة تلقائياً بمجرد قبول الطبيب.
+                  {{ t('session.waitingRoom.autoJoinNote') }}
                 </p>
               </div>
 
@@ -440,25 +687,25 @@ function formatDate(val: string | Date | undefined) {
                   <Clock class="size-6 animate-pulse" />
                 </div>
                 <h4 class="text-base font-bold text-foreground">
-                  أنت الآن في غرفة الانتظار
+                  {{ t('session.waitingRoom.waitingForDoctorTitle') }}
                 </h4>
                 <p class="mt-1 text-sm text-muted-foreground">
-                  في انتظار دخول الطبيب إلى الغرفة...
+                  {{ t('session.waitingRoom.waitingForDoctorDesc') }}
                 </p>
                 <div class="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                   <span class="size-2 rounded-full bg-emerald-500"></span>
-                  <span>الاتصال بالخادم نشط وجاهز</span>
+                  <span>{{ t('session.waitingRoom.serverConnected') }}</span>
                 </div>
               </div>
             </div>
 
-            <!-- Helpful Tips -->
+            <!-- Helpful Guidance Tips -->
             <div class="mt-6 rounded-2xl bg-muted/60 p-4 text-xs text-muted-foreground leading-relaxed border border-border/40">
-              <p class="font-semibold text-foreground mb-1">💡 إرشادات لجلسة مريحة:</p>
+              <p class="font-semibold text-foreground mb-1.5">💡 {{ t('session.waitingRoom.tipsTitle') }}</p>
               <ul class="list-disc list-inside space-y-1">
-                <li>استخدم سماعات الرأس للحصول على أفضل وضوح للصوت.</li>
-                <li>تأكد من الجلوس في مكان هادئ ذي إضاءة مناسبة أمام الكاميرا.</li>
-                <li>الجلسة مشفرة ومحمية بأعلى معايير الخصوصية الطبية.</li>
+                <li>{{ t('session.waitingRoom.tipHeadphones') }}</li>
+                <li>{{ t('session.waitingRoom.tipLighting') }}</li>
+                <li>{{ t('session.waitingRoom.tipPrivacy') }}</li>
               </ul>
             </div>
           </div>
@@ -467,7 +714,7 @@ function formatDate(val: string | Date | undefined) {
     </div>
 
     <!-- State 3: Active Online Session (Phase 6) -->
-    <div v-else class="session-active-stage flex-1 flex flex-col relative bg-slate-950 text-white overflow-hidden rounded-3xl">
+    <div v-else class="session-active-stage flex min-h-0 flex-1 flex-col relative bg-slate-950 text-white overflow-hidden">
       <!-- Top Session Info Bar -->
       <header class="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 sm:px-6 py-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
         <div class="flex items-center gap-3">
@@ -476,13 +723,13 @@ function formatDate(val: string | Date | undefined) {
           </div>
           <div>
             <h2 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              {{ sessionInfo?.doctorName ? `د. ${sessionInfo.doctorName}` : 'الطبيب المعالج' }}
+              {{ sessionInfo?.doctorName ? `Dr. ${sessionInfo.doctorName}` : t('session.waitingRoom.doctorAssigned') }}
               <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-normal text-emerald-400">
                 <span class="size-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                مباشر
+                {{ t('session.active.live') }}
               </span>
             </h2>
-            <p class="text-xs text-slate-300/80">{{ sessionInfo?.service || 'استشارة طبية' }}</p>
+            <p class="text-xs text-slate-300/80">{{ sessionInfo?.service || t('session.active.service') }}</p>
           </div>
         </div>
 
@@ -496,7 +743,7 @@ function formatDate(val: string | Date | undefined) {
           <!-- Security Badge -->
           <div class="hidden sm:flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-xs text-emerald-400">
             <ShieldCheck class="size-3.5" />
-            <span>مشفرة وآمنة</span>
+            <span>{{ t('session.active.encrypted') }}</span>
           </div>
         </div>
       </header>
@@ -526,13 +773,13 @@ function formatDate(val: string | Date | undefined) {
                   <VideoOff class="size-4" />
                 </span>
               </div>
-              <h3 class="text-lg font-bold text-white">د. {{ primaryRemoteVideo.participantName }}</h3>
-              <p class="mt-1 text-xs text-slate-400">الكاميرا مغلقة من قِبل الطبيب</p>
+              <h3 class="text-lg font-bold text-white">Dr. {{ primaryRemoteVideo.participantName }}</h3>
+              <p class="mt-1 text-xs text-slate-400">{{ t('session.active.remoteCamOff') }}</p>
             </div>
 
             <!-- Doctor Name & Mic Badge (Bottom Left) -->
-            <div class="absolute bottom-24 right-6 z-20 flex items-center gap-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 text-xs text-white">
-              <span class="font-medium">د. {{ primaryRemoteVideo.participantName }}</span>
+            <div class="absolute bottom-24 left-6 z-20 flex items-center gap-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 text-xs text-white">
+              <span class="font-medium">Dr. {{ primaryRemoteVideo.participantName }}</span>
               <span class="size-1 rounded-full bg-white/40"></span>
               <component :is="isDoctorPresent ? Mic : MicOff" class="size-3.5 text-emerald-400" />
             </div>
@@ -550,15 +797,15 @@ function formatDate(val: string | Date | undefined) {
               <Stethoscope class="size-10" />
             </div>
           </div>
-          <h3 class="text-xl font-bold text-white">في انتظار انضمام الطبيب للجلسة...</h3>
+          <h3 class="text-xl font-bold text-white">{{ t('session.active.waitingForRemote') }}</h3>
           <p class="mt-2 text-sm text-slate-400 max-w-sm leading-relaxed">
-            تم قبولك في الجلسة بنجاح. ستظهر صورة وصوت الطبيب هنا فور اتصاله.
+            {{ t('session.active.waitingForRemoteDesc') }}
           </p>
         </div>
 
         <!-- Picture-in-Picture / Self-View (Patient Tile) -->
         <div
-          class="absolute bottom-24 left-4 sm:left-6 z-20 w-36 h-24 sm:w-48 sm:h-32 md:w-56 md:h-36 rounded-2xl overflow-hidden border border-white/20 bg-slate-900 shadow-2xl transition-all"
+          class="absolute bottom-24 right-4 sm:right-6 z-20 w-36 h-24 sm:w-48 sm:h-32 md:w-56 md:h-36 rounded-2xl overflow-hidden border border-white/20 bg-slate-900 shadow-2xl transition-all"
         >
           <!-- Local Video -->
           <video
@@ -578,15 +825,125 @@ function formatDate(val: string | Date | undefined) {
             <div class="flex size-10 items-center justify-center rounded-full bg-slate-800 border border-slate-700 mb-1">
               <User class="size-5 text-slate-300" />
             </div>
-            <span class="text-[11px] font-medium text-slate-400">الكاميرا متوقفة</span>
+            <span class="text-[11px] font-medium text-slate-400">{{ t('session.active.camOffSelf') }}</span>
           </div>
 
           <!-- Self Badge -->
-          <div class="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-md bg-black/60 backdrop-blur px-2 py-0.5 text-[10px] text-white">
-            <span>أنت</span>
+          <div class="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md bg-black/60 backdrop-blur px-2 py-0.5 text-[10px] text-white">
+            <span>{{ t('session.active.you') }}</span>
             <component :is="isMicEnabled ? Mic : MicOff" class="size-2.5" :class="isMicEnabled ? 'text-emerald-400' : 'text-rose-400'" />
           </div>
         </div>
+
+        <!-- Media & Device Settings Popover / Dropdown (Section 8) -->
+        <transition
+          enter-active-class="transition duration-200 ease-out"
+          enter-from-class="transform scale-95 opacity-0 translate-y-2"
+          enter-to-class="transform scale-100 opacity-100 translate-y-0"
+          leave-active-class="transition duration-150 ease-in"
+          leave-from-class="transform scale-100 opacity-100 translate-y-0"
+          leave-to-class="transform scale-95 opacity-0 translate-y-2"
+        >
+          <div
+            v-if="showSettingsMenu"
+            class="absolute bottom-24 z-40 w-80 sm:w-96 rounded-2xl bg-slate-900/95 backdrop-blur-2xl border border-white/20 p-5 shadow-2xl text-white"
+          >
+            <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+              <h4 class="text-sm font-bold flex items-center gap-2">
+                <Settings class="size-4 text-primary" />
+                {{ t('session.devices.title') }}
+              </h4>
+              <button
+                type="button"
+                class="size-7 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition"
+                @click="showSettingsMenu = false"
+              >
+                <X class="size-4" />
+              </button>
+            </div>
+
+            <div class="space-y-4">
+              <!-- Microphone Selector -->
+              <div class="space-y-1.5">
+                <label class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Mic class="size-3.5 text-primary" />
+                  {{ t('session.devices.microphone') }}
+                </label>
+                <select
+                  v-model="selectedAudioInputId"
+                  class="w-full rounded-xl border border-white/15 bg-slate-800 px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  data-testid="session-select-mic"
+                  @change="switchMicrophone(selectedAudioInputId)"
+                >
+                  <option v-if="audioInputDevices.length === 0" value="">
+                    {{ t('session.devices.defaultMic') }}
+                  </option>
+                  <option
+                    v-for="(dev, idx) in audioInputDevices"
+                    :key="dev.deviceId"
+                    :value="dev.deviceId"
+                  >
+                    {{ formatDeviceLabel(dev, idx, 'audioinput') }}
+                  </option>
+                </select>
+              </div>
+
+              <!-- Speaker Selector -->
+              <div class="space-y-1.5">
+                <label class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Volume2 class="size-3.5 text-primary" />
+                  {{ t('session.devices.speaker') }}
+                </label>
+                <select
+                  v-model="selectedAudioOutputId"
+                  :disabled="!isSpeakerOutputSupported"
+                  class="w-full rounded-xl border border-white/15 bg-slate-800 px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                  data-testid="session-select-speaker"
+                  @change="switchSpeaker(selectedAudioOutputId)"
+                >
+                  <option v-if="audioOutputDevices.length === 0 || !isSpeakerOutputSupported" value="">
+                    {{ isSpeakerOutputSupported ? t('session.devices.defaultSpeaker') : t('session.devices.speakerNotSupported') }}
+                  </option>
+                  <option
+                    v-for="(dev, idx) in audioOutputDevices"
+                    :key="dev.deviceId"
+                    :value="dev.deviceId"
+                  >
+                    {{ formatDeviceLabel(dev, idx, 'audiooutput') }}
+                  </option>
+                </select>
+                <p v-if="!isSpeakerOutputSupported" class="text-[10px] text-slate-400">
+                  {{ t('session.devices.speakerNotSupported') }}
+                </p>
+              </div>
+
+              <!-- Camera Selector -->
+              <div class="space-y-1.5">
+                <label class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Video class="size-3.5 text-primary" />
+                  {{ t('session.devices.camera') }}
+                </label>
+                <select
+                  v-model="selectedVideoInputId"
+                  class="w-full rounded-xl border border-white/15 bg-slate-800 px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  data-testid="session-select-cam"
+                  @change="switchCamera(selectedVideoInputId)"
+                >
+                  <option v-if="videoInputDevices.length === 0" value="">
+                    {{ t('session.devices.defaultCam') }}
+                  </option>
+                  <option
+                    v-for="(dev, idx) in videoInputDevices"
+                    :key="dev.deviceId"
+                    :value="dev.deviceId"
+                  >
+                    {{ formatDeviceLabel(dev, idx, 'videoinput') }}
+                  </option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </transition>
       </main>
 
       <!-- Floating Bottom Controls Bar (Glassmorphic Telemedicine Dock) -->
@@ -600,8 +957,8 @@ function formatDate(val: string | Date | undefined) {
             :class="isMicEnabled
               ? 'bg-slate-800 text-white hover:bg-slate-700 border border-white/10'
               : 'bg-rose-500 text-white hover:bg-rose-600 shadow-rose-500/20'"
-            :title="isMicEnabled ? 'كتم الميكروفون' : 'تشغيل الميكروفون'"
-            :aria-label="isMicEnabled ? 'كتم الميكروفون' : 'تشغيل الميكروفون'"
+            :title="isMicEnabled ? t('session.controls.micMute') : t('session.controls.micUnmute')"
+            :aria-label="isMicEnabled ? t('session.controls.micMute') : t('session.controls.micUnmute')"
             data-testid="toggle-mic"
             @click="toggleMicrophone"
           >
@@ -617,8 +974,8 @@ function formatDate(val: string | Date | undefined) {
             :class="isCamEnabled
               ? 'bg-slate-800 text-white hover:bg-slate-700 border border-white/10'
               : 'bg-rose-500 text-white hover:bg-rose-600 shadow-rose-500/20'"
-            :title="isCamEnabled ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'"
-            :aria-label="isCamEnabled ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'"
+            :title="isCamEnabled ? t('session.controls.camTurnOff') : t('session.controls.camTurnOn')"
+            :aria-label="isCamEnabled ? t('session.controls.camTurnOff') : t('session.controls.camTurnOn')"
             data-testid="toggle-cam"
             @click="toggleCamera"
           >
@@ -633,12 +990,27 @@ function formatDate(val: string | Date | undefined) {
             :class="isSpeakerMuted
               ? 'bg-amber-500 text-white hover:bg-amber-600'
               : 'bg-slate-800 text-white hover:bg-slate-700 border border-white/10'"
-            :title="isSpeakerMuted ? 'تشغيل صوت الجلسة' : 'كتم صوت الجلسة'"
-            :aria-label="isSpeakerMuted ? 'تشغيل صوت الجلسة' : 'كتم صوت الجلسة'"
+            :title="isSpeakerMuted ? t('session.controls.speakerUnmute') : t('session.controls.speakerMute')"
+            :aria-label="isSpeakerMuted ? t('session.controls.speakerUnmute') : t('session.controls.speakerMute')"
             data-testid="toggle-speaker"
             @click="toggleSpeaker"
           >
             <component :is="isSpeakerMuted ? VolumeX : Volume2" class="size-5" />
+          </button>
+
+          <!-- Media Settings Toggle -->
+          <button
+            type="button"
+            class="flex size-12 items-center justify-center rounded-full transition shadow-soft focus:outline-none focus:ring-2 focus:ring-primary"
+            :class="showSettingsMenu
+              ? 'bg-primary text-white'
+              : 'bg-slate-800 text-white hover:bg-slate-700 border border-white/10'"
+            :title="t('session.controls.settings')"
+            :aria-label="t('session.controls.settings')"
+            data-testid="toggle-settings"
+            @click="showSettingsMenu = !showSettingsMenu"
+          >
+            <Settings class="size-5" />
           </button>
 
           <!-- Separator -->
@@ -649,11 +1021,11 @@ function formatDate(val: string | Date | undefined) {
             type="button"
             class="flex items-center gap-2 rounded-full bg-rose-600 hover:bg-rose-700 text-white px-5 py-3 font-semibold text-sm transition shadow-lg shadow-rose-600/30 focus:outline-none focus:ring-2 focus:ring-rose-500"
             data-testid="leave-session"
-            aria-label="إنهاء الجلسة والمغادرة"
+            :aria-label="t('session.controls.endCall')"
             @click="showLeaveModal = true"
           >
             <PhoneOff class="size-4" />
-            <span class="hidden sm:inline">إنهاء الجلسة</span>
+            <span class="hidden sm:inline">{{ t('session.controls.endCall') }}</span>
           </button>
         </div>
       </footer>
@@ -682,9 +1054,9 @@ function formatDate(val: string | Date | undefined) {
         <div class="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500">
           <PhoneOff class="size-7" />
         </div>
-        <h4 class="text-lg font-bold text-foreground">هل أنت متأكد من رغبتك في المغادرة؟</h4>
+        <h4 class="text-lg font-bold text-foreground">{{ t('session.modal.leaveTitle') }}</h4>
         <p class="mt-2 text-xs text-muted-foreground leading-relaxed">
-          عند المغادرة سيتم قطع اتصال الجلسة والعودة إلى قائمة مواعيدك.
+          {{ t('session.modal.leaveDesc') }}
         </p>
         <div class="mt-6 flex items-center justify-center gap-3">
           <button
@@ -693,7 +1065,7 @@ function formatDate(val: string | Date | undefined) {
             data-testid="cancel-leave"
             @click="showLeaveModal = false"
           >
-            البقاء في الجلسة
+            {{ t('session.controls.stayInCall') }}
           </button>
           <button
             type="button"
@@ -701,7 +1073,7 @@ function formatDate(val: string | Date | undefined) {
             data-testid="confirm-leave"
             @click="onConfirmLeave"
           >
-            تأكيد المغادرة
+            {{ t('session.controls.confirmEnd') }}
           </button>
         </div>
       </div>
