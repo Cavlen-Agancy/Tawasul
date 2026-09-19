@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ArrowLeft, ChevronDown } from 'lucide-vue-next'
+import { ArrowLeft } from 'lucide-vue-next'
 import { quickConsultServices } from '~/lib/home-content'
 import { siteConfig } from '~/lib/site'
 
 const selectedMode = ref<'online' | 'in-person'>('online')
 const clientName = ref('')
 const clientPhone = ref('')
-const selectedService = ref('')
+const selectedService = ref('استشارة نفسية متخصصة (فردية)')
 const formError = ref('')
 
 const serviceOptions = [
@@ -115,15 +115,16 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
 </script>
 
 <template>
-  <section id="hero" aria-labelledby="hero-title" class="relative w-full overflow-hidden">
+  <section id="hero" aria-labelledby="hero-title" class="hero-section relative w-full">
     <!-- ================================================================= -->
     <!-- 1. DESKTOP HERO LAYOUT (@media min-width: 769px)                  -->
-    <!-- EXACT MATCH TO IMAGE 1 SCREENSHOT WITH SUBTLE ANIMATIONS          -->
+    <!-- EXACT REMAINING VIEWPORT HEIGHT: calc(100vh - 80px)               -->
+    <!-- Vertically centered content, zero overlap, no bleed from below    -->
     <!-- ================================================================= -->
-    <div class="hero-desktop-view relative w-full overflow-hidden bg-[#111116] pt-12 pb-20">
-      <!-- Background image with looping slow zoom-in (scale 1.05 -> 1) -->
+    <div class="hero-desktop-view relative w-full h-[calc(100vh-80px)] min-h-[calc(100vh-80px)] max-h-[calc(100vh-80px)] overflow-hidden bg-[#111116] flex flex-col justify-center items-center">
+      <!-- Background image covering the entire remaining viewport height below navbar -->
       <div
-        class="hero-bg-zoom pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+        class="hero-bg-zoom pointer-events-none absolute inset-0 h-full w-full bg-cover bg-center bg-no-repeat"
         style="background-image: url('/hero.png');"
         aria-hidden="true"
       />
@@ -132,16 +133,16 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
       <div class="absolute inset-0 bg-black/45" aria-hidden="true" />
       <div class="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-[#111116]" aria-hidden="true" />
 
-      <!-- Center content with staggered entrance animations -->
-      <div class="relative z-10 mx-auto flex w-full max-w-7xl flex-col items-center px-4 text-center sm:px-6 lg:px-8">
+      <!-- Center content with vertical centering -->
+      <div class="relative z-10 mx-auto flex w-full max-w-7xl flex-col items-center justify-center px-4 text-center sm:px-6 lg:px-8 py-0 my-auto">
         <!-- Top Pill Badge -->
-        <div class="animate-hero-heading inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/60 px-4 py-1.5 text-xs font-medium text-white shadow-soft backdrop-blur-md">
+        <div class="animate-hero-heading inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/60 px-4 py-1 text-xs font-medium text-white shadow-soft backdrop-blur-md mb-2">
           <span class="h-2 w-2 rounded-full bg-[#e91e8c] animate-pulse" aria-hidden="true" />
           <span>أكاديمية تواصل — بجمهورية مصر العربية</span>
         </div>
 
         <!-- Main Headline (fade in + slide up) -->
-        <h1 class="animate-hero-heading mt-7 text-5xl lg:text-6xl xl:text-7xl font-extrabold tracking-tight text-white leading-[1.15]">
+        <h1 class="animate-hero-heading mt-2 text-4xl lg:text-5xl xl:text-[3.75rem] font-extrabold tracking-tight text-white leading-[1.15]">
           <span>نتواصل </span>
           <span class="relative inline-block text-[#e91e8c]">
             نفهم
@@ -150,12 +151,12 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
         </h1>
 
         <!-- Subtitle (0.2s delay stagger) -->
-        <p class="animate-hero-subtext mt-5 max-w-2xl text-base lg:text-lg leading-relaxed text-white/80">
+        <p class="animate-hero-subtext mt-3 max-w-2xl text-xs sm:text-sm lg:text-base leading-relaxed text-white/80">
           نساعدك على استعادة التوازن النفسي والأسري من خلال جلسات استشارية وعلاجية مبنية على أسس علمية رصينة، مع نخبة من الاستشاريين والأخصائيين المعتمدين.
         </p>
 
         <!-- Search / Quick Booking Pill Bar (0.4s delay stagger) -->
-        <div class="animate-hero-form mt-9 w-full max-w-4xl rounded-full border border-white/15 bg-[#171720]/85 p-2 shadow-medium backdrop-blur-xl">
+        <div class="animate-hero-form mt-6 w-full max-w-4xl rounded-full border border-white/15 bg-[#171720]/85 p-1.5 shadow-medium backdrop-blur-xl">
           <form class="flex items-center justify-between gap-2" @submit.prevent="() => handleBooking()">
             <!-- Name Input -->
             <div class="flex-1 px-3">
@@ -166,11 +167,11 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
                 type="text"
                 autocomplete="name"
                 placeholder="اسم العميل الكريم"
-                class="h-11 w-full rounded-full bg-transparent px-3 text-sm text-white placeholder:text-white/50 focus:outline-none"
+                class="h-10 w-full rounded-full bg-transparent px-3 text-sm text-white placeholder:text-white/50 focus:outline-none"
               >
             </div>
 
-            <div class="h-7 w-px bg-white/20" aria-hidden="true" />
+            <div class="h-6 w-px bg-white/20" aria-hidden="true" />
 
             <!-- Phone Input -->
             <div class="flex-1 px-3">
@@ -182,19 +183,19 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
                 dir="ltr"
                 autocomplete="tel"
                 placeholder="رقم الهاتف / واتساب"
-                class="tnum h-11 w-full rounded-full bg-transparent px-3 text-right text-sm text-white placeholder:text-white/50 focus:outline-none"
+                class="tnum h-10 w-full rounded-full bg-transparent px-3 text-right text-sm text-white placeholder:text-white/50 focus:outline-none"
               >
             </div>
 
-            <div class="h-7 w-px bg-white/20" aria-hidden="true" />
+            <div class="h-6 w-px bg-white/20" aria-hidden="true" />
 
-            <!-- Service Dropdown -->
+            <!-- Service Dropdown on Desktop (unchanged) -->
             <div class="flex-1 px-3">
               <label for="d-service" class="sr-only">نوع الاستشارة</label>
               <select
                 id="d-service"
                 v-model="selectedService"
-                class="h-11 w-full cursor-pointer rounded-full bg-transparent px-3 text-sm text-white focus:outline-none"
+                class="h-10 w-full cursor-pointer rounded-full bg-transparent px-3 text-sm text-white focus:outline-none"
               >
                 <option value="" disabled selected class="bg-[#171720] text-white/50">نوع الاستشارة...</option>
                 <option v-for="s in quickConsultServices" :key="s" :value="s" class="bg-[#171720] text-white">{{ s }}</option>
@@ -204,7 +205,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
             <!-- Submit Button with hover scale -->
             <button
               type="submit"
-              class="flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#e91e8c] px-7 font-bold text-white shadow-magenta transition-transform hover:bg-[#d8157e] active:scale-95"
+              class="flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#e91e8c] px-6 text-sm font-bold text-white shadow-magenta transition-transform hover:bg-[#d8157e] active:scale-95 cursor-pointer"
             >
               <span>احجز استشارتك</span>
               <ArrowLeft class="size-4" aria-hidden="true" />
@@ -212,99 +213,103 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
           </form>
         </div>
 
-        <p v-if="formError" role="alert" class="mt-2 text-xs font-medium text-red-400">
+        <p v-if="formError" role="alert" class="mt-1 text-xs font-medium text-red-400">
           {{ formError }}
         </p>
 
-        <!-- Direct Selection Badges -->
-        <div class="animate-hero-form mt-4 flex items-center justify-center gap-2 text-xs text-white/70">
-          <span>أو تفضل باختيار طريقة الجلسة مباشرة:</span>
+        <!-- Desktop Session Type Toggle Buttons below the main form row -->
+        <div class="animate-hero-form mt-4 flex items-center justify-center gap-3">
           <button
             type="button"
-            class="rounded-full border border-white/20 bg-black/50 px-4 py-1 text-xs text-white/90 transition-colors hover:border-[#e91e8c] hover:text-[#e91e8c] active:scale-95"
-            @click="handleBooking('online')"
+            class="flex items-center gap-2 rounded-full px-5 py-2 text-xs sm:text-sm font-bold transition-all duration-200 active:scale-95 cursor-pointer"
+            :class="selectedMode === 'online' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'border border-white/20 bg-black/50 text-white/80 hover:border-[#e91e8c] hover:text-white'"
+            @click="selectedMode = 'online'"
           >
-            جلسة أونلاين مباشرة
+            <span class="size-2 rounded-full" :class="selectedMode === 'online' ? 'bg-white animate-pulse' : 'bg-white/40'" />
+            <span>جلسة أونلاين مباشرة</span>
           </button>
+
           <button
             type="button"
-            class="rounded-full border border-white/20 bg-black/50 px-4 py-1 text-xs text-white/90 transition-colors hover:border-[#e91e8c] hover:text-[#e91e8c] active:scale-95"
-            @click="handleBooking('in-person')"
+            class="flex items-center gap-2 rounded-full px-5 py-2 text-xs sm:text-sm font-bold transition-all duration-200 active:scale-95 cursor-pointer"
+            :class="selectedMode === 'in-person' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'border border-white/20 bg-black/50 text-white/80 hover:border-[#e91e8c] hover:text-white'"
+            @click="selectedMode = 'in-person'"
           >
-            حضور شخصي بمقر تواصل
+            <span class="size-2 rounded-full" :class="selectedMode === 'in-person' ? 'bg-white animate-pulse' : 'bg-white/40'" />
+            <span>حضور شخصي بمقر تواصل</span>
           </button>
         </div>
 
         <!-- Trust Metrics 4 Columns Card with count-up & viewport fade-in/scale-up -->
         <div
           ref="statsContainerRef"
-          class="mt-12 w-full max-w-5xl rounded-3xl border border-white/10 bg-[#171720]/80 p-6 sm:p-8 backdrop-blur-md"
+          class="mt-6 w-full max-w-5xl rounded-3xl border border-white/10 bg-[#171720]/80 p-4 sm:p-5 backdrop-blur-md"
         >
-          <dl class="grid grid-cols-4 gap-4 divide-x divide-x-reverse divide-white/10">
+          <dl class="grid grid-cols-4 gap-3 divide-x divide-x-reverse divide-white/10">
             <!-- 500+ -->
             <div
               class="stat-card-anim flex flex-col items-center text-center"
               :class="{ 'is-active': statsAnimated }"
               style="transition-delay: 0.1s;"
             >
-              <dd class="tnum text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+              <dd class="tnum text-2xl lg:text-3xl font-extrabold tracking-tight text-white">
                 +{{ statsAnimated ? count500 : 500 }}
               </dd>
-              <dt class="mt-2 text-sm font-bold text-white">
+              <dt class="mt-1 text-xs lg:text-sm font-bold text-white">
                 جلسة استشارية ناجحة
               </dt>
-              <p class="mt-1 text-xs text-white/60 leading-snug">
+              <p class="mt-0.5 text-[11px] text-white/60 leading-snug">
                 خلال العام الحالي بنسبة رضا عالية
               </p>
             </div>
 
             <!-- 50+ -->
             <div
-              class="stat-card-anim flex flex-col items-center text-center pe-4"
+              class="stat-card-anim flex flex-col items-center text-center pe-3"
               :class="{ 'is-active': statsAnimated }"
               style="transition-delay: 0.2s;"
             >
-              <dd class="tnum text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+              <dd class="tnum text-2xl lg:text-3xl font-extrabold tracking-tight text-white">
                 +{{ statsAnimated ? count50 : 50 }}
               </dd>
-              <dt class="mt-2 text-sm font-bold text-white">
+              <dt class="mt-1 text-xs lg:text-sm font-bold text-white">
                 استشاري ومعالج معتمد
               </dt>
-              <p class="mt-1 text-xs text-white/60 leading-snug">
+              <p class="mt-0.5 text-[11px] text-white/60 leading-snug">
                 أطباء وأخصائيون ذوو كفاءة وخبرة
               </p>
             </div>
 
             <!-- 8+ -->
             <div
-              class="stat-card-anim flex flex-col items-center text-center pe-4"
+              class="stat-card-anim flex flex-col items-center text-center pe-3"
               :class="{ 'is-active': statsAnimated }"
               style="transition-delay: 0.3s;"
             >
-              <dd class="tnum text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+              <dd class="tnum text-2xl lg:text-3xl font-extrabold tracking-tight text-white">
                 +{{ statsAnimated ? count8 : 8 }}
               </dd>
-              <dt class="mt-2 text-sm font-bold text-white">
+              <dt class="mt-1 text-xs lg:text-sm font-bold text-white">
                 سنوات من التميز والعطاء
               </dt>
-              <p class="mt-1 text-xs text-white/60 leading-snug">
+              <p class="mt-0.5 text-[11px] text-white/60 leading-snug">
                 في تقديم الخدمات النفسية والأسرية
               </p>
             </div>
 
             <!-- 100% -->
             <div
-              class="stat-card-anim flex flex-col items-center text-center pe-4"
+              class="stat-card-anim flex flex-col items-center text-center pe-3"
               :class="{ 'is-active': statsAnimated }"
               style="transition-delay: 0.4s;"
             >
-              <dd class="tnum text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+              <dd class="tnum text-2xl lg:text-3xl font-extrabold tracking-tight text-white">
                 {{ statsAnimated ? count100 : 100 }}%
               </dd>
-              <dt class="mt-2 text-sm font-bold text-white">
+              <dt class="mt-1 text-xs lg:text-sm font-bold text-white">
                 خصوصية وسرية تامة
               </dt>
-              <p class="mt-1 text-xs text-white/60 leading-snug">
+              <p class="mt-0.5 text-[11px] text-white/60 leading-snug">
                 وفق ميثاق الشرف الأخلاقي والمهني
               </p>
             </div>
@@ -373,13 +378,13 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
         </div>
 
         <!-- 2. Form Section Card -->
-        <div class="animate-hero-form rounded-[26px] border border-white/10 bg-[#171722] p-4 shadow-xl">
+        <div class="animate-hero-form relative rounded-[26px] border border-white/10 bg-[#171722] p-4 shadow-xl">
           <form class="flex flex-col gap-3.5" @submit.prevent="() => handleBooking()">
             <!-- Two Toggle Buttons Side-by-Side -->
             <div class="grid grid-cols-2 gap-1 rounded-full bg-[#0e0e14] p-1 border border-white/5">
               <button
                 type="button"
-                class="rounded-full py-2.5 px-3 text-xs font-bold transition-all duration-200 text-center truncate"
+                class="rounded-full py-2.5 px-3 text-xs font-bold transition-all duration-200 text-center truncate cursor-pointer"
                 :class="selectedMode === 'online' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'text-white/70 hover:text-white'"
                 @click="selectedMode = 'online'"
               >
@@ -387,7 +392,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
               </button>
               <button
                 type="button"
-                class="rounded-full py-2.5 px-3 text-xs font-medium transition-all duration-200 text-center truncate"
+                class="rounded-full py-2.5 px-3 text-xs font-medium transition-all duration-200 text-center truncate cursor-pointer"
                 :class="selectedMode === 'in-person' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'text-white/70 hover:text-white'"
                 @click="selectedMode = 'in-person'"
               >
@@ -426,30 +431,24 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
               >
             </div>
 
-            <!-- Dropdown 3: Service Selection -->
-            <div class="flex flex-col gap-1.5">
-              <label for="m-service-select" class="text-xs font-medium text-white/90 text-right">
+            <!-- Dropdown 3: Native HTML <select> on Mobile -->
+            <div class="flex flex-col gap-1.5 w-full">
+              <label for="m-native-select" class="text-xs font-medium text-white/90 text-right">
                 نوع الاستشارة المطلوبة
               </label>
-              <div class="relative">
-                <select
-                  id="m-service-select"
-                  v-model="selectedService"
-                  class="h-11 w-full appearance-none rounded-2xl border border-white/10 bg-[#101017] pe-10 ps-4 text-xs text-white focus:border-[#e91e8c] focus:outline-none focus:ring-1 focus:ring-[#e91e8c]"
-                >
-                  <option
-                    v-for="s in serviceOptions"
-                    :key="s"
-                    :value="s"
-                    class="bg-[#171722] text-white"
-                  >
-                    {{ s }}
-                  </option>
-                </select>
-                <span class="pointer-events-none absolute inset-y-0 start-3 flex items-center text-white/60">
-                  <ChevronDown class="size-4" />
-                </span>
-              </div>
+              <select
+                id="m-native-select"
+                v-model="selectedService"
+                class="native-mobile-select"
+              >
+                <option value="">نوع الاستشارة المطلوبة...</option>
+                <option value="استشارة نفسية متخصصة (فردية)">استشارة نفسية متخصصة (فردية)</option>
+                <option value="الاستشارات التربوية وإرشاد الأسرة">الاستشارات التربوية وإرشاد الأسرة</option>
+                <option value="الاستشارات الزوجية والأسرية">الاستشارات الزوجية والأسرية</option>
+                <option value="التخاطب وعيوب النطق والكلام">التخاطب وعيوب النطق والكلام</option>
+                <option value="تعديل وتوجيه السلوك">تعديل وتوجيه السلوك</option>
+                <option value="تنمية المهارات والقدرات">تنمية المهارات والقدرات</option>
+              </select>
             </div>
 
             <p v-if="formError" role="alert" class="text-xs font-medium text-red-400">
@@ -459,7 +458,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
             <!-- Full-width CTA button -->
             <button
               type="submit"
-              class="mt-1 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#e91e8c] px-6 text-sm font-bold text-white shadow-magenta transition-transform hover:bg-[#d8157e] active:scale-[0.98]"
+              class="mt-1 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#e91e8c] px-6 text-sm font-bold text-white shadow-magenta transition-transform hover:bg-[#d8157e] active:scale-[0.98] cursor-pointer"
             >
               <span>احجز استشارتك الآن</span>
               <ArrowLeft class="size-4" aria-hidden="true" />
@@ -572,8 +571,41 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
   transform: scale(1) translateY(0);
 }
 
+/* Native HTML <select> styling on mobile */
+.native-mobile-select {
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  padding-left: 2.5rem;
+  color: #ffffff;
+  font-size: 0.9rem;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.7)' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 1rem center;
+  background-size: 1.25rem;
+  cursor: pointer;
+}
+
+.native-mobile-select:focus {
+  border-color: #e91e8c;
+  outline: none;
+  box-shadow: 0 0 0 1px #e91e8c;
+}
+
+.native-mobile-select option {
+  background-color: #1a1a2e;
+  color: #ffffff;
+}
+
 /* Strict CSS media query separation */
 @media (max-width: 768px) {
+  .hero-section {
+    overflow: visible !important;
+  }
   .hero-desktop-view {
     display: none !important;
   }
@@ -583,8 +615,14 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
 }
 
 @media (min-width: 769px) {
+  .hero-section {
+    overflow: hidden !important;
+  }
   .hero-desktop-view {
-    display: block !important;
+    display: flex !important;
+    height: calc(100vh - 80px) !important;
+    min-height: calc(100vh - 80px) !important;
+    max-height: calc(100vh - 80px) !important;
   }
   .hero-mobile-view {
     display: none !important;
