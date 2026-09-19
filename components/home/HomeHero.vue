@@ -129,8 +129,8 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
         aria-hidden="true"
       />
 
-      <!-- Dark overlay -->
-      <div class="absolute inset-0 bg-black/45" aria-hidden="true" />
+      <!-- Dark overlay adjusted for optimal text readability on desktop -->
+      <div class="absolute inset-0" style="background: rgba(0, 0, 0, 0.55);" aria-hidden="true" />
       <div class="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-[#111116]" aria-hidden="true" />
 
       <!-- Center content with vertical centering -->
@@ -142,7 +142,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
         </div>
 
         <!-- Main Headline (fade in + slide up) -->
-        <h1 class="animate-hero-heading mt-2 text-4xl lg:text-5xl xl:text-[3.75rem] font-extrabold tracking-tight text-white leading-[1.15]">
+        <h1 class="desktop-hero-heading animate-hero-heading mt-2 text-4xl lg:text-5xl xl:text-[3.75rem] font-extrabold tracking-tight text-white leading-[1.15]">
           <span>نتواصل </span>
           <span class="relative inline-block text-[#e91e8c]">
             نفهم
@@ -151,7 +151,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
         </h1>
 
         <!-- Subtitle (0.2s delay stagger) -->
-        <p class="animate-hero-subtext mt-3 max-w-2xl text-xs sm:text-sm lg:text-base leading-relaxed text-white/80">
+        <p class="desktop-hero-subtext animate-hero-subtext mt-3 max-w-2xl text-xs sm:text-sm lg:text-base leading-relaxed text-white/80">
           نساعدك على استعادة التوازن النفسي والأسري من خلال جلسات استشارية وعلاجية مبنية على أسس علمية رصينة، مع نخبة من الاستشاريين والأخصائيين المعتمدين.
         </p>
 
@@ -615,6 +615,12 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
 }
 
 @media (min-width: 769px) {
+  .desktop-hero-heading {
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  }
+  .desktop-hero-subtext {
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+  }
   .hero-section {
     overflow: hidden !important;
   }

@@ -64,6 +64,7 @@ export default {
       },
       fontFamily: {
         sans: ['"IBM Plex Sans Arabic"', 'Inter', 'DM Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        arabic: ['Almarai', 'sans-serif'],
       },
       keyframes: {
         shimmer: {

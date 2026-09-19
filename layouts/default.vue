@@ -21,6 +21,21 @@ watch(() => route.fullPath, () => {
 
 useHead({
   htmlAttrs: { dir: 'rtl', lang: 'ar' },
+  link: [
+    {
+      rel: 'preconnect',
+      href: 'https://fonts.googleapis.com',
+    },
+    {
+      rel: 'preconnect',
+      href: 'https://fonts.gstatic.com',
+      crossorigin: '',
+    },
+    {
+      rel: 'stylesheet',
+      href: 'https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&display=swap',
+    },
+  ],
 })
 
 const year = 2026
@@ -41,7 +56,12 @@ async function handleLogout() {
 </script>
 
 <template>
-  <div dir="rtl" lang="ar" class="flex min-h-screen flex-col bg-background text-foreground selection:bg-primary/20 selection:text-primary">
+  <div
+    dir="rtl"
+    lang="ar"
+    class="flex min-h-screen flex-col bg-background text-foreground selection:bg-primary/20 selection:text-primary"
+    :class="{ 'marketing-layout': !isAuthPage }"
+  >
     <a
       href="#main-content"
       class="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-[100] focus:rounded-xl focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
@@ -511,6 +531,10 @@ async function handleLogout() {
 </template>
 
 <style scoped>
+.marketing-layout {
+  font-family: 'Almarai', sans-serif;
+}
+
 @keyframes navbarSlideDown {
   from {
     opacity: 0;
