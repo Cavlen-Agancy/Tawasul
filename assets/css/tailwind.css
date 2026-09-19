@@ -4,44 +4,46 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 300 0% 18%;
+    /* Light mode — warm neutral healthcare palette, brand accent #E91E8C */
+    --background: 330 33% 98.5%;
+    --foreground: 320 12% 16%;
     --card: 0 0% 100%;
-    --card-foreground: 300 0% 18%;
+    --card-foreground: 320 12% 16%;
     --primary: 329 79% 52%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 326 78% 96%;
-    --secondary-foreground: 329 68% 42%;
-    --muted: 0 0% 98%;
-    --muted-foreground: 300 2% 30%;
-    --accent: 326 78% 96%;
-    --accent-foreground: 329 68% 42%;
+    --secondary: 327 70% 95%;
+    --secondary-foreground: 329 68% 38%;
+    --muted: 325 20% 95.5%;
+    --muted-foreground: 320 8% 38%;
+    --accent: 327 70% 95%;
+    --accent-foreground: 329 68% 38%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 92%;
-    --input: 0 0% 92%;
-    --ring: 326 78% 96%;
+    --border: 325 18% 89%;
+    --input: 325 18% 89%;
+    --ring: 329 79% 52%;
     --radius: 1rem;
   }
 
   .dark {
-    --background: 250 8% 9%;
-    --foreground: 0 0% 98%;
-    --card: 250 8% 13%;
-    --card-foreground: 0 0% 98%;
-    --primary: 329 78% 58%;
+    /* Dark mode — preserves Stitch identity: #111111 bg, #161616 surface, #1C1C1C card */
+    --background: 0 0% 7%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 11%;
+    --card-foreground: 0 0% 96%;
+    --primary: 329 82% 58%;
     --primary-foreground: 0 0% 100%;
     --secondary: 329 35% 18%;
     --secondary-foreground: 326 80% 92%;
-    --muted: 250 8% 16%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 0 0% 13.5%;
+    --muted-foreground: 0 0% 66%;
     --accent: 329 35% 18%;
     --accent-foreground: 326 80% 92%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 250 7% 20%;
-    --input: 250 7% 20%;
-    --ring: 329 75% 58%;
+    --border: 0 0% 17%;
+    --input: 0 0% 17%;
+    --ring: 329 82% 58%;
   }
 }
 
@@ -49,8 +51,42 @@
   * {
     @apply border-border;
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'IBM Plex Sans Arabic', 'Inter', 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    text-rendering: optimizeLegibility;
+    overflow-x: clip;
+  }
+  /* Anchor sections: offset for sticky header */
+  section[id] {
+    scroll-margin-top: 5.5rem;
+  }
+  /* Numeric values (metrics, prices, times) in Inter for tabular clarity */
+  .tnum {
+    font-family: 'Inter', 'IBM Plex Sans Arabic', ui-sans-serif, system-ui, sans-serif;
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.22);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 

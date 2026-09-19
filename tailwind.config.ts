@@ -63,7 +63,7 @@ export default {
         magenta: '0 4px 24px rgba(233,30,140,0.15)',
       },
       fontFamily: {
-        sans: ['Inter', 'DM Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['"IBM Plex Sans Arabic"', 'Inter', 'DM Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       keyframes: {
         shimmer: {
