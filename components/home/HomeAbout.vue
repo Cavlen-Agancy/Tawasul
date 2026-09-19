@@ -15,17 +15,48 @@ const features = [
     description: 'نضمن الحفاظ المطلق على سرية بياناتك وتفاصيل جلساتك وفق أشد اللوائح المهنية صرامة.',
   },
 ]
+
+// Trigger scroll animations using IntersectionObserver
+const sectionRef = ref<HTMLElement | null>(null)
+const isAboutVisible = ref(false)
+
+onMounted(() => {
+  if (typeof IntersectionObserver !== 'undefined') {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            isAboutVisible.value = true
+            observer.disconnect()
+          }
+        })
+      },
+      { threshold: 0.15 }
+    )
+    if (sectionRef.value) observer.observe(sectionRef.value)
+  } else {
+    isAboutVisible.value = true
+  }
+})
 </script>
 
 <template>
-  <section id="why-us" aria-labelledby="about-title" class="relative w-full py-14 sm:py-20 overflow-hidden">
+  <section
+    id="why-us"
+    ref="sectionRef"
+    aria-labelledby="about-title"
+    class="relative w-full py-14 sm:py-20 overflow-hidden"
+  >
     <div class="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
       <!-- Layout: On Mobile stacks vertically (text then visual); On Desktop two columns (text right, visual left in RTL) -->
       <div class="flex flex-col lg:grid lg:grid-cols-12 gap-10 lg:gap-14 items-center">
         <!-- ============================================================= -->
-        <!-- TEXT CONTENT (Right side in RTL desktop, top on mobile)       -->
+        <!-- TEXT CONTENT (Fades in from right)                           -->
         <!-- ============================================================= -->
-        <div class="w-full flex flex-col lg:col-span-7 text-start">
+        <div
+          class="about-text-anim w-full flex flex-col lg:col-span-7 text-start"
+          :class="{ 'is-visible': isAboutVisible }"
+        >
           <!-- Small pink label -->
           <p class="text-xs font-bold uppercase tracking-wider text-[#e91e8c]">
             رؤيتنا ورسالتنا الإنسانية
@@ -86,9 +117,12 @@ const features = [
         </div>
 
         <!-- ============================================================= -->
-        <!-- VISUAL CARD (Left side in RTL desktop, bottom on mobile)      -->
+        <!-- VISUAL CARD (Fades in from left)                             -->
         <!-- ============================================================= -->
-        <div class="w-full lg:col-span-5 relative">
+        <div
+          class="about-card-anim w-full lg:col-span-5 relative"
+          :class="{ 'is-visible': isAboutVisible }"
+        >
           <!-- Subtle pink gradient glow behind the visual card -->
           <div class="pointer-events-none absolute -inset-3 rounded-[28px] bg-gradient-to-tr from-[#e91e8c]/25 via-primary/10 to-transparent blur-2xl opacity-75 -z-10" aria-hidden="true" />
 
@@ -165,6 +199,31 @@ const features = [
 </template>
 
 <style scoped>
+/* Scroll-triggered slide animations */
+.about-text-anim {
+  opacity: 0;
+  transform: translateX(25px);
+  transition: opacity 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.about-text-anim.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.about-card-anim {
+  opacity: 0;
+  transform: translateX(-25px);
+  transition: opacity 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.15s,
+              transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.15s;
+}
+
+.about-card-anim.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
 /* Subtle animated shimmer glow on clinic card */
 .clinic-card {
   transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
@@ -194,6 +253,18 @@ const features = [
   }
   100% {
     transform: translate(-30%, -30%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .about-text-anim,
+  .about-card-anim {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .shimmer-glow {
+    animation: none !important;
   }
 }
 </style>

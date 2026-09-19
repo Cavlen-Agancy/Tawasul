@@ -49,13 +49,38 @@ const mobileServices = [
     icon: Compass,
   },
 ]
+
+// Scroll-triggered staggered reveal via IntersectionObserver
+const desktopGridRef = ref<HTMLElement | null>(null)
+const mobileGridRef = ref<HTMLElement | null>(null)
+const isServicesVisible = ref(false)
+
+onMounted(() => {
+  if (typeof IntersectionObserver !== 'undefined') {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            isServicesVisible.value = true
+            observer.disconnect()
+          }
+        })
+      },
+      { threshold: 0.1 }
+    )
+    if (desktopGridRef.value) observer.observe(desktopGridRef.value)
+    if (mobileGridRef.value) observer.observe(mobileGridRef.value)
+  } else {
+    isServicesVisible.value = true
+  }
+})
 </script>
 
 <template>
   <section id="services" aria-labelledby="services-title" class="w-full">
     <!-- ================================================================= -->
     <!-- 1. DESKTOP SERVICES LAYOUT (@media min-width: 769px)              -->
-    <!-- UNTOUCHED DESKTOP DESIGN                                          -->
+    <!-- UNTOUCHED DESKTOP DESIGN WITH SMOOTH STAGGER & HOVER PULSE       -->
     <!-- ================================================================= -->
     <div class="services-desktop-view mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
       <!-- Header -->
@@ -89,19 +114,25 @@ const mobileServices = [
         </div>
       </div>
 
-      <!-- 6 Cards Grid -->
-      <div v-show="activeTab === 'individual'" class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <!-- 6 Cards Grid with staggered scroll reveal -->
+      <div
+        ref="desktopGridRef"
+        v-show="activeTab === 'individual'"
+        class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+      >
         <div
-          v-for="service in homeServices"
+          v-for="(service, index) in homeServices"
           :key="service.key"
-          class="group relative flex flex-col justify-between rounded-3xl border border-border/70 bg-card/70 p-6 shadow-soft backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-magenta"
+          class="service-card-anim group relative flex flex-col justify-between rounded-3xl border border-border/70 bg-card/70 p-6 shadow-soft backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-magenta"
+          :class="{ 'is-visible': isServicesVisible }"
+          :style="{ transitionDelay: `${index * 0.08}s` }"
         >
-          <!-- Top bar: Category Badge + Icon -->
+          <!-- Top bar: Category Badge + Icon (with pulse on hover) -->
           <div class="flex items-center justify-between">
             <span class="rounded-full border border-border/70 bg-muted/60 px-3 py-1 text-[11px] font-semibold text-muted-foreground">
               {{ service.category }}
             </span>
-            <span class="flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary transition-colors duration-200 group-hover:bg-primary group-hover:text-white" aria-hidden="true">
+            <span class="service-icon-badge flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary transition-colors duration-200 group-hover:bg-primary group-hover:text-white" aria-hidden="true">
               <Component :is="iconMap[service.icon]" class="size-5" />
             </span>
           </div>
@@ -175,7 +206,7 @@ const mobileServices = [
 
     <!-- ================================================================= -->
     <!-- 2. MOBILE SERVICES LAYOUT (@media max-width: 768px)               -->
-    <!-- 2-COLUMN GRID MATCHING MOBILE DESIGN                              -->
+    <!-- 2-COLUMN GRID MATCHING MOBILE DESIGN WITH STAGGERED ENTRANCE      -->
     <!-- ================================================================= -->
     <div class="services-mobile-view w-full bg-[#121218] px-3.5 py-8">
       <div class="mx-auto w-full max-w-[420px] flex flex-col gap-5">
@@ -192,17 +223,19 @@ const mobileServices = [
           </p>
         </div>
 
-        <!-- 2-Column Grid (6 Cards: 2x3) -->
-        <div class="grid grid-cols-2 gap-2.5">
+        <!-- 2-Column Grid (6 Cards: 2x3) with staggered entrance -->
+        <div ref="mobileGridRef" class="grid grid-cols-2 gap-2.5">
           <NuxtLink
-            v-for="card in mobileServices"
+            v-for="(card, index) in mobileServices"
             :key="card.title"
             :to="siteConfig.booking.basePath"
-            class="group relative flex flex-col justify-between rounded-2xl border border-white/10 bg-[#1a1a28] p-3.5 shadow-sm transition-all duration-200 active:scale-[0.98] hover:border-[#e91e8c]/50"
+            class="service-card-anim group relative flex flex-col justify-between rounded-2xl border border-white/10 bg-[#1a1a28] p-3.5 shadow-sm transition-all duration-200 active:scale-[0.98] hover:border-[#e91e8c]/50"
+            :class="{ 'is-visible': isServicesVisible }"
+            :style="{ transitionDelay: `${index * 0.07}s` }"
           >
             <!-- Top: Pink icon + top-right arrow -->
             <div class="flex items-start justify-between">
-              <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#e91e8c]/15 text-[#e91e8c]" aria-hidden="true">
+              <span class="service-icon-badge flex h-9 w-9 items-center justify-center rounded-xl bg-[#e91e8c]/15 text-[#e91e8c] transition-all" aria-hidden="true">
                 <Component :is="card.icon" class="size-4" />
               </span>
               <span class="text-white/40 group-hover:text-[#e91e8c] transition-colors" aria-hidden="true">
@@ -236,6 +269,36 @@ const mobileServices = [
 </template>
 
 <style scoped>
+/* Staggered card fade in + slide up */
+.service-card-anim {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              transform 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.service-card-anim.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Subtle pink glow pulse on card icon on hover */
+.service-card-anim:hover .service-icon-badge {
+  animation: pinkIconPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pinkIconPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(233, 30, 140, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(233, 30, 140, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(233, 30, 140, 0);
+  }
+}
+
 /* Strict CSS media query separation */
 @media (max-width: 768px) {
   .services-desktop-view {
@@ -252,6 +315,17 @@ const mobileServices = [
   }
   .services-mobile-view {
     display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .service-card-anim {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .service-card-anim:hover .service-icon-badge {
+    animation: none !important;
   }
 }
 </style>

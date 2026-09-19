@@ -9,6 +9,11 @@ const route = useRoute()
 
 const { isLoggedIn, user, logout } = useAuth()
 
+const isAuthPage = computed(() => {
+  const p = route.path
+  return p === '/login' || p === '/register' || p === '/forgot-password' || p === '/reset-password'
+})
+
 watch(() => route.fullPath, () => {
   mobileMenuOpen.value = false
 })
@@ -34,8 +39,8 @@ async function handleLogout() {
       تخطَّ إلى المحتوى
     </a>
 
-    <!-- Top Navigation Bar -->
-    <header class="sticky top-0 z-50 border-b border-border/40 bg-background/85 backdrop-blur-xl">
+    <!-- Top Navigation Bar with slide-down on page load -->
+    <header class="animate-navbar-slide-down sticky top-0 z-50 border-b border-border/40 bg-background/85 backdrop-blur-xl">
       <div class="mx-auto flex h-20 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <!-- Logo -->
         <NuxtLink to="/" class="flex shrink-0 items-center gap-3" aria-label="أكاديمية تواصل — الرئيسية">
@@ -173,8 +178,8 @@ async function handleLogout() {
       <slot />
     </main>
 
-    <!-- Footer matching Image 1 -->
-    <footer class="border-t border-border/40 bg-card/60 backdrop-blur-md">
+    <!-- Footer matching Image 1 (hidden on auth pages) -->
+    <footer v-if="!isAuthPage" class="border-t border-border/40 bg-card/60 backdrop-blur-md">
       <div class="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div class="flex flex-col items-center justify-between gap-6 md:flex-row">
           <!-- Logo & Slogan -->
@@ -221,3 +226,28 @@ async function handleLogout() {
     </footer>
   </div>
 </template>
+
+<style scoped>
+@keyframes navbarSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-navbar-slide-down {
+  animation: navbarSlideDown 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-navbar-slide-down {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+</style>
