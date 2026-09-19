@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Menu as MenuIcon, X as XIcon } from 'lucide-vue-next'
+import { Menu as MenuIcon, X as XIcon, MapPin, Phone, Mail, Clock } from 'lucide-vue-next'
 import { homeNavItems } from '~/lib/home-content'
 import { siteConfig } from '~/lib/site'
 
@@ -8,6 +8,7 @@ const showTextLogo = ref(false)
 const route = useRoute()
 
 const { isLoggedIn, user, logout } = useAuth()
+const { email, phone, whatsappUrl } = useSiteSettings()
 
 const isAuthPage = computed(() => {
   const p = route.path
@@ -22,7 +23,16 @@ useHead({
   htmlAttrs: { dir: 'rtl', lang: 'ar' },
 })
 
-const year = new Date().getFullYear()
+const year = 2026
+
+const serviceFooterLinks = [
+  { label: 'الاستشارات النفسية', href: '#services' },
+  { label: 'الاستشارات الزوجية والأسرية', href: '#services' },
+  { label: 'الاستشارات التربوية', href: '#services' },
+  { label: 'التخاطب وعيوب النطق', href: '#services' },
+  { label: 'تنمية المهارات', href: '#services' },
+  { label: 'تعديل وتوجيه السلوك', href: '#services' },
+]
 
 async function handleLogout() {
   mobileMenuOpen.value = false
@@ -178,48 +188,309 @@ async function handleLogout() {
       <slot />
     </main>
 
-    <!-- Footer matching Image 1 (hidden on auth pages) -->
-    <footer v-if="!isAuthPage" class="border-t border-border/40 bg-card/60 backdrop-blur-md">
-      <div class="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div class="flex flex-col items-center justify-between gap-6 md:flex-row">
-          <!-- Logo & Slogan -->
-          <div class="flex flex-col items-center gap-1.5 md:items-start">
-            <div class="flex items-center gap-2.5">
+    <!-- Professional Footer (Hidden on auth pages) -->
+    <footer v-if="!isAuthPage" class="border-t border-white/[0.08] bg-[#0d0d0d] text-white">
+      <!-- ============================================================= -->
+      <!-- 1. DESKTOP FOOTER (min-width: 769px) — 4 COLUMNS UNTOUCHED    -->
+      <!-- ============================================================= -->
+      <div class="hidden md:block mx-auto w-full max-w-7xl px-6 lg:px-8 pt-16 pb-8">
+        <div class="grid grid-cols-12 gap-10">
+          <!-- Column 1: Logo, Slogan, About & Social Media (4 cols) -->
+          <div class="flex flex-col items-start text-start col-span-4">
+            <div class="flex items-center gap-3">
               <img
                 v-if="!showTextLogo"
                 :src="siteConfig.brand.logoSrc"
                 :alt="siteConfig.brand.nameAr"
-                class="h-8 w-auto rounded-lg object-contain dark:brightness-110"
+                class="h-9 w-auto rounded-lg object-contain brightness-110"
                 loading="lazy"
                 @error="showTextLogo = true"
               >
-              <span class="text-lg font-bold tracking-tight">{{ siteConfig.brand.nameAr }}</span>
+              <div class="flex flex-col leading-none">
+                <span class="text-lg font-bold tracking-tight text-white">{{ siteConfig.brand.nameAr }}</span>
+                <span class="text-[10px] tracking-wider text-white/50">TAWASUL ACADEMY</span>
+              </div>
             </div>
-            <p class="text-xs font-medium text-primary">
+
+            <p class="mt-3 text-xs font-bold text-[#e91e8c]">
               نتواصل... نفهم... نساند
             </p>
+
+            <p class="mt-3 text-xs leading-relaxed text-white/65 max-w-sm">
+              أكاديمية تواصل منصة رائدة متخصصة في تقديم الاستشارات النفسية والتربوية والأسرية وخدمات التخاطب وفق أعلى معايير الجودة والسرية التامة.
+            </p>
+
+            <!-- Social Media Icons -->
+            <div class="mt-5 flex items-center gap-2.5" aria-label="وسائل التواصل الاجتماعي">
+              <a
+                href="https://facebook.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook"
+                class="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-[#e91e8c] hover:bg-[#e91e8c] hover:text-white"
+              >
+                <svg class="size-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" />
+                </svg>
+              </a>
+
+              <a
+                href="https://instagram.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+                class="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-[#e91e8c] hover:bg-[#e91e8c] hover:text-white"
+              >
+                <svg class="size-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                </svg>
+              </a>
+
+              <a
+                :href="whatsappUrl || 'https://wa.me/201234567890'"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="WhatsApp"
+                class="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-[#e91e8c] hover:bg-[#e91e8c] hover:text-white"
+              >
+                <svg class="size-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564c.173.087.289.129.332.202.043.073.043.423-.101.828zM12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.985-1.396C8.423 21.499 10.155 22 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
+                </svg>
+              </a>
+
+              <a
+                href="https://twitter.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="X (formerly Twitter)"
+                class="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-[#e91e8c] hover:bg-[#e91e8c] hover:text-white"
+              >
+                <svg class="size-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+              </a>
+            </div>
           </div>
 
-          <!-- Nav links -->
-          <nav aria-label="روابط سريعة" class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs sm:text-sm text-muted-foreground">
-            <NuxtLink
-              v-for="link in homeNavItems"
-              :key="link.href"
-              :to="`/${link.href}`"
-              class="transition-colors hover:text-primary"
-            >
-              {{ link.label }}
-            </NuxtLink>
-          </nav>
+          <!-- Column 2: روابط سريعة (2 cols) -->
+          <div class="flex flex-col items-start text-start col-span-2">
+            <h3 class="text-sm font-bold text-white tracking-wide">روابط سريعة</h3>
+            <ul class="mt-4 flex flex-col gap-2.5">
+              <li v-for="link in homeNavItems" :key="link.href">
+                <NuxtLink
+                  :to="`/${link.href}`"
+                  class="text-xs sm:text-sm text-white/65 transition-colors duration-200 hover:text-[#e91e8c]"
+                >
+                  {{ link.label }}
+                </NuxtLink>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Column 3: خدماتنا (3 cols) -->
+          <div class="flex flex-col items-start text-start col-span-3">
+            <h3 class="text-sm font-bold text-white tracking-wide">خدماتنا</h3>
+            <ul class="mt-4 flex flex-col gap-2.5">
+              <li v-for="item in serviceFooterLinks" :key="item.label">
+                <a
+                  :href="item.href"
+                  class="text-xs sm:text-sm text-white/65 transition-colors duration-200 hover:text-[#e91e8c]"
+                >
+                  {{ item.label }}
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Column 4: تواصل معنا (3 cols) -->
+          <div class="flex flex-col items-start text-start col-span-3">
+            <h3 class="text-sm font-bold text-white tracking-wide">تواصل معنا</h3>
+            <ul class="mt-4 flex flex-col gap-3 text-xs sm:text-sm text-white/65">
+              <li class="flex items-start gap-2.5">
+                <MapPin class="size-4 shrink-0 text-[#e91e8c] mt-0.5" aria-hidden="true" />
+                <span>جمهورية مصر العربية — القاهرة</span>
+              </li>
+
+              <li class="flex items-center gap-2.5">
+                <Phone class="size-4 shrink-0 text-[#e91e8c]" aria-hidden="true" />
+                <a :href="`tel:${phone || '+201234567890'}`" dir="ltr" class="tnum transition-colors hover:text-[#e91e8c]">
+                  {{ phone || '+201234567890' }}
+                </a>
+              </li>
+
+              <li class="flex items-center gap-2.5">
+                <Mail class="size-4 shrink-0 text-[#e91e8c]" aria-hidden="true" />
+                <a :href="`mailto:${email || 'admin@tawasul.com'}`" dir="ltr" class="tnum transition-colors hover:text-[#e91e8c]">
+                  {{ email || 'admin@tawasul.com' }}
+                </a>
+              </li>
+
+              <li class="flex items-start gap-2.5">
+                <Clock class="size-4 shrink-0 text-[#e91e8c] mt-0.5" aria-hidden="true" />
+                <span>السبت - الخميس (١٠ ص حتى ١٠ م)</span>
+              </li>
+            </ul>
+          </div>
         </div>
 
-        <!-- Bottom Copyright & Policies -->
-        <div class="mt-8 flex flex-col items-center justify-between gap-3 border-t border-border/30 pt-6 text-center text-xs text-muted-foreground md:flex-row md:text-start">
-          <p>© <span class="tnum">{{ year }}</span> {{ siteConfig.brand.nameAr }} (Tawasul Academy) — جميع الحقوق محفوظة.</p>
-          <div class="flex items-center gap-4 text-xs text-muted-foreground/80">
-            <a href="#about" class="transition-colors hover:text-primary">سياسة الخصوصية والسرية</a>
-            <span aria-hidden="true">·</span>
-            <a href="#about" class="transition-colors hover:text-primary">ميثاق الشرف الأخلاقي</a>
+        <!-- Bottom Bar Desktop -->
+        <div class="mt-12 flex items-center justify-between border-t border-white/[0.08] pt-6 text-xs text-white/50">
+          <p>© {{ year }} أكاديمية تواصل (Tawasul Academy) — جميع الحقوق محفوظة.</p>
+          <div class="flex items-center gap-4 text-white/60">
+            <a href="#about" class="transition-colors hover:text-[#e91e8c]">سياسة الخصوصية والسرية</a>
+            <span aria-hidden="true" class="text-white/30">·</span>
+            <a href="#about" class="transition-colors hover:text-[#e91e8c]">ميثاق الشرف الأخلاقي</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================= -->
+      <!-- 2. MOBILE FOOTER (max-width: 768px) — REDESIGNED 3-TIER       -->
+      <!-- ============================================================= -->
+      <div class="block md:hidden w-full px-5 py-8 text-center">
+        <!-- 1. Top Area (Centered) -->
+        <div class="flex flex-col items-center">
+          <div class="flex items-center gap-2.5">
+            <img
+              v-if="!showTextLogo"
+              :src="siteConfig.brand.logoSrc"
+              :alt="siteConfig.brand.nameAr"
+              class="h-8 w-auto rounded-lg object-contain brightness-110"
+              loading="lazy"
+              @error="showTextLogo = true"
+            >
+            <div class="flex flex-col leading-none text-start">
+              <span class="text-base font-bold text-white">{{ siteConfig.brand.nameAr }}</span>
+              <span class="text-[9px] text-white/50 tracking-wider">TAWASUL ACADEMY</span>
+            </div>
+          </div>
+
+          <p class="mt-2 text-xs font-bold text-[#e91e8c]">
+            نتواصل... نفهم... نساند
+          </p>
+
+          <p class="mt-2 text-[11px] leading-relaxed text-white/65 max-w-xs line-clamp-2">
+            منصة رائدة متخصصة في تقديم الاستشارات النفسية والتربوية والأسرية وخدمات التخاطب بأعلى معايير الجودة.
+          </p>
+
+          <!-- Social media icons centered with good spacing -->
+          <div class="mt-4 flex items-center justify-center gap-3">
+            <a
+              href="https://facebook.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Facebook"
+              class="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70"
+            >
+              <svg class="size-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/>
+              </svg>
+            </a>
+            <a
+              href="https://instagram.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+              class="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70"
+            >
+              <svg class="size-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+              </svg>
+            </a>
+            <a
+              :href="whatsappUrl || 'https://wa.me/201234567890'"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="WhatsApp"
+              class="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70"
+            >
+              <svg class="size-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564c.173.087.289.129.332.202.043.073.043.423-.101.828zM12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.985-1.396C8.423 21.499 10.155 22 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
+              </svg>
+            </a>
+            <a
+              href="https://twitter.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="X"
+              class="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70"
+            >
+              <svg class="size-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- 2. Middle Area — Two Columns Side-by-Side (gap: 1.5rem) -->
+        <div class="my-6 grid grid-cols-2 gap-4 text-start border-y border-white/[0.08] py-5">
+          <!-- Right Column: روابط سريعة -->
+          <div>
+            <h4 class="text-xs font-bold text-white mb-2 pb-1 border-b border-white/10">روابط سريعة</h4>
+            <ul class="flex flex-col">
+              <li v-for="link in homeNavItems" :key="link.href" class="min-h-[2rem] flex items-center">
+                <NuxtLink
+                  :to="`/${link.href}`"
+                  class="text-[11px] text-white/65 hover:text-[#e91e8c]"
+                >
+                  {{ link.label }}
+                </NuxtLink>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Left Column: خدماتنا -->
+          <div>
+            <h4 class="text-xs font-bold text-white mb-2 pb-1 border-b border-white/10">خدماتنا</h4>
+            <ul class="flex flex-col">
+              <li v-for="item in serviceFooterLinks" :key="item.label" class="min-h-[2rem] flex items-center">
+                <a
+                  :href="item.href"
+                  class="text-[11px] text-white/65 hover:text-[#e91e8c]"
+                >
+                  {{ item.label }}
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 3. Bottom Area — تواصل معنا & Copyright -->
+        <div class="flex flex-col items-center gap-3">
+          <h4 class="text-xs font-bold text-white">تواصل معنا</h4>
+          <ul class="flex flex-col items-center gap-2 text-[11px] text-white/70">
+            <li class="flex items-center gap-2">
+              <MapPin class="size-3.5 text-[#e91e8c]" />
+              <span>جمهورية مصر العربية — القاهرة</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <Phone class="size-3.5 text-[#e91e8c]" />
+              <a :href="`tel:${phone || '+201234567890'}`" dir="ltr" class="tnum hover:text-[#e91e8c]">
+                {{ phone || '+201234567890' }}
+              </a>
+            </li>
+            <li class="flex items-center gap-2">
+              <Mail class="size-3.5 text-[#e91e8c]" />
+              <a :href="`mailto:${email || 'admin@tawasul.com'}`" dir="ltr" class="tnum hover:text-[#e91e8c]">
+                {{ email || 'admin@tawasul.com' }}
+              </a>
+            </li>
+            <li class="flex items-center gap-2">
+              <Clock class="size-3.5 text-[#e91e8c]" />
+              <span>السبت - الخميس (١٠ ص حتى ١٠ م)</span>
+            </li>
+          </ul>
+
+          <!-- Separator -->
+          <div class="w-full border-t border-white/[0.08] pt-4 mt-2 flex flex-col items-center gap-2">
+            <p class="text-[10px] text-white/50">
+              © {{ year }} أكاديمية تواصل (Tawasul Academy) — جميع الحقوق محفوظة.
+            </p>
+            <div class="flex items-center gap-3 text-[10px] text-white/60">
+              <a href="#about" class="hover:text-[#e91e8c]">سياسة الخصوصية والسرية</a>
+              <span class="text-white/30">·</span>
+              <a href="#about" class="hover:text-[#e91e8c]">ميثاق الشرف الأخلاقي</a>
+            </div>
           </div>
         </div>
       </div>
