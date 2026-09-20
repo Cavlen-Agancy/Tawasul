@@ -3,30 +3,33 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    /* Light mode — warm neutral healthcare palette, brand accent #E91E8C */
-    --background: 330 33% 98.5%;
-    --foreground: 320 12% 16%;
+  :root,
+  .light,
+  [data-theme="light"] {
+    /* Light mode — clean healthcare palette (#f8f8fc bg, #1a1a2e headings, #444/#555 body, brand accent #e91e8c) */
+    --background: 240 25% 98.5%;
+    --foreground: 240 28% 14%;
     --card: 0 0% 100%;
-    --card-foreground: 320 12% 16%;
+    --card-foreground: 240 28% 14%;
     --primary: 329 79% 52%;
     --primary-foreground: 0 0% 100%;
     --secondary: 327 70% 95%;
     --secondary-foreground: 329 68% 38%;
-    --muted: 325 20% 95.5%;
-    --muted-foreground: 320 8% 38%;
+    --muted: 240 15% 96%;
+    --muted-foreground: 0 0% 32%;
     --accent: 327 70% 95%;
     --accent-foreground: 329 68% 38%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 325 18% 89%;
-    --input: 325 18% 89%;
+    --border: 240 10% 92%;
+    --input: 240 10% 92%;
     --ring: 329 79% 52%;
     --radius: 1rem;
   }
 
-  .dark {
-    /* Dark mode — preserves Stitch identity: #111111 bg, #161616 surface, #1C1C1C card */
+  .dark,
+  [data-theme="dark"] {
+    /* Dark mode — Stitch identity: #111111 bg, #161616 surface, #1C1C1C card */
     --background: 0 0% 7%;
     --foreground: 0 0% 96%;
     --card: 0 0% 11%;
@@ -113,6 +116,28 @@
       transform: none !important;
     }
   }
+}
+
+/* Light mode overrides scoped by .light and [data-theme="light"] */
+.light .marketing-layout section:not(#hero):not(#contact),
+[data-theme="light"] .marketing-layout section:not(#hero):not(#contact) {
+  background-color: #f8f8fc;
+}
+
+.light .marketing-layout section:not(#hero):not(#contact) h1,
+.light .marketing-layout section:not(#hero):not(#contact) h2,
+.light .marketing-layout section:not(#hero):not(#contact) h3,
+.light .marketing-layout section:not(#hero):not(#contact) h4,
+[data-theme="light"] .marketing-layout section:not(#hero):not(#contact) h1,
+[data-theme="light"] .marketing-layout section:not(#hero):not(#contact) h2,
+[data-theme="light"] .marketing-layout section:not(#hero):not(#contact) h3,
+[data-theme="light"] .marketing-layout section:not(#hero):not(#contact) h4 {
+  color: #1a1a2e;
+}
+
+.light .marketing-layout section:not(#hero):not(#contact) p,
+[data-theme="light"] .marketing-layout section:not(#hero):not(#contact) p {
+  color: #444444;
 }
 
 /* FullCalendar dark mode support */

@@ -28,6 +28,5 @@ useHead({
     <HomeBookingChannels />
     <HomeFaq />
     <HomeContact />
-    <HomeQuickNav />
   </div>
 </template>

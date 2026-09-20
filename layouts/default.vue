@@ -69,8 +69,8 @@ async function handleLogout() {
       تخطَّ إلى المحتوى
     </a>
 
-    <!-- Top Navigation Bar: Normal style (sticky h-20 with standard dark background, not transparent over image) -->
-    <header class="animate-navbar-slide-down sticky top-0 z-50 h-20 border-b border-border/40 bg-background/85 backdrop-blur-xl">
+    <!-- Top Navigation Bar: Light mode white/95 with dark text; Dark mode dark with white text -->
+    <header class="animate-navbar-slide-down sticky top-0 z-50 h-20 border-b border-black/[0.08] dark:border-white/[0.08] bg-white/95 dark:bg-[#111116]/95 backdrop-blur-xl transition-colors duration-200">
       <div class="mx-auto flex h-20 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <!-- Logo -->
         <NuxtLink to="/" class="flex shrink-0 items-center gap-3" aria-label="أكاديمية تواصل — الرئيسية">
@@ -83,10 +83,10 @@ async function handleLogout() {
             @error="showTextLogo = true"
           >
           <div class="flex flex-col leading-none">
-            <span class="text-base font-bold tracking-tight sm:text-lg text-white">
+            <span class="text-base font-bold tracking-tight sm:text-lg text-[#1a1a2e] dark:text-white">
               {{ siteConfig.brand.nameAr }}
             </span>
-            <span class="text-[10px] tracking-wider text-white/60">
+            <span class="text-[10px] tracking-wider text-[#1a1a2e]/60 dark:text-white/60">
               TAWASUL ACADEMY
             </span>
           </div>
@@ -98,8 +98,8 @@ async function handleLogout() {
             v-for="link in homeNavItems"
             :key="link.href"
             :to="`/${link.href}`"
-            class="rounded-full px-3.5 py-1.5 text-sm font-medium text-white/80 transition-colors duration-150 hover:text-primary"
-            :class="link.href === '#hero' ? 'font-semibold text-primary' : ''"
+            class="rounded-full px-3.5 py-1.5 text-sm font-medium text-[#1a1a2e] dark:text-white/80 transition-colors duration-150 hover:text-primary"
+            :class="link.href === '#hero' ? 'font-semibold text-primary dark:text-primary' : ''"
           >
             {{ link.label }}
           </NuxtLink>
@@ -146,7 +146,7 @@ async function handleLogout() {
             تسجيل الآن
           </Button>
           <button
-            class="flex h-10 w-10 items-center justify-center rounded-2xl text-foreground transition-colors duration-150 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            class="flex h-10 w-10 items-center justify-center rounded-2xl text-[#1a1a2e] dark:text-white transition-colors duration-150 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             type="button"
             :aria-expanded="mobileMenuOpen"
             aria-label="القائمة"
@@ -169,20 +169,20 @@ async function handleLogout() {
         <nav
           v-if="mobileMenuOpen"
           id="mobile-nav"
-          class="flex flex-col border-t border-border/40 bg-background/95 px-5 py-5 backdrop-blur-xl lg:hidden"
+          class="flex flex-col border-t border-black/[0.08] dark:border-border/40 bg-white/95 dark:bg-background/95 px-5 py-5 backdrop-blur-xl lg:hidden"
           aria-label="تنقل الجوال"
         >
           <NuxtLink
             v-for="link in homeNavItems"
             :key="link.href"
             :to="`/${link.href}`"
-            class="min-h-[2.75rem] rounded-xl px-3 py-2 text-base font-medium text-muted-foreground transition-colors hover:text-primary"
+            class="min-h-[2.75rem] rounded-xl px-3 py-2 text-base font-medium text-[#1a1a2e] dark:text-muted-foreground transition-colors hover:text-primary"
             :class="link.href === '#hero' ? 'font-bold text-primary' : ''"
             @click="mobileMenuOpen = false"
           >
             {{ link.label }}
           </NuxtLink>
-          <div class="mt-4 flex flex-col gap-2.5 border-t border-border/40 pt-4">
+          <div class="mt-4 flex flex-col gap-2.5 border-t border-black/[0.08] dark:border-border/40 pt-4">
             <template v-if="isLoggedIn">
               <Button variant="outline" as="a" href="/dashboard" class="w-full rounded-full" @click="mobileMenuOpen = false">
                 لوحة التحكم

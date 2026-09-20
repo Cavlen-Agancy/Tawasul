@@ -195,7 +195,7 @@ export default defineNuxtConfig({
       ],
       script: [
         {
-          innerHTML: `(function(){try{var m=localStorage.getItem('tawasul-color-mode')||'system';var d=m==='dark'||(m==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d){document.documentElement.classList.add('dark');}else{document.documentElement.classList.remove('dark');}}catch(e){}})();`,
+          innerHTML: `(function(){try{var m=localStorage.getItem('tawasul-color-mode')||'system';var d=m==='dark'||(m==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;if(d){r.classList.add('dark');r.classList.remove('light');r.setAttribute('data-theme','dark');}else{r.classList.remove('dark');r.classList.add('light');r.setAttribute('data-theme','light');}}catch(e){}})();`,
         },
       ],
       link: [

@@ -26,8 +26,12 @@ function applyTheme(dark: boolean) {
   const root = document.documentElement
   if (dark) {
     root.classList.add('dark')
+    root.classList.remove('light')
+    root.setAttribute('data-theme', 'dark')
   } else {
     root.classList.remove('dark')
+    root.classList.add('light')
+    root.setAttribute('data-theme', 'light')
   }
   updateThemeColorMeta(dark)
 }

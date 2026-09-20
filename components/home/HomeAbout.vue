@@ -45,7 +45,7 @@ onMounted(() => {
     id="why-us"
     ref="sectionRef"
     aria-labelledby="about-title"
-    class="relative w-full py-14 sm:py-20 overflow-hidden"
+    class="relative w-full py-14 sm:py-20 overflow-hidden bg-[#f8f8fc] dark:bg-[#111116] transition-colors duration-200"
   >
     <div class="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
       <!-- Layout: On Mobile stacks vertically (text then visual); On Desktop two columns (text right, visual left in RTL) -->
@@ -63,12 +63,12 @@ onMounted(() => {
           </p>
 
           <!-- Large bold heading -->
-          <h2 id="about-title" class="mt-2.5 text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-foreground leading-[1.25]">
+          <h2 id="about-title" class="mt-2.5 text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-[#1a1a2e] dark:text-white leading-[1.25]">
             لماذا تختار أكاديمية تواصل لمسارك العلاجي؟
           </h2>
 
           <!-- Paragraph text -->
-          <p class="mt-4 text-xs sm:text-sm lg:text-base leading-relaxed text-muted-foreground">
+          <p class="mt-4 text-xs sm:text-sm lg:text-base leading-relaxed text-[#444] dark:text-white/70">
             في أكاديمية تواصل، نؤمن بأن الصحة النفسية ليست رفاهية، بل هي الركيزة الأساسية لحياة هادئة ومستقرة. نلتزم بأعلى معايير الدقة العلمية والميثاق الأخلاقي لنوفر لك مساحة استماع صادقة ومنهجية بالكامل، تضمن لك الأمان لاستكشاف ذاتك وتجاوز التحديات.
           </p>
 
@@ -83,27 +83,27 @@ onMounted(() => {
                 <CheckCircle2 class="size-4 stroke-[2.5]" />
               </span>
               <div>
-                <h3 class="text-xs sm:text-sm font-bold text-foreground group-hover:text-[#e91e8c] transition-colors">
+                <h3 class="text-xs sm:text-sm font-bold text-[#1a1a2e] dark:text-white group-hover:text-[#e91e8c] transition-colors">
                   {{ item.title }}
                 </h3>
-                <p class="mt-1 text-[11px] sm:text-xs leading-relaxed text-muted-foreground">
+                <p class="mt-1 text-[11px] sm:text-xs leading-relaxed text-[#555] dark:text-muted-foreground">
                   {{ item.description }}
                 </p>
               </div>
             </li>
           </ul>
 
-          <!-- Bottom Trust Badge -->
-          <div class="mt-8 flex items-center gap-3.5 rounded-2xl border border-border/80 bg-[#161622]/80 p-3.5 sm:p-4 backdrop-blur-md shadow-sm">
+          <!-- Bottom Trust Badge (light background in light mode) -->
+          <div class="mt-8 flex items-center gap-3.5 rounded-2xl border border-black/[0.08] dark:border-border/80 bg-white dark:bg-[#161622]/80 p-3.5 sm:p-4 backdrop-blur-md shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:shadow-sm">
             <!-- Avatars -->
             <div class="flex -space-x-2 space-x-reverse shrink-0" aria-hidden="true">
-              <div class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[#161622] bg-[#e91e8c] text-white font-bold text-xs shadow-sm">
+              <div class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white dark:border-[#161622] bg-[#e91e8c] text-white font-bold text-xs shadow-sm">
                 أ.د
               </div>
-              <div class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[#161622] bg-[#36364a] text-white font-semibold text-xs shadow-sm">
+              <div class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white dark:border-[#161622] bg-[#36364a] text-white font-semibold text-xs shadow-sm">
                 د.م
               </div>
-              <div class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[#161622] bg-[#222232] text-white font-semibold text-xs shadow-sm">
+              <div class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white dark:border-[#161622] bg-[#222232] text-white font-semibold text-xs shadow-sm">
                 أ.ن
               </div>
             </div>
@@ -111,7 +111,7 @@ onMounted(() => {
             <!-- Trust Text -->
             <div class="text-xs sm:text-sm">
               <span class="font-extrabold text-[#e91e8c]">50+ طبيب ومختص </span>
-              <span class="text-muted-foreground">من أكفأ الاستشارين والمعالجين النفسيين في خدمتك</span>
+              <span class="text-[#555] dark:text-muted-foreground">من أكفأ الاستشارين والمعالجين النفسيين في خدمتك</span>
             </div>
           </div>
         </div>

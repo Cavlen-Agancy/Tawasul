@@ -80,33 +80,33 @@ onMounted(() => {
   <section id="services" aria-labelledby="services-title" class="w-full">
     <!-- ================================================================= -->
     <!-- 1. DESKTOP SERVICES LAYOUT (@media min-width: 769px)              -->
-    <!-- UNTOUCHED DESKTOP DESIGN WITH SMOOTH STAGGER & HOVER PULSE       -->
+    <!-- UNTOUCHED DESKTOP DESIGN WITH INTENTIONAL LIGHT/DARK MODE         -->
     <!-- ================================================================= -->
-    <div class="services-desktop-view mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+    <div class="services-desktop-view mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 bg-[#f8f8fc] dark:bg-transparent transition-colors duration-200">
       <!-- Header -->
       <div class="mx-auto max-w-2xl text-center">
         <p class="text-xs font-bold uppercase tracking-wider text-primary">الرعاية المتخصصة</p>
-        <h2 id="services-title" class="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl text-foreground">
+        <h2 id="services-title" class="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl text-[#1a1a2e] dark:text-foreground">
           خدماتنا الاستشارية والعلاجية
         </h2>
-        <p class="mt-4 text-sm leading-relaxed text-muted-foreground sm:text-base">
+        <p class="mt-4 text-sm leading-relaxed text-[#555555] dark:text-muted-foreground sm:text-base">
           حلول مرئية متكاملة ومدروسة يقدمها نخبة من الأطباء والخبراء المعتمدين لمساعدتك في مختلف جوانب حياتك.
         </p>
 
         <!-- Category Filter Pills -->
-        <div class="mt-8 inline-flex items-center rounded-full border border-border/70 bg-card/60 p-1 backdrop-blur-md">
+        <div class="mt-8 inline-flex items-center rounded-full border border-black/[0.08] dark:border-border/70 bg-white dark:bg-card/60 p-1 backdrop-blur-md shadow-sm">
           <button
             type="button"
-            class="rounded-full px-5 py-2 text-xs font-bold transition-all duration-200"
-            :class="activeTab === 'individual' ? 'bg-primary text-white shadow-magenta' : 'text-muted-foreground hover:text-foreground'"
+            class="rounded-full px-5 py-2 text-xs font-bold transition-all duration-200 cursor-pointer"
+            :class="activeTab === 'individual' ? 'bg-primary text-white shadow-magenta' : 'text-[#555] dark:text-muted-foreground hover:text-[#1a1a2e] dark:hover:text-foreground'"
             @click="activeTab = 'individual'"
           >
             استشارات الأفراد والأسرة
           </button>
           <button
             type="button"
-            class="rounded-full px-5 py-2 text-xs font-bold transition-all duration-200"
-            :class="activeTab === 'corporate' ? 'bg-primary text-white shadow-magenta' : 'text-muted-foreground hover:text-foreground'"
+            class="rounded-full px-5 py-2 text-xs font-bold transition-all duration-200 cursor-pointer"
+            :class="activeTab === 'corporate' ? 'bg-primary text-white shadow-magenta' : 'text-[#555] dark:text-muted-foreground hover:text-[#1a1a2e] dark:hover:text-foreground'"
             @click="activeTab = 'corporate'"
           >
             حلول المؤسسات وبيئات العمل
@@ -123,13 +123,13 @@ onMounted(() => {
         <div
           v-for="(service, index) in homeServices"
           :key="service.key"
-          class="service-card-anim group relative flex flex-col justify-between rounded-3xl border border-border/70 bg-card/70 p-6 shadow-soft backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-magenta"
+          class="service-card-anim group relative flex flex-col justify-between rounded-3xl border border-black/[0.08] dark:border-border/70 bg-white dark:bg-card/70 p-6 shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:shadow-soft backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-magenta"
           :class="{ 'is-visible': isServicesVisible }"
           :style="{ transitionDelay: `${index * 0.08}s` }"
         >
           <!-- Top bar: Category Badge + Icon (with pulse on hover) -->
           <div class="flex items-center justify-between">
-            <span class="rounded-full border border-border/70 bg-muted/60 px-3 py-1 text-[11px] font-semibold text-muted-foreground">
+            <span class="rounded-full border border-black/[0.06] dark:border-border/70 bg-black/5 dark:bg-muted/60 px-3 py-1 text-[11px] font-semibold text-[#555] dark:text-muted-foreground">
               {{ service.category }}
             </span>
             <span class="service-icon-badge flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary transition-colors duration-200 group-hover:bg-primary group-hover:text-white" aria-hidden="true">
@@ -139,10 +139,10 @@ onMounted(() => {
 
           <!-- Body -->
           <div class="mt-5 flex-1">
-            <h3 class="text-lg font-bold text-foreground transition-colors group-hover:text-primary">
+            <h3 class="text-lg font-bold text-[#1a1a2e] dark:text-foreground transition-colors group-hover:text-primary">
               {{ service.title }}
             </h3>
-            <p class="mt-2.5 text-xs leading-6 text-muted-foreground">
+            <p class="mt-2.5 text-xs leading-6 text-[#555555] dark:text-muted-foreground">
               {{ service.description }}
             </p>
           </div>
@@ -154,7 +154,7 @@ onMounted(() => {
               size="sm"
               as="a"
               :href="siteConfig.booking.inPersonPath"
-              class="rounded-full border-border/80 text-xs font-semibold hover:border-primary hover:text-primary"
+              class="rounded-full border-black/[0.12] dark:border-border/80 text-xs font-semibold text-[#1a1a2e] dark:text-foreground hover:border-primary hover:text-primary"
             >
               احجز حضوري
             </Button>
@@ -171,23 +171,23 @@ onMounted(() => {
       </div>
 
       <!-- Corporate tab preview if switched -->
-      <div v-show="activeTab === 'corporate'" class="mt-12 rounded-3xl border border-border/70 bg-card/70 p-8 text-center backdrop-blur-md">
-        <h3 class="text-xl font-bold">{{ institutionalSolutions.title }}</h3>
-        <p class="mx-auto mt-3 max-w-xl text-sm leading-7 text-muted-foreground">{{ institutionalSolutions.description }}</p>
+      <div v-show="activeTab === 'corporate'" class="mt-12 rounded-3xl border border-black/[0.08] dark:border-border/70 bg-white dark:bg-card/70 p-8 text-center backdrop-blur-md shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:shadow-none">
+        <h3 class="text-xl font-bold text-[#1a1a2e] dark:text-white">{{ institutionalSolutions.title }}</h3>
+        <p class="mx-auto mt-3 max-w-xl text-sm leading-7 text-[#555555] dark:text-muted-foreground">{{ institutionalSolutions.description }}</p>
         <Button as="a" href="#contact" class="mt-6 rounded-full bg-primary px-8 font-bold text-white shadow-magenta">
           {{ institutionalSolutions.cta }}
         </Button>
       </div>
 
       <!-- Institutional Solutions Banner -->
-      <div class="mt-10 overflow-hidden rounded-3xl border border-border/70 bg-card/60 p-6 sm:p-8 backdrop-blur-md">
+      <div class="mt-10 overflow-hidden rounded-3xl border border-black/[0.08] dark:border-border/70 bg-white dark:bg-card/60 p-6 sm:p-8 backdrop-blur-md shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:shadow-none">
         <div class="flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
           <div class="flex-1">
             <p class="text-xs font-bold text-primary">{{ institutionalSolutions.tag }}</p>
-            <h3 class="mt-1 text-lg font-bold sm:text-xl text-foreground">
+            <h3 class="mt-1 text-lg font-bold sm:text-xl text-[#1a1a2e] dark:text-foreground">
               {{ institutionalSolutions.title }}
             </h3>
-            <p class="mt-2 max-w-2xl text-xs sm:text-sm leading-6 text-muted-foreground">
+            <p class="mt-2 max-w-2xl text-xs sm:text-sm leading-6 text-[#555555] dark:text-muted-foreground">
               {{ institutionalSolutions.description }}
             </p>
           </div>
@@ -195,7 +195,7 @@ onMounted(() => {
             variant="outline"
             as="a"
             href="#contact"
-            class="rounded-full border-border/80 px-6 text-xs font-semibold hover:border-primary hover:text-primary shrink-0"
+            class="rounded-full border-black/[0.12] dark:border-border/80 px-6 text-xs font-semibold text-[#1a1a2e] dark:text-foreground hover:border-primary hover:text-primary shrink-0"
           >
             <span>{{ institutionalSolutions.cta }}</span>
             <ArrowLeft class="size-4" aria-hidden="true" />
@@ -206,19 +206,19 @@ onMounted(() => {
 
     <!-- ================================================================= -->
     <!-- 2. MOBILE SERVICES LAYOUT (@media max-width: 768px)               -->
-    <!-- 2-COLUMN GRID MATCHING MOBILE DESIGN WITH STAGGERED ENTRANCE      -->
+    <!-- 2-COLUMN GRID MATCHING MOBILE DESIGN WITH INTENTIONAL LIGHT/DARK  -->
     <!-- ================================================================= -->
-    <div class="services-mobile-view w-full bg-[#121218] px-3.5 py-8">
+    <div class="services-mobile-view w-full bg-[#f8f8fc] dark:bg-[#121218] px-3.5 py-8 transition-colors duration-200">
       <div class="mx-auto w-full max-w-[420px] flex flex-col gap-5">
         <!-- Section Header -->
         <div class="text-center">
           <p class="text-xs font-bold text-[#e91e8c]">
             تخصصاتنا الإكلينيكية
           </p>
-          <h2 class="mt-2 text-2xl font-extrabold text-white tracking-tight">
+          <h2 class="mt-2 text-2xl font-extrabold text-[#1a1a2e] dark:text-white tracking-tight">
             خدماتنا الاستشارية والعلاجية
           </h2>
-          <p class="mt-2 text-xs leading-relaxed text-white/70 max-w-xs mx-auto">
+          <p class="mt-2 text-xs leading-relaxed text-[#555555] dark:text-white/70 max-w-xs mx-auto">
             مسارات متكاملة مصممة لتلائم احتياجك بأعلى معايير الرعاية
           </p>
         </div>
@@ -229,7 +229,7 @@ onMounted(() => {
             v-for="(card, index) in mobileServices"
             :key="card.title"
             :to="siteConfig.booking.basePath"
-            class="service-card-anim group relative flex flex-col justify-between rounded-2xl border border-white/10 bg-[#1a1a28] p-3.5 shadow-sm transition-all duration-200 active:scale-[0.98] hover:border-[#e91e8c]/50"
+            class="service-card-anim group relative flex flex-col justify-between rounded-2xl border border-black/[0.08] dark:border-white/10 bg-white dark:bg-[#1a1a28] p-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:shadow-sm transition-all duration-200 active:scale-[0.98] hover:border-[#e91e8c]/50"
             :class="{ 'is-visible': isServicesVisible }"
             :style="{ transitionDelay: `${index * 0.07}s` }"
           >
@@ -238,17 +238,17 @@ onMounted(() => {
               <span class="service-icon-badge flex h-9 w-9 items-center justify-center rounded-xl bg-[#e91e8c]/15 text-[#e91e8c] transition-all" aria-hidden="true">
                 <Component :is="card.icon" class="size-4" />
               </span>
-              <span class="text-white/40 group-hover:text-[#e91e8c] transition-colors" aria-hidden="true">
+              <span class="text-black/30 dark:text-white/40 group-hover:text-[#e91e8c] transition-colors" aria-hidden="true">
                 <ArrowUpRight class="size-4" />
               </span>
             </div>
 
-            <!-- Body: White Bold Title + Gray Small Description -->
+            <!-- Body: Title + Gray Description -->
             <div class="mt-3 flex-1 flex flex-col">
-              <h3 class="text-xs font-bold text-white leading-snug group-hover:text-[#e91e8c] transition-colors">
+              <h3 class="text-xs font-bold text-[#1a1a2e] dark:text-white leading-snug group-hover:text-[#e91e8c] transition-colors">
                 {{ card.title }}
               </h3>
-              <p class="mt-1 text-[10px] leading-relaxed text-white/60">
+              <p class="mt-1 text-[10px] leading-relaxed text-[#555555] dark:text-white/60">
                 {{ card.description }}
               </p>
             </div>
