@@ -156,7 +156,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
         </p>
 
         <!-- Search / Quick Booking Pill Bar (0.4s delay stagger) -->
-        <div class="animate-hero-form mt-6 w-full max-w-4xl rounded-full border border-white/15 bg-[#171720]/85 p-1.5 shadow-medium backdrop-blur-xl">
+        <div class="desktop-hero-form animate-hero-form mt-6 w-full max-w-4xl rounded-full border border-white/15 bg-[#171720]/85 p-1.5 shadow-medium backdrop-blur-xl">
           <form class="flex items-center justify-between gap-2" @submit.prevent="() => handleBooking()">
             <!-- Name Input -->
             <div class="flex-1 px-3">
@@ -167,7 +167,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
                 type="text"
                 autocomplete="name"
                 placeholder="اسم العميل الكريم"
-                class="h-10 w-full rounded-full bg-transparent px-3 text-sm text-white placeholder:text-white/50 focus:outline-none"
+                class="desktop-hero-input h-10 w-full rounded-full bg-transparent px-3 text-sm text-white placeholder:text-white/50 focus:outline-none"
               >
             </div>
 
@@ -183,7 +183,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
                 dir="ltr"
                 autocomplete="tel"
                 placeholder="رقم الهاتف / واتساب"
-                class="tnum h-10 w-full rounded-full bg-transparent px-3 text-right text-sm text-white placeholder:text-white/50 focus:outline-none"
+                class="desktop-hero-input tnum h-10 w-full rounded-full bg-transparent px-3 text-right text-sm text-white placeholder:text-white/50 focus:outline-none"
               >
             </div>
 
@@ -195,7 +195,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
               <select
                 id="d-service"
                 v-model="selectedService"
-                class="h-10 w-full cursor-pointer rounded-full bg-transparent px-3 text-sm text-white focus:outline-none"
+                class="desktop-hero-input h-10 w-full cursor-pointer rounded-full bg-transparent px-3 text-sm text-white focus:outline-none"
               >
                 <option value="" disabled selected class="bg-[#171720] text-white/50">نوع الاستشارة...</option>
                 <option v-for="s in quickConsultServices" :key="s" :value="s" class="bg-[#171720] text-white">{{ s }}</option>
@@ -222,7 +222,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
           <button
             type="button"
             class="flex items-center gap-2 rounded-full px-5 py-2 text-xs sm:text-sm font-bold transition-all duration-200 active:scale-95 cursor-pointer"
-            :class="selectedMode === 'online' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'border border-white/20 bg-black/50 text-white/80 hover:border-[#e91e8c] hover:text-white'"
+            :class="selectedMode === 'online' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'desktop-toggle-inactive border border-white/20 bg-black/50 text-white/80 hover:border-[#e91e8c] hover:text-white'"
             @click="selectedMode = 'online'"
           >
             <span class="size-2 rounded-full" :class="selectedMode === 'online' ? 'bg-white animate-pulse' : 'bg-white/40'" />
@@ -232,7 +232,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
           <button
             type="button"
             class="flex items-center gap-2 rounded-full px-5 py-2 text-xs sm:text-sm font-bold transition-all duration-200 active:scale-95 cursor-pointer"
-            :class="selectedMode === 'in-person' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'border border-white/20 bg-black/50 text-white/80 hover:border-[#e91e8c] hover:text-white'"
+            :class="selectedMode === 'in-person' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'desktop-toggle-inactive border border-white/20 bg-black/50 text-white/80 hover:border-[#e91e8c] hover:text-white'"
             @click="selectedMode = 'in-person'"
           >
             <span class="size-2 rounded-full" :class="selectedMode === 'in-person' ? 'bg-white animate-pulse' : 'bg-white/40'" />
@@ -243,7 +243,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
         <!-- Trust Metrics 4 Columns Card with count-up & viewport fade-in/scale-up -->
         <div
           ref="statsContainerRef"
-          class="mt-6 w-full max-w-5xl rounded-3xl border border-white/10 bg-[#171720]/80 p-4 sm:p-5 backdrop-blur-md"
+          class="desktop-hero-stats mt-6 w-full max-w-5xl rounded-3xl border border-white/10 bg-[#171720]/80 p-4 sm:p-5 backdrop-blur-md"
         >
           <dl class="grid grid-cols-4 gap-3 divide-x divide-x-reverse divide-white/10">
             <!-- 500+ -->
@@ -599,6 +599,68 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
 .native-mobile-select option {
   background-color: #1a1a2e;
   color: #ffffff;
+}
+
+/* Light mode glassy styling for hero overlay elements */
+:root:not(.dark) .desktop-hero-form,
+.light .desktop-hero-form,
+[data-theme="light"] .desktop-hero-form {
+  background: rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+}
+
+:root:not(.dark) .desktop-hero-input,
+.light .desktop-hero-input,
+[data-theme="light"] .desktop-hero-input {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+:root:not(.dark) .desktop-hero-input::placeholder,
+.light .desktop-hero-input::placeholder,
+[data-theme="light"] .desktop-hero-input::placeholder {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+:root:not(.dark) .desktop-toggle-inactive,
+.light .desktop-toggle-inactive,
+[data-theme="light"] .desktop-toggle-inactive {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+}
+
+:root:not(.dark) .desktop-hero-stats,
+.light .desktop-hero-stats,
+[data-theme="light"] .desktop-hero-stats {
+  background: rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+:root:not(.dark) .desktop-hero-stats dd,
+.light .desktop-hero-stats dd,
+[data-theme="light"] .desktop-hero-stats dd {
+  color: #ffffff !important;
+}
+
+:root:not(.dark) .desktop-hero-stats dt,
+:root:not(.dark) .desktop-hero-stats p,
+.light .desktop-hero-stats dt,
+.light .desktop-hero-stats p,
+[data-theme="light"] .desktop-hero-stats dt,
+[data-theme="light"] .desktop-hero-stats p {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+:root:not(.dark) .desktop-hero-stats dl > div,
+.light .desktop-hero-stats dl > div,
+[data-theme="light"] .desktop-hero-stats dl > div {
+  border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
 /* Strict CSS media query separation */
