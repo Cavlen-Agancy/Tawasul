@@ -7,8 +7,8 @@ const STORAGE_KEY = 'tawasul-color-mode'
 const isClient = () => typeof window !== 'undefined' && typeof document !== 'undefined'
 
 // Module-level reactive singleton state so all components stay in sync
-const themeMode = ref<ThemeMode>('system')
-const isDark = ref(false)
+const themeMode = ref<ThemeMode>('dark')
+const isDark = ref(true)
 let isInitialized = false
 let mediaQueryListener: ((e: MediaQueryListEvent) => void) | null = null
 
@@ -68,10 +68,10 @@ function initTheme() {
     if (saved === 'light' || saved === 'dark' || saved === 'system') {
       themeMode.value = saved
     } else {
-      themeMode.value = 'system'
+      themeMode.value = 'dark'
     }
   } catch {
-    themeMode.value = 'system'
+    themeMode.value = 'dark'
   }
 
   const shouldBeDark = resolveIsDark(themeMode.value)

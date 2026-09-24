@@ -336,13 +336,13 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
               loading="eager"
             >
             <!-- Gradient overlay at bottom -->
-            <div class="absolute inset-0 bg-gradient-to-b from-black/25 via-black/40 to-[#161620]" />
+            <div class="mobile-hero-overlay absolute inset-0 bg-gradient-to-b from-black/25 via-black/40 to-[#161620]" />
           </div>
 
           <!-- Content inside top card (animated) -->
           <div class="relative -mt-20 px-4 pb-6 pt-2 text-center">
             <!-- Top badge with pink dot -->
-            <div class="animate-hero-heading inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/70 px-3.5 py-1 text-[11px] font-medium text-white shadow-soft backdrop-blur-md">
+            <div class="animate-hero-heading mobile-hero-badge inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/70 px-3.5 py-1 text-[11px] font-medium text-white shadow-soft backdrop-blur-md">
               <span class="h-2 w-2 rounded-full bg-[#e91e8c]" aria-hidden="true" />
               <span>أكاديمية تواصل — جمهورية مصر العربية</span>
             </div>
@@ -378,21 +378,21 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
         </div>
 
         <!-- 2. Form Section Card -->
-        <div class="animate-hero-form relative rounded-[26px] border border-white/10 bg-[#171722] p-4 shadow-xl">
+        <div class="animate-hero-form mobile-hero-form relative rounded-[26px] border border-white/10 bg-[#171722] p-4 shadow-xl">
           <form class="flex flex-col gap-3.5" @submit.prevent="() => handleBooking()">
             <!-- Two Toggle Buttons Side-by-Side -->
-            <div class="grid grid-cols-2 gap-1 rounded-full bg-[#0e0e14] p-1 border border-white/5">
+            <div class="mobile-toggle-container grid grid-cols-2 gap-1 rounded-full bg-[#0e0e14] p-1 border border-white/5">
               <button
                 type="button"
                 class="rounded-full py-2.5 px-3 text-xs font-bold transition-all duration-200 text-center truncate cursor-pointer"
-                :class="selectedMode === 'online' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'text-white/70 hover:text-white'"
+                :class="selectedMode === 'online' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'mobile-toggle-inactive text-white/70 hover:text-white'"
                 @click="selectedMode = 'online'"
               >
                 جلسة أونلاين مشفرة
               </button>
               <button
                 type="button"
-                class="rounded-full py-2.5 px-3 text-xs font-medium transition-all duration-200 text-center truncate cursor-pointer"
+                class="mobile-toggle-inactive rounded-full py-2.5 px-3 text-xs font-medium transition-all duration-200 text-center truncate cursor-pointer"
                 :class="selectedMode === 'in-person' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'text-white/70 hover:text-white'"
                 @click="selectedMode = 'in-person'"
               >
@@ -402,7 +402,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
 
             <!-- Input 1: Client Name -->
             <div class="flex flex-col gap-1.5">
-              <label for="m-client-name" class="text-xs font-medium text-white/90 text-right">
+              <label for="m-client-name" class="mobile-hero-label text-xs font-medium text-white/90 text-right">
                 الاسم الكريم
               </label>
               <input
@@ -411,13 +411,13 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
                 type="text"
                 autocomplete="name"
                 placeholder="أدخل اسمك بالكامل"
-                class="h-11 w-full rounded-2xl border border-white/10 bg-[#101017] px-4 text-xs text-white placeholder:text-white/35 focus:border-[#e91e8c] focus:outline-none focus:ring-1 focus:ring-[#e91e8c]"
+                class="mobile-hero-input h-11 w-full rounded-2xl border border-white/10 bg-[#101017] px-4 text-xs text-white placeholder:text-white/35 focus:border-[#e91e8c] focus:outline-none focus:ring-1 focus:ring-[#e91e8c]"
               >
             </div>
 
             <!-- Input 2: Phone / WhatsApp -->
             <div class="flex flex-col gap-1.5">
-              <label for="m-client-phone" class="text-xs font-medium text-white/90 text-right">
+              <label for="m-client-phone" class="mobile-hero-label text-xs font-medium text-white/90 text-right">
                 رقم الهاتف أو الواتساب
               </label>
               <input
@@ -427,13 +427,13 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
                 dir="ltr"
                 autocomplete="tel"
                 placeholder="+20 100 000 0000"
-                class="tnum h-11 w-full rounded-2xl border border-white/10 bg-[#101017] px-4 text-left text-xs text-white placeholder:text-white/35 focus:border-[#e91e8c] focus:outline-none focus:ring-1 focus:ring-[#e91e8c]"
+                class="mobile-hero-input tnum h-11 w-full rounded-2xl border border-white/10 bg-[#101017] px-4 text-left text-xs text-white placeholder:text-white/35 focus:border-[#e91e8c] focus:outline-none focus:ring-1 focus:ring-[#e91e8c]"
               >
             </div>
 
             <!-- Dropdown 3: Native HTML <select> on Mobile -->
             <div class="flex flex-col gap-1.5 w-full">
-              <label for="m-native-select" class="text-xs font-medium text-white/90 text-right">
+              <label for="m-native-select" class="mobile-hero-label text-xs font-medium text-white/90 text-right">
                 نوع الاستشارة المطلوبة
               </label>
               <select
@@ -471,42 +471,42 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
           <!-- Header row -->
           <div class="flex items-center justify-between px-1 text-xs">
             <span class="font-bold text-[#e91e8c]">أرقام نفخر بها</span>
-            <span class="text-[11px] text-white/50">اسحب لليمين واليسار ←</span>
+            <span class="mobile-stats-hint text-[11px] text-white/50">اسحب لليمين واليسار ←</span>
           </div>
 
           <!-- 3 cards in one row -->
           <div class="grid grid-cols-3 gap-2" role="region" aria-label="أرقام وإحصائيات">
             <!-- Card 1: 500+ جلسة ناجحة -->
             <div
-              class="stat-card-anim flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#171722] p-2.5 sm:p-3.5 text-center"
+              class="stat-card-anim mobile-stat-card flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#171722] p-2.5 sm:p-3.5 text-center"
               :class="{ 'is-active': statsAnimated }"
               style="transition-delay: 0.1s;"
             >
               <span class="tnum text-xl sm:text-2xl font-extrabold text-[#e91e8c]">+{{ statsAnimated ? count500 : 500 }}</span>
-              <span class="mt-1 text-[11px] sm:text-xs font-bold text-white leading-tight">جلسة ناجحة</span>
-              <span class="mt-1 text-[9px] sm:text-[10px] leading-tight text-white/55">نتائج إيجابية مستدامة</span>
+              <span class="mobile-stat-title mt-1 text-[11px] sm:text-xs font-bold text-white leading-tight">جلسة ناجحة</span>
+              <span class="mobile-stat-sub mt-1 text-[9px] sm:text-[10px] leading-tight text-white/55">نتائج إيجابية مستدامة</span>
             </div>
 
             <!-- Card 2: 50+ استشاري معتمد -->
             <div
-              class="stat-card-anim flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#171722] p-2.5 sm:p-3.5 text-center"
+              class="stat-card-anim mobile-stat-card flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#171722] p-2.5 sm:p-3.5 text-center"
               :class="{ 'is-active': statsAnimated }"
               style="transition-delay: 0.2s;"
             >
               <span class="tnum text-xl sm:text-2xl font-extrabold text-[#e91e8c]">+{{ statsAnimated ? count50 : 50 }}</span>
-              <span class="mt-1 text-[11px] sm:text-xs font-bold text-white leading-tight">استشاري معتمد</span>
-              <span class="mt-1 text-[9px] sm:text-[10px] leading-tight text-white/55">أطباء ذوو خبرة</span>
+              <span class="mobile-stat-title mt-1 text-[11px] sm:text-xs font-bold text-white leading-tight">استشاري معتمد</span>
+              <span class="mobile-stat-sub mt-1 text-[9px] sm:text-[10px] leading-tight text-white/55">أطباء ذوو خبرة</span>
             </div>
 
             <!-- Card 3: 3+ خبرة -->
             <div
-              class="stat-card-anim flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#171722] p-2.5 sm:p-3.5 text-center"
+              class="stat-card-anim mobile-stat-card flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#171722] p-2.5 sm:p-3.5 text-center"
               :class="{ 'is-active': statsAnimated }"
               style="transition-delay: 0.3s;"
             >
               <span class="tnum text-xl sm:text-2xl font-extrabold text-[#e91e8c]">+{{ statsAnimated ? count3 : 3 }}</span>
-              <span class="mt-1 text-[11px] sm:text-xs font-bold text-white leading-tight">سنوات خبرة</span>
-              <span class="mt-1 text-[9px] sm:text-[10px] leading-tight text-white/55">مسار علاجي معتمد</span>
+              <span class="mobile-stat-title mt-1 text-[11px] sm:text-xs font-bold text-white leading-tight">سنوات خبرة</span>
+              <span class="mobile-stat-sub mt-1 text-[9px] sm:text-[10px] leading-tight text-white/55">مسار علاجي معتمد</span>
             </div>
           </div>
         </div>
@@ -673,6 +673,106 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
   }
   .hero-mobile-view {
     display: block !important;
+  }
+
+  /* Mobile Hero in light mode */
+  :root:not(.dark) .mobile-hero-overlay,
+  .light .mobile-hero-overlay,
+  [data-theme="light"] .mobile-hero-overlay {
+    background: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  :root:not(.dark) .mobile-hero-badge,
+  .light .mobile-hero-badge,
+  [data-theme="light"] .mobile-hero-badge {
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  }
+
+  :root:not(.dark) .mobile-hero-form,
+  .light .mobile-hero-form,
+  [data-theme="light"] .mobile-hero-form {
+    background: #f5f5fa !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+  }
+
+  :root:not(.dark) .mobile-toggle-container,
+  .light .mobile-toggle-container,
+  [data-theme="light"] .mobile-toggle-container {
+    background: #e8e8f2 !important;
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  }
+
+  :root:not(.dark) .mobile-toggle-inactive,
+  .light .mobile-toggle-inactive,
+  [data-theme="light"] .mobile-toggle-inactive {
+    background: #f0f0f8 !important;
+    color: #1a1a2e !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  }
+
+  :root:not(.dark) .mobile-hero-label,
+  .light .mobile-hero-label,
+  [data-theme="light"] .mobile-hero-label {
+    color: #1a1a2e !important;
+  }
+
+  :root:not(.dark) .mobile-hero-input,
+  .light .mobile-hero-input,
+  [data-theme="light"] .mobile-hero-input {
+    background: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+    color: #1a1a2e !important;
+  }
+
+  :root:not(.dark) .mobile-hero-input::placeholder,
+  .light .mobile-hero-input::placeholder,
+  [data-theme="light"] .mobile-hero-input::placeholder {
+    color: rgba(0, 0, 0, 0.4) !important;
+  }
+
+  :root:not(.dark) .native-mobile-select,
+  .light .native-mobile-select,
+  [data-theme="light"] .native-mobile-select {
+    background-color: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+    color: #1a1a2e !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(26,26,46,0.7)' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E") !important;
+  }
+
+  :root:not(.dark) .native-mobile-select option,
+  .light .native-mobile-select option,
+  [data-theme="light"] .native-mobile-select option {
+    background: #ffffff !important;
+    color: #1a1a2e !important;
+  }
+
+  :root:not(.dark) .mobile-stat-card,
+  .light .mobile-stat-card,
+  [data-theme="light"] .mobile-stat-card {
+    background: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  }
+
+  :root:not(.dark) .mobile-stat-title,
+  .light .mobile-stat-title,
+  [data-theme="light"] .mobile-stat-title {
+    color: #1a1a2e !important;
+  }
+
+  :root:not(.dark) .mobile-stat-sub,
+  .light .mobile-stat-sub,
+  [data-theme="light"] .mobile-stat-sub {
+    color: #444444 !important;
+  }
+
+  :root:not(.dark) .mobile-stats-hint,
+  .light .mobile-stats-hint,
+  [data-theme="light"] .mobile-stats-hint {
+    color: #666666 !important;
   }
 }
 
