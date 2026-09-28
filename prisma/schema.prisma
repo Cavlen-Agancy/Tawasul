@@ -1,7 +1,3 @@
-// Tawasul Academy — Prisma Schema v2
-// Database: PostgreSQL
-// ORM: Prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,9 +7,186 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─────────────────────────────────────────
-// ENUMS
-// ─────────────────────────────────────────
+model User {
+  id                      String       @id @default(cuid())
+  email                   String       @unique
+  password                String
+  name                    String
+  phone                   String?
+  photo                   String?
+  accountType             AccountType  @default(PATIENT)
+  emailVerified           Boolean      @default(false)
+  emailVerificationToken  String?
+  emailVerificationExpiry DateTime?
+  passwordResetToken      String?
+  passwordResetExpiry     DateTime?
+  isActive                Boolean      @default(true)
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+  bookings                Booking[]    @relation("PatientBookings")
+  doctor                  Doctor?
+  permissions             Permission[]
+
+  @@map("users")
+}
+
+model Permission {
+  id        String   @id @default(cuid())
+  userId    String
+  resource  Resource
+  action    Action
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, resource, action])
+  @@map("permissions")
+}
+
+model Doctor {
+  id              String         @id @default(cuid())
+  userId          String         @unique
+  bio             String?
+  slug            String         @unique
+  specializations String[]
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  availability    Availability[]
+  blockedSlots    BlockedSlot[]
+  bookings        Booking[]      @relation("DoctorBookings")
+  doctorNotes     DoctorNote[]
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("doctors")
+}
+
+model Availability {
+  id              String   @id @default(cuid())
+  doctorId        String
+  dayOfWeek       Int
+  startTime       String
+  endTime         String
+  sessionDuration Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, dayOfWeek])
+  @@map("availability")
+}
+
+model BlockedSlot {
+  id        String   @id @default(cuid())
+  doctorId  String
+  date      DateTime @db.Date
+  startTime String
+  endTime   String
+  createdAt DateTime @default(now())
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@map("blocked_slots")
+}
+
+model AdminSchedule {
+  id              String   @id @default(cuid())
+  dayOfWeek       Int      @unique
+  startTime       String
+  endTime         String
+  sessionDuration Int
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("admin_schedules")
+}
+
+model GlobalBlockedDate {
+  id        String   @id @default(cuid())
+  date      DateTime @unique @db.Date
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@map("global_blocked_dates")
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  userId      String
+  doctorId    String?
+  date        DateTime      @db.Date
+  startTime   String
+  endTime     String
+  service     String
+  status      BookingStatus @default(PENDING)
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  sessionType SessionType   @default(ONLINE)
+  doctor      Doctor?       @relation("DoctorBookings", fields: [doctorId], references: [id])
+  user        User          @relation("PatientBookings", fields: [userId], references: [id], onDelete: Cascade)
+  doctorNotes DoctorNote[]
+  payment     Payment?
+  sessionRoom SessionRoom?
+
+  @@map("bookings")
+}
+
+model DoctorNote {
+  id        String   @id @default(cuid())
+  content   String
+  bookingId String
+  doctorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, doctorId])
+  @@map("doctor_notes")
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  bookingId        String        @unique
+  amount           Decimal       @db.Decimal(10, 2)
+  currency         String        @default("EGP")
+  status           PaymentStatus @default(PENDING)
+  gatewayReference String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  booking          Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model SessionRoom {
+  id        String   @id @default(cuid())
+  bookingId String   @unique
+  roomName  String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("session_rooms")
+}
+
+model Settings {
+  id                     String   @id @default("singleton")
+  platformName           String   @default("Tawasul Academy")
+  contactEmail           String   @default("")
+  contactPhone           String   @default("")
+  whatsappNumber         String   @default("")
+  paymentGateway         String   @default("paymob")
+  paymentGatewayKey      String   @default("")
+  paymentGatewaySecret   String   @default("")
+  sessionPricePerHour    Decimal  @default(0) @db.Decimal(10, 2)
+  defaultSessionDuration Int      @default(60)
+  defaultWorkingStart    String   @default("09:00")
+  defaultWorkingEnd      String   @default("17:00")
+  updatedAt              DateTime @updatedAt
+
+  @@map("settings")
+}
 
 enum AccountType {
   PATIENT
@@ -25,7 +198,7 @@ enum BookingStatus {
   PENDING
   CONFIRMED
   CANCELLED
-  IN_REVIEW // reserved for future use
+  IN_REVIEW
 }
 
 enum PaymentStatus {
@@ -40,11 +213,6 @@ enum SessionType {
   IN_CLINIC
 }
 
-// ─────────────────────────────────────────
-// PERMISSIONS
-// ─────────────────────────────────────────
-
-// Resources that can have permissions assigned
 enum Resource {
   APPOINTMENTS
   PATIENTS
@@ -54,275 +222,9 @@ enum Resource {
   STAFF
 }
 
-// Actions available per resource
 enum Action {
   CREATE
   READ
   UPDATE
   DELETE
-}
-
-// ─────────────────────────────────────────
-// USER (all account types)
-// ─────────────────────────────────────────
-
-model User {
-  id          String      @id @default(cuid())
-  email       String      @unique
-  password    String
-  name        String
-  phone       String?
-  photo       String?
-  accountType AccountType @default(PATIENT)
-
-  emailVerified           Boolean   @default(false)
-  emailVerificationToken  String?
-  emailVerificationExpiry DateTime?
-
-  passwordResetToken  String?
-  passwordResetExpiry DateTime?
-
-  isActive  Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  doctor       Doctor?
-  permissions  Permission[]
-  bookings     Booking[]     @relation("PatientBookings")
-
-  @@map("users")
-}
-
-// ─────────────────────────────────────────
-// PERMISSION
-// ─────────────────────────────────────────
-
-model Permission {
-  id       String   @id @default(cuid())
-  userId   String
-  resource Resource
-  action   Action
-
-  createdAt DateTime @default(now())
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, resource, action])
-  @@map("permissions")
-}
-
-// ─────────────────────────────────────────
-// DOCTOR
-// ─────────────────────────────────────────
-
-model Doctor {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  bio             String?
-  slug            String   @unique
-  specializations String[]
-  isActive        Boolean  @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  availability Availability[]
-  blockedSlots BlockedSlot[]
-  bookings     Booking[]     @relation("DoctorBookings")
-  doctorNotes  DoctorNote[]
-
-  @@map("doctors")
-}
-
-// ─────────────────────────────────────────
-// AVAILABILITY
-// ─────────────────────────────────────────
-
-model Availability {
-  id              String @id @default(cuid())
-  doctorId        String
-  dayOfWeek       Int    // 0 = Sunday, 6 = Saturday
-  startTime       String // "09:00"
-  endTime         String // "17:00"
-  sessionDuration Int    // minutes: 30, 45, or 60
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-
-  @@unique([doctorId, dayOfWeek])
-  @@map("availability")
-}
-
-// ─────────────────────────────────────────
-// BLOCKED SLOT
-// ─────────────────────────────────────────
-
-model BlockedSlot {
-  id        String   @id @default(cuid())
-  doctorId  String
-  date      DateTime @db.Date
-  startTime String   // "10:00"
-  endTime   String   // "11:00"
-
-  createdAt DateTime @default(now())
-
-  // Relations
-  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-
-  @@map("blocked_slots")
-}
-
-// ─────────────────────────────────────────
-// ADMIN SCHEDULE (global booking availability)
-// ─────────────────────────────────────────
-
-// Single source of truth for what patients can book. Admin-controlled.
-model AdminSchedule {
-  id              String  @id @default(cuid())
-  dayOfWeek       Int     // 0 = Sunday, 6 = Saturday
-  startTime       String  // "09:00"
-  endTime         String  // "17:00"
-  sessionDuration Int     // minutes: 30, 45, or 60
-  isActive        Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([dayOfWeek])
-  @@map("admin_schedules")
-}
-
-// ─────────────────────────────────────────
-// GLOBAL BLOCKED DATE (admin-controlled date blocks)
-// ─────────────────────────────────────────
-
-model GlobalBlockedDate {
-  id     String  @id @default(cuid())
-  date   DateTime @db.Date
-  reason String?
-
-  createdAt DateTime @default(now())
-
-  @@unique([date])
-  @@map("global_blocked_dates")
-}
-
-// ─────────────────────────────────────────
-// BOOKING
-// ─────────────────────────────────────────
-
-model Booking {
-  id          String        @id @default(cuid())
-  userId      String
-  doctorId    String?
-  date        DateTime      @db.Date
-  startTime   String        // "10:00"
-  endTime     String        // "11:00"
-  service     String
-  status      BookingStatus @default(PENDING)
-  sessionType SessionType   @default(ONLINE)
-  notes       String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  user        User         @relation("PatientBookings", fields: [userId], references: [id], onDelete: Cascade)
-  doctor      Doctor?      @relation("DoctorBookings", fields: [doctorId], references: [id], onDelete: SetNull)
-  payment     Payment?
-  sessionRoom SessionRoom?
-  doctorNotes DoctorNote[]
-
-  @@map("bookings")
-}
-
-// ─────────────────────────────────────────
-// DOCTOR NOTE (doctor-authored session notes; Booking.notes left untouched)
-// ─────────────────────────────────────────
-
-model DoctorNote {
-  id        String   @id @default(cuid())
-  content   String
-  bookingId String
-  doctorId  String
-  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([bookingId, doctorId])
-  @@map("doctor_notes")
-}
-
-// ─────────────────────────────────────────
-// PAYMENT
-// ─────────────────────────────────────────
-
-model Payment {
-  id               String        @id @default(cuid())
-  bookingId        String        @unique
-  amount           Decimal       @db.Decimal(10, 2)
-  currency         String        @default("EGP")
-  status           PaymentStatus @default(PENDING)
-  gatewayReference String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@map("payments")
-}
-
-// ─────────────────────────────────────────
-// ─────────────────────────────────────────
-
-model SessionRoom {
-  id        String   @id @default(cuid())
-  bookingId String   @unique
-  roomName  String   @unique
-  expiresAt DateTime
-
-  createdAt DateTime @default(now())
-
-  // Relations
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@map("session_rooms")
-}
-
-// ─────────────────────────────────────────
-// SETTINGS (singleton)
-// ─────────────────────────────────────────
-
-model Settings {
-  id String @id @default("singleton")
-
-  platformName   String @default("Tawasul Academy")
-  contactEmail   String @default("")
-  contactPhone   String @default("")
-  whatsappNumber String @default("")
-
-  paymentGateway       String  @default("paymob") // "paymob" or "stripe"
-  paymentGatewayKey    String  @default("")
-  paymentGatewaySecret String  @default("")
-
-  sessionPricePerHour    Decimal @default(0) @db.Decimal(10, 2)
-  defaultSessionDuration Int     @default(60) // minutes
-  defaultWorkingStart    String  @default("09:00")
-  defaultWorkingEnd      String  @default("17:00")
-
-
-  updatedAt DateTime @updatedAt
-
-  @@map("settings")
 }

@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { LogOut, SlidersHorizontal } from 'lucide-vue-next'
 
+// Meeting lobby is English-only → force LTR, overriding global RTL
+useHead({
+  htmlAttrs: { dir: 'ltr', lang: 'en' },
+})
+
 const { logout, user } = useAuth()
 const route = useRoute()
 
@@ -17,7 +22,7 @@ const backTo = computed<string>(() => {
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col bg-background">
+  <div dir="ltr" lang="en" class="flex min-h-screen flex-col bg-background text-left">
     <header class="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-4 md:px-8">
       <NuxtLink to="/" class="flex items-center text-lg font-semibold">
         Tawasul <span class="text-primary">Academy</span>

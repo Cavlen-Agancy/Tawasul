@@ -7,6 +7,11 @@ import {
   User,
 } from 'lucide-vue-next'
 
+// Patient panel is English-only → force LTR, overriding global RTL
+useHead({
+  htmlAttrs: { dir: 'ltr', lang: 'en' },
+})
+
 const { logout, user } = useAuth()
 const route = useRoute()
 
@@ -22,7 +27,7 @@ const isActive = (to: string) => route.path.startsWith(to)
 </script>
 
 <template>
-  <div class="flex h-screen bg-background">
+  <div dir="ltr" lang="en" class="flex h-screen bg-background text-left">
     <aside class="hidden w-[240px] shrink-0 border-r border-border bg-muted lg:flex lg:flex-col">
       <div class="flex h-full flex-col">
         <div class="flex h-16 items-center border-b border-border px-4">

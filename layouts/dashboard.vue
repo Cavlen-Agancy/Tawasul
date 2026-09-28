@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { Menu as MenuIcon } from 'lucide-vue-next'
 
+// Generic dashboard panel is English-only → force LTR, overriding global RTL
+useHead({
+  htmlAttrs: { dir: 'ltr', lang: 'en' },
+})
+
 const mobileNavOpen = ref(false)
 </script>
 
 <template>
-  <div class="flex h-screen bg-background">
+  <div dir="ltr" lang="en" class="flex h-screen bg-background text-left">
     <aside class="hidden w-[240px] shrink-0 border-r border-border bg-muted lg:flex lg:flex-col">
       <slot name="sidebar" />
     </aside>

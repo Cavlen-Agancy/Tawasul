@@ -59,10 +59,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, message: 'Invalid credentials' })
   }
 
-  if (!user.emailVerified) {
-    throw createError({ statusCode: 403, message: 'Please verify your email before logging in' })
-  }
-
   if (!user.isActive) {
     throw createError({ statusCode: 403, message: 'Your account has been deactivated' })
   }
