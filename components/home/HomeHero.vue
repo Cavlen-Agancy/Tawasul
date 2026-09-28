@@ -3,7 +3,7 @@ import { ArrowLeft } from 'lucide-vue-next'
 import { quickConsultServices } from '~/lib/home-content'
 import { siteConfig } from '~/lib/site'
 
-const selectedMode = ref<'online' | 'in-person'>('online')
+const selectedMode = ref<'online' | 'in-person'>('in-person')
 const clientName = ref('')
 const clientPhone = ref('')
 const selectedService = ref('استشارة نفسية متخصصة (فردية)')
@@ -135,12 +135,6 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
 
       <!-- Center content with vertical centering -->
       <div class="relative z-10 mx-auto flex w-full max-w-7xl flex-col items-center justify-center px-4 text-center sm:px-6 lg:px-8 py-0 my-auto">
-        <!-- Top Pill Badge -->
-        <div class="animate-hero-heading inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/60 px-4 py-1 text-xs font-medium text-white shadow-soft backdrop-blur-md mb-2">
-          <span class="h-2 w-2 rounded-full bg-[#e91e8c] animate-pulse" aria-hidden="true" />
-          <span>أكاديمية تواصل — بجمهورية مصر العربية</span>
-        </div>
-
         <!-- Main Headline (fade in + slide up) -->
         <h1 class="desktop-hero-heading animate-hero-heading mt-2 text-4xl lg:text-5xl xl:text-[3.75rem] font-extrabold tracking-tight text-white leading-[1.15]">
           <span>نتواصل </span>
@@ -160,13 +154,13 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
           <form class="flex items-center justify-between gap-2" @submit.prevent="() => handleBooking()">
             <!-- Name Input -->
             <div class="flex-1 px-3">
-              <label for="d-name" class="sr-only">اسم العميل الكريم</label>
+              <label for="d-name" class="sr-only">اسم العميل</label>
               <input
                 id="d-name"
                 v-model="clientName"
                 type="text"
                 autocomplete="name"
-                placeholder="اسم العميل الكريم"
+                placeholder="اسم العميل"
                 class="desktop-hero-input h-10 w-full rounded-full bg-transparent px-3 text-sm text-white placeholder:text-white/50 focus:outline-none"
               >
             </div>
@@ -221,11 +215,10 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
         <div class="animate-hero-form mt-4 flex items-center justify-center gap-3">
           <button
             type="button"
-            class="flex items-center gap-2 rounded-full px-5 py-2 text-xs sm:text-sm font-bold transition-all duration-200 active:scale-95 cursor-pointer"
-            :class="selectedMode === 'online' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'desktop-toggle-inactive border border-white/20 bg-black/50 text-white/80 hover:border-[#e91e8c] hover:text-white'"
-            @click="selectedMode = 'online'"
+            class="flex items-center gap-2 rounded-full px-5 py-2 text-xs sm:text-sm font-bold transition-all duration-200 active:scale-95 cursor-pointer desktop-toggle-inactive border border-white/20 bg-black/50 text-white/80 hover:border-[#e91e8c] hover:text-white"
+            @click="navigateTo(siteConfig.auth.loginPath)"
           >
-            <span class="size-2 rounded-full" :class="selectedMode === 'online' ? 'bg-white animate-pulse' : 'bg-white/40'" />
+            <span class="size-2 rounded-full bg-white/40" />
             <span>جلسة أونلاين مباشرة</span>
           </button>
 
@@ -341,12 +334,6 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
 
           <!-- Content inside top card (animated) -->
           <div class="relative -mt-20 px-4 pb-6 pt-2 text-center">
-            <!-- Top badge with pink dot -->
-            <div class="animate-hero-heading mobile-hero-badge inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/70 px-3.5 py-1 text-[11px] font-medium text-white shadow-soft backdrop-blur-md">
-              <span class="h-2 w-2 rounded-full bg-[#e91e8c]" aria-hidden="true" />
-              <span>أكاديمية تواصل — جمهورية مصر العربية</span>
-            </div>
-
             <!-- Main Heading -->
             <h1 class="animate-hero-heading mt-3.5 text-3xl font-extrabold tracking-tight text-white leading-tight">
               <span>نتواصل </span>
@@ -384,9 +371,8 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
             <div class="mobile-toggle-container grid grid-cols-2 gap-1 rounded-full bg-[#0e0e14] p-1 border border-white/5">
               <button
                 type="button"
-                class="rounded-full py-2.5 px-3 text-xs font-bold transition-all duration-200 text-center truncate cursor-pointer"
-                :class="selectedMode === 'online' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'mobile-toggle-inactive text-white/70 hover:text-white'"
-                @click="selectedMode = 'online'"
+                class="rounded-full py-2.5 px-3 text-xs font-bold transition-all duration-200 text-center truncate cursor-pointer mobile-toggle-inactive text-white/70 hover:text-white"
+                @click="navigateTo(siteConfig.auth.loginPath)"
               >
                 جلسة أونلاين مشفرة
               </button>
@@ -403,7 +389,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
             <!-- Input 1: Client Name -->
             <div class="flex flex-col gap-1.5">
               <label for="m-client-name" class="mobile-hero-label text-xs font-medium text-white/90 text-right">
-                الاسم الكريم
+                اسم العميل
               </label>
               <input
                 id="m-client-name"

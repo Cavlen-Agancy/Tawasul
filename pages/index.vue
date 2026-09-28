@@ -52,7 +52,7 @@ function startSlideshow() {
 // ==========================================
 // Hero Content State & Logic
 // ==========================================
-const selectedMode = ref<'online' | 'in-person'>('online')
+const selectedMode = ref<'online' | 'in-person'>('in-person')
 const clientName = ref('')
 const clientPhone = ref('')
 const selectedService = ref('استشارة نفسية متخصصة (فردية)')
@@ -221,12 +221,6 @@ const courses: TrainingCourse[] = [
 
         <!-- Center content with vertical centering -->
         <div class="relative z-10 mx-auto flex w-full max-w-7xl flex-col items-center justify-center px-4 text-center sm:px-6 lg:px-8 my-auto">
-          <!-- Top Pill Badge -->
-          <div class="animate-hero-heading inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/60 px-4 py-1 text-xs font-medium text-white shadow-soft backdrop-blur-md mb-2">
-            <span class="h-2 w-2 rounded-full bg-[#e91e8c] animate-pulse" aria-hidden="true" />
-            <span>أكاديمية تواصل — بجمهورية مصر العربية</span>
-          </div>
-
           <!-- Main Headline -->
           <h1 class="desktop-hero-heading animate-hero-heading mt-2 text-4xl lg:text-5xl xl:text-[3.75rem] font-extrabold tracking-tight text-white leading-[1.15]">
             <span>نتواصل </span>
@@ -246,13 +240,13 @@ const courses: TrainingCourse[] = [
             <form class="flex items-center justify-between gap-2" @submit.prevent="() => handleBooking()">
               <!-- Name Input -->
               <div class="flex-1 px-3">
-                <label for="d-name" class="sr-only">اسم العميل الكريم</label>
+                <label for="d-name" class="sr-only">اسم العميل</label>
                 <input
                   id="d-name"
                   v-model="clientName"
                   type="text"
                   autocomplete="name"
-                  placeholder="اسم العميل الكريم"
+                  placeholder="اسم العميل"
                   class="desktop-hero-input h-10 w-full rounded-full bg-transparent px-3 text-sm text-white placeholder:text-white/50 focus:outline-none"
                 >
               </div>
@@ -307,11 +301,10 @@ const courses: TrainingCourse[] = [
           <div class="animate-hero-form mt-4 flex items-center justify-center gap-3">
             <button
               type="button"
-              class="flex items-center gap-2 rounded-full px-5 py-2 text-xs sm:text-sm font-bold transition-all duration-200 active:scale-95 cursor-pointer"
-              :class="selectedMode === 'online' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'desktop-toggle-inactive border border-white/20 bg-black/50 text-white/80 hover:border-[#e91e8c] hover:text-white'"
-              @click="selectedMode = 'online'"
+              class="flex items-center gap-2 rounded-full px-5 py-2 text-xs sm:text-sm font-bold transition-all duration-200 active:scale-95 cursor-pointer desktop-toggle-inactive border border-white/20 bg-black/50 text-white/80 hover:border-[#e91e8c] hover:text-white"
+              @click="navigateTo(siteConfig.auth.loginPath)"
             >
-              <span class="size-2 rounded-full" :class="selectedMode === 'online' ? 'bg-white animate-pulse' : 'bg-white/40'" />
+              <span class="size-2 rounded-full bg-white/40" />
               <span>جلسة أونلاين مباشرة</span>
             </button>
 
@@ -384,12 +377,6 @@ const courses: TrainingCourse[] = [
 
             <!-- Content inside top card -->
             <div class="relative z-10 px-4 pb-6 pt-28 text-center flex flex-col items-center">
-              <!-- Top badge with pink dot -->
-              <div class="animate-hero-heading inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/60 px-3.5 py-1 text-[11px] font-medium text-white shadow-soft backdrop-blur-md mb-2.5">
-                <span class="h-2 w-2 rounded-full bg-[#e91e8c]" aria-hidden="true" />
-                <span>أكاديمية تواصل — جمهورية مصر العربية</span>
-              </div>
-
               <!-- Main Heading with curvy underline under 'نفهم' -->
               <h1 class="animate-hero-heading text-3xl font-extrabold tracking-tight text-white leading-tight">
                 <span>نتواصل </span>
@@ -427,9 +414,8 @@ const courses: TrainingCourse[] = [
               <div class="grid grid-cols-2 gap-1 rounded-full bg-[#0e0e14] p-1 border border-white/5">
                 <button
                   type="button"
-                  class="rounded-full py-2.5 px-3 text-xs font-bold transition-all duration-200 text-center truncate cursor-pointer"
-                  :class="selectedMode === 'online' ? 'bg-[#e91e8c] text-white shadow-magenta' : 'text-white/70 hover:text-white'"
-                  @click="selectedMode = 'online'"
+                  class="rounded-full py-2.5 px-3 text-xs font-bold transition-all duration-200 text-center truncate cursor-pointer text-white/70 hover:text-white"
+                  @click="navigateTo(siteConfig.auth.loginPath)"
                 >
                   جلسة أونلاين مشفرة
                 </button>
@@ -446,7 +432,7 @@ const courses: TrainingCourse[] = [
               <!-- Input 1: Client Name matching Image 1 -->
               <div class="flex flex-col gap-1.5 text-right">
                 <label for="m-client-name" class="text-xs font-medium text-white/90">
-                  الاسم الكريم
+                  اسم العميل
                 </label>
                 <input
                   id="m-client-name"
@@ -551,52 +537,52 @@ const courses: TrainingCourse[] = [
           </p>
         </div>
 
-        <!-- شبكة الـ 3 كروت: 3 columns على desktop وعمود واحد على mobile -->
-        <div class="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+        <!-- شبكة الكروت: 2 columns على الموبايل و 3 columns على desktop -->
+        <div class="mt-8 sm:mt-12 grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 lg:gap-8">
           <article
             v-for="course in courses"
             :key="course.id"
             class="course-card flex flex-col justify-between"
           >
-            <!-- 1. صورة في الأعلى تأخذ العرض الكامل وارتفاع ثابت 240px وحواف علوية مستديرة فقط -->
-            <div class="relative w-full h-[240px] overflow-hidden">
+            <!-- 1. صورة في الأعلى تأخذ العرض الكامل وحواف علوية مستديرة فقط -->
+            <div class="relative w-full h-[140px] sm:h-[200px] lg:h-[240px] overflow-hidden">
               <img
                 :src="course.image"
                 :alt="course.title"
                 class="w-full h-full object-cover"
-                style="height: 240px; object-fit: cover; border-top-left-radius: 16px; border-top-right-radius: 16px;"
+                style="object-fit: cover; border-top-left-radius: 16px; border-top-right-radius: 16px;"
                 loading="lazy"
               />
             </div>
 
-            <!-- 2. محتوى تحت الصورة داخل الكارد — padding: 24px -->
-            <div class="course-content flex flex-col flex-1 justify-between gap-4 p-6" style="padding: 24px;">
-              <div class="flex flex-col gap-3">
+            <!-- 2. محتوى تحت الصورة داخل الكارد -->
+            <div class="course-content flex flex-col flex-1 justify-between gap-2 sm:gap-4 p-3 sm:p-6">
+              <div class="flex flex-col gap-2 sm:gap-3">
                 <!-- باج صغير فوق العنوان: خلفية ماجنتا خفيفة مع نص ماجنتا -->
-                <span class="course-badge self-start inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold">
+                <span class="course-badge self-start inline-flex items-center rounded-full px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-semibold">
                   {{ course.badge }}
                 </span>
 
                 <!-- عنوان الدورة: bold، كبير -->
-                <h3 class="text-xl sm:text-2xl font-bold text-[#1a1a2e] dark:text-foreground leading-snug">
+                <h3 class="text-sm sm:text-xl lg:text-2xl font-bold text-[#1a1a2e] dark:text-foreground leading-snug">
                   {{ course.title }}
                 </h3>
 
                 <!-- وصف قصير: muted، 2-3 سطور -->
-                <p class="text-xs sm:text-sm leading-relaxed text-[#555555] dark:text-muted-foreground line-clamp-3">
+                <p class="text-[11px] sm:text-sm leading-relaxed text-[#555555] dark:text-muted-foreground line-clamp-2 sm:line-clamp-3">
                   {{ course.description }}
                 </p>
               </div>
 
               <!-- خط فاصل -->
-              <hr class="course-divider my-2 border-0 h-px w-full" />
+              <hr class="course-divider my-1 sm:my-2 border-0 h-px w-full" />
 
               <!-- زر احجز الآن في الأسفل في يمين الكارد (start في RTL) -->
               <div class="flex items-center justify-start pt-1">
                 <!-- زر (filled، ماجنتا) -->
                 <NuxtLink
                   :to="siteConfig.booking.basePath"
-                  class="btn-filled-magenta inline-flex items-center justify-center rounded-full px-5 py-2.5 text-xs sm:text-sm font-bold text-white transition-all cursor-pointer"
+                  class="btn-filled-magenta inline-flex items-center justify-center rounded-full px-4 sm:px-5 py-2 sm:py-2.5 text-[11px] sm:text-sm font-bold text-white transition-all cursor-pointer"
                 >
                   احجز الآن
                 </NuxtLink>
