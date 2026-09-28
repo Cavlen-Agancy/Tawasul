@@ -2,7 +2,7 @@
 import {
   Heart, Users, HeartHandshake, MessageSquare, Brain, Sparkles, ArrowLeft, ArrowUpRight, GraduationCap, Compass,
 } from 'lucide-vue-next'
-import { homeServices, institutionalSolutions } from '~/lib/home-content'
+import { homeServices, corporateServices, institutionalSolutions } from '~/lib/home-content'
 import { siteConfig } from '~/lib/site'
 
 const activeTab = ref<'individual' | 'corporate'>('individual')
@@ -14,6 +14,7 @@ const iconMap: Record<string, unknown> = {
   speech: MessageSquare,
   brain: Brain,
   sparkles: Sparkles,
+  graduation: GraduationCap,
 }
 
 // Mobile specific 6 cards list matching the user prompt
@@ -170,13 +171,50 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Corporate tab preview if switched -->
-      <div v-show="activeTab === 'corporate'" class="mt-12 rounded-3xl border border-black/[0.08] dark:border-border/70 bg-white dark:bg-card/70 p-8 text-center backdrop-blur-md shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:shadow-none">
-        <h3 class="text-xl font-bold text-[#1a1a2e] dark:text-white">{{ institutionalSolutions.title }}</h3>
-        <p class="mx-auto mt-3 max-w-xl text-sm leading-7 text-[#555555] dark:text-muted-foreground">{{ institutionalSolutions.description }}</p>
-        <Button as="a" href="#contact" class="mt-6 rounded-full bg-primary px-8 font-bold text-white shadow-magenta">
-          {{ institutionalSolutions.cta }}
-        </Button>
+      <!-- Corporate tab: 3 cards, same style as individual cards -->
+      <div
+        v-show="activeTab === 'corporate'"
+        class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        <div
+          v-for="(service, index) in corporateServices"
+          :key="service.key"
+          class="service-card-anim group relative flex flex-col justify-between rounded-3xl border border-black/[0.08] dark:border-border/70 bg-white dark:bg-card/70 p-6 shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:shadow-soft backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-magenta"
+          :class="{ 'is-visible': isServicesVisible }"
+          :style="{ transitionDelay: `${index * 0.08}s` }"
+        >
+          <!-- Top bar: Category Badge + Icon (with pulse on hover) -->
+          <div class="flex items-center justify-between">
+            <span class="rounded-full border border-black/[0.06] dark:border-border/70 bg-black/5 dark:bg-muted/60 px-3 py-1 text-[11px] font-semibold text-[#555] dark:text-muted-foreground">
+              {{ service.category }}
+            </span>
+            <span class="service-icon-badge flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary transition-colors duration-200 group-hover:bg-primary group-hover:text-white" aria-hidden="true">
+              <Component :is="iconMap[service.icon]" class="size-5" />
+            </span>
+          </div>
+
+          <!-- Body -->
+          <div class="mt-5 flex-1">
+            <h3 class="text-lg font-bold text-[#1a1a2e] dark:text-foreground transition-colors group-hover:text-primary">
+              {{ service.title }}
+            </h3>
+            <p class="mt-2.5 text-xs leading-6 text-[#555555] dark:text-muted-foreground">
+              {{ service.description }}
+            </p>
+          </div>
+
+          <!-- Action Button -->
+          <div class="mt-6 pt-2">
+            <Button
+              size="sm"
+              as="a"
+              href="#contact"
+              class="w-full rounded-full border border-primary/40 bg-primary/15 text-xs font-semibold text-primary hover:bg-primary hover:text-white"
+            >
+              للحجز والاستعلام
+            </Button>
+          </div>
+        </div>
       </div>
 
       <!-- Institutional Solutions Banner -->
@@ -263,6 +301,40 @@ onMounted(() => {
           <span>احجز استشارتك الان</span>
           <ArrowLeft class="size-4" aria-hidden="true" />
         </NuxtLink>
+
+        <!-- Corporate mini-block -->
+        <div class="mt-2 text-center">
+          <p class="text-xs font-bold text-[#e91e8c]">
+            حلول المؤسسات وبيئات العمل
+          </p>
+        </div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <a
+            v-for="(card, index) in corporateServices"
+            :key="card.key"
+            href="#contact"
+            class="service-card-anim group relative flex flex-col justify-between rounded-2xl border border-black/[0.08] dark:border-white/10 bg-white dark:bg-[#1a1a28] p-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:shadow-sm transition-all duration-200 active:scale-[0.98] hover:border-[#e91e8c]/50"
+            :class="{ 'is-visible': isServicesVisible }"
+            :style="{ transitionDelay: `${(index + 6) * 0.07}s` }"
+          >
+            <div class="flex items-start justify-between">
+              <span class="service-icon-badge flex h-9 w-9 items-center justify-center rounded-xl bg-[#e91e8c]/15 text-[#e91e8c] transition-all" aria-hidden="true">
+                <Component :is="iconMap[card.icon]" class="size-4" />
+              </span>
+              <span class="text-black/30 dark:text-white/40 group-hover:text-[#e91e8c] transition-colors" aria-hidden="true">
+                <ArrowUpRight class="size-4" />
+              </span>
+            </div>
+            <div class="mt-3 flex-1 flex flex-col">
+              <h3 class="text-xs font-bold text-[#1a1a2e] dark:text-white leading-snug group-hover:text-[#e91e8c] transition-colors">
+                {{ card.title }}
+              </h3>
+              <p class="mt-1 text-[10px] leading-relaxed text-[#555555] dark:text-white/60">
+                {{ card.description }}
+              </p>
+            </div>
+          </a>
+        </div>
       </div>
     </div>
   </section>

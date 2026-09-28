@@ -94,6 +94,30 @@ export const institutionalSolutions = {
   cta: 'طلب العرض المؤسسي',
 } as const
 
+export const corporateServices: HomeService[] = [
+  {
+    key: 'edu-institutions',
+    title: 'المؤسسات التعليمية',
+    description: 'برامج متكاملة لدعم المؤسسات التعليمية (الحضانات والمدارس والجامعات) لتعزيز الصحة النفسية للطلاب والكوادر التعليمية وتأهيلها.',
+    category: 'تعليم',
+    icon: 'graduation',
+  },
+  {
+    key: 'health-institutions',
+    title: 'المؤسسات الصحية',
+    description: 'برامج تطويرية للعاملين في القطاع الصحي لتعزيز الصحة النفسية والوقاية من الإرهاق الوظيفي.',
+    category: 'صحة',
+    icon: 'heart',
+  },
+  {
+    key: 'companies',
+    title: 'الشركات والمؤسسات',
+    description: 'حلول متكاملة لتعزيز الصحة النفسية في بيئة العمل وزيادة الإنتاجية والرضا الوظيفي وخدمات الـBusiness Psychology.',
+    category: 'أعمال',
+    icon: 'users',
+  },
+]
+
 export const homeBenefits = [
   {
     title: 'نخبة من الاستشاريين والأطباء المعتمدين',
