@@ -357,9 +357,9 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
               <span> نساند</span>
             </h1>
 
-            <!-- Subtext paragraph -->
+            <!-- Subtext paragraph (same copy as desktop hero) -->
             <p class="animate-hero-subtext mt-2.5 text-xs leading-relaxed text-white/75 max-w-sm mx-auto">
-              نساعدك على استعادة التوازن النفسي والأسري بجلسات استشارية وعلاجية مبنية على أسس علمية رصينة.
+              نساعدك على استعادة التوازن النفسي والأسري من خلال جلسات استشارية وعلاجية مبنية على أسس علمية رصينة، مع نخبة من الاستشاريين والأخصائيين المعتمدين.
             </p>
           </div>
         </div>
@@ -374,7 +374,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
                 class="rounded-full py-2.5 px-3 text-xs font-bold transition-all duration-200 text-center truncate cursor-pointer mobile-toggle-inactive text-white/70 hover:text-white"
                 @click="navigateTo(siteConfig.auth.loginPath)"
               >
-                جلسة أونلاين مشفرة
+                جلسة أونلاين مباشرة
               </button>
               <button
                 type="button"
@@ -452,47 +452,57 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
           </form>
         </div>
 
-        <!-- 3. Stats Section below form: 3 cards in ONE row without horizontal scroll -->
+        <!-- 3. Stats Section below form: same 4 stats as desktop hero -->
         <div ref="mobileStatsRef" class="flex flex-col gap-2 pt-1">
           <!-- Header row -->
-          <div class="flex items-center justify-between px-1 text-xs">
+          <div class="flex items-center justify-center px-1 text-xs">
             <span class="font-bold text-[#e91e8c]">أرقام نفخر بها</span>
-            <span class="mobile-stats-hint text-[11px] text-white/50">اسحب لليمين واليسار ←</span>
           </div>
 
-          <!-- 3 cards in one row -->
-          <div class="grid grid-cols-3 gap-2" role="region" aria-label="أرقام وإحصائيات">
-            <!-- Card 1: 500+ جلسة ناجحة -->
+          <!-- 4 cards in 2x2 grid (same data as desktop) -->
+          <div class="grid grid-cols-2 gap-2" role="region" aria-label="أرقام وإحصائيات">
+            <!-- Card 1: 500+ جلسة استشارية ناجحة -->
             <div
               class="stat-card-anim mobile-stat-card flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#171722] p-2.5 sm:p-3.5 text-center"
               :class="{ 'is-active': statsAnimated }"
               style="transition-delay: 0.1s;"
             >
               <span class="tnum text-xl sm:text-2xl font-extrabold text-[#e91e8c]">+{{ statsAnimated ? count500 : 500 }}</span>
-              <span class="mobile-stat-title mt-1 text-[11px] sm:text-xs font-bold text-white leading-tight">جلسة ناجحة</span>
-              <span class="mobile-stat-sub mt-1 text-[9px] sm:text-[10px] leading-tight text-white/55">نتائج إيجابية مستدامة</span>
+              <span class="mobile-stat-title mt-1 text-[11px] sm:text-xs font-bold text-white leading-tight">جلسة استشارية ناجحة</span>
+              <span class="mobile-stat-sub mt-1 text-[9px] sm:text-[10px] leading-tight text-white/55">خلال العام الحالي بنسبة رضا عالية</span>
             </div>
 
-            <!-- Card 2: 50+ استشاري معتمد -->
+            <!-- Card 2: 50+ استشاري ومعالج معتمد -->
             <div
               class="stat-card-anim mobile-stat-card flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#171722] p-2.5 sm:p-3.5 text-center"
               :class="{ 'is-active': statsAnimated }"
               style="transition-delay: 0.2s;"
             >
               <span class="tnum text-xl sm:text-2xl font-extrabold text-[#e91e8c]">+{{ statsAnimated ? count50 : 50 }}</span>
-              <span class="mobile-stat-title mt-1 text-[11px] sm:text-xs font-bold text-white leading-tight">استشاري معتمد</span>
-              <span class="mobile-stat-sub mt-1 text-[9px] sm:text-[10px] leading-tight text-white/55">أطباء ذوو خبرة</span>
+              <span class="mobile-stat-title mt-1 text-[11px] sm:text-xs font-bold text-white leading-tight">استشاري ومعالج معتمد</span>
+              <span class="mobile-stat-sub mt-1 text-[9px] sm:text-[10px] leading-tight text-white/55">أطباء وأخصائيون ذوو كفاءة وخبرة</span>
             </div>
 
-            <!-- Card 3: 3+ خبرة -->
+            <!-- Card 3: 8+ سنوات من التميز والعطاء -->
             <div
               class="stat-card-anim mobile-stat-card flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#171722] p-2.5 sm:p-3.5 text-center"
               :class="{ 'is-active': statsAnimated }"
               style="transition-delay: 0.3s;"
             >
-              <span class="tnum text-xl sm:text-2xl font-extrabold text-[#e91e8c]">+{{ statsAnimated ? count3 : 3 }}</span>
-              <span class="mobile-stat-title mt-1 text-[11px] sm:text-xs font-bold text-white leading-tight">سنوات خبرة</span>
-              <span class="mobile-stat-sub mt-1 text-[9px] sm:text-[10px] leading-tight text-white/55">مسار علاجي معتمد</span>
+              <span class="tnum text-xl sm:text-2xl font-extrabold text-[#e91e8c]">+{{ statsAnimated ? count8 : 8 }}</span>
+              <span class="mobile-stat-title mt-1 text-[11px] sm:text-xs font-bold text-white leading-tight">سنوات من التميز والعطاء</span>
+              <span class="mobile-stat-sub mt-1 text-[9px] sm:text-[10px] leading-tight text-white/55">في تقديم الخدمات النفسية والأسرية</span>
+            </div>
+
+            <!-- Card 4: 100% خصوصية وسرية تامة -->
+            <div
+              class="stat-card-anim mobile-stat-card flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#171722] p-2.5 sm:p-3.5 text-center"
+              :class="{ 'is-active': statsAnimated }"
+              style="transition-delay: 0.4s;"
+            >
+              <span class="tnum text-xl sm:text-2xl font-extrabold text-[#e91e8c]">{{ statsAnimated ? count100 : 100 }}%</span>
+              <span class="mobile-stat-title mt-1 text-[11px] sm:text-xs font-bold text-white leading-tight">خصوصية وسرية تامة</span>
+              <span class="mobile-stat-sub mt-1 text-[9px] sm:text-[10px] leading-tight text-white/55">وفق ميثاق الشرف الأخلاقي والمهني</span>
             </div>
           </div>
         </div>
