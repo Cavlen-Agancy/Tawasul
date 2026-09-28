@@ -712,7 +712,10 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
   }
 
   // Disconnect & Cleanup
-  function leaveSession() {
+  // Async: `room.disconnect()` resolves only after the engine closes and the
+  // Disconnected event is emitted — callers must await it before navigating
+  // away, otherwise the trailing Disconnected event fires post-unmount.
+  async function leaveSession() {
     devLog(`${rolePrefix} leaving`)
     if (permCheckTimer) {
       clearInterval(permCheckTimer)
@@ -735,8 +738,8 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
       localAudioTrack.value = null
     }
 
-    if (room.state === ConnectionState.Connected || room.state === ConnectionState.Connecting) {
-      room.disconnect()
+    if (room.state !== ConnectionState.Disconnected) {
+      await room.disconnect()
     }
     loadingStage.value = 'idle'
     devLog(`${rolePrefix} cleanup complete`)

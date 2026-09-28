@@ -759,7 +759,7 @@ function formatDate(val: string | Date | undefined) {
               autoplay
               playsinline
               class="size-full object-cover"
-              :ref="(el) => attachRemoteVideo(el as HTMLVideoElement, primaryRemoteVideo.track)"
+              :ref="(el) => { if (el && primaryRemoteVideo) attachRemoteVideo(el as HTMLVideoElement, primaryRemoteVideo.track) }"
             />
 
             <!-- Doctor Camera Off State -->
@@ -1038,7 +1038,7 @@ function formatDate(val: string | Date | undefined) {
           autoplay
           playsinline
           :muted="isSpeakerMuted"
-          :ref="(el) => attachRemoteAudio(el as HTMLAudioElement, audio.track)"
+          :ref="(el) => { if (el) attachRemoteAudio(el as HTMLAudioElement, audio.track) }"
         />
       </div>
     </div>

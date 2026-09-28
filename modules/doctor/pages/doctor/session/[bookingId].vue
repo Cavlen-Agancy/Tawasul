@@ -91,6 +91,9 @@ const isOutsideJoinWindow = computed(() => {
   return status === 403 && (msg.includes('not available') || msg.includes('window') || msg.includes('time'))
 })
 
+// Set before the LiveKit composable so `onDisconnected` can read it.
+const confirmedExit = ref(false)
+
 // Initialize LiveKit composable for Doctor
 const {
   room,
@@ -133,6 +136,9 @@ const {
   token,
   isModerator: true,
   onDisconnected: () => {
+    // Intentional leave (End Session) navigates on its own after disconnect.
+    // Skipping here avoids a second, post-unmount push to the same route.
+    if (confirmedExit.value) return
     router.push('/doctor/calendar')
   },
 })
@@ -194,7 +200,6 @@ watch(isCamEnabled, (enabled) => {
 // First remote video (the patient)
 const primaryPatientVideo = computed(() => remoteVideoTracks.value[0] || null)
 
-const confirmedExit = ref(false)
 let bootInFlight = false
 
 // ── Staged, non-blocking boot ────────────────────────────
@@ -262,12 +267,12 @@ if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', handleBeforeUnload)
 }
 
-function onConfirmLeave() {
+async function onConfirmLeave() {
   confirmedExit.value = true
   showLeaveModal.value = false
   if (import.meta.dev) console.log('[Doctor][Session] leaving')
-  leaveSession()
-  router.push('/doctor/calendar')
+  await leaveSession()
+  await router.push('/doctor/calendar')
 }
 
 function formatDate(val: string | Date | undefined) {
@@ -511,7 +516,7 @@ function formatDate(val: string | Date | undefined) {
               autoplay
               playsinline
               class="size-full object-cover"
-              :ref="(el) => attachRemoteVideo(el as HTMLVideoElement, primaryPatientVideo.track)"
+              :ref="(el) => { if (el && primaryPatientVideo) attachRemoteVideo(el as HTMLVideoElement, primaryPatientVideo.track) }"
             />
 
             <!-- Patient Camera Off State -->
@@ -790,7 +795,7 @@ function formatDate(val: string | Date | undefined) {
           autoplay
           playsinline
           :muted="isSpeakerMuted"
-          :ref="(el) => attachRemoteAudio(el as HTMLAudioElement, audio.track)"
+          :ref="(el) => { if (el) attachRemoteAudio(el as HTMLAudioElement, audio.track) }"
         />
       </div>
     </div>
