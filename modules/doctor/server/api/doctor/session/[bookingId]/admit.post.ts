@@ -38,7 +38,10 @@ export default defineEventHandler(async (event) => {
 
   const apiKey = process.env.LIVEKIT_API_KEY!
   const apiSecret = process.env.LIVEKIT_API_SECRET!
-  const liveKitUrl = (process.env.LIVEKIT_URL || 'ws://localhost:7880').replace('ws://', 'http://').replace('wss://', 'https://')
+  const liveKitUrl = process.env.LIVEKIT_INTERNAL_URL ||
+    (process.env.NODE_ENV === 'production'
+      ? 'http://tawasul_livekit:7880'
+      : (process.env.LIVEKIT_URL || 'ws://localhost:7880').replace('ws://', 'http://').replace('wss://', 'https://'))
 
   const roomService = new RoomServiceClient(liveKitUrl, apiKey, apiSecret)
 

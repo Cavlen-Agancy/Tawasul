@@ -9,6 +9,9 @@ import { handleSuccessfulPayment } from '~/server/utils/booking-status'
  * booking flow is testable end-to-end without a real payment provider.
  */
 export default defineEventHandler(async (event) => {
+  if (process.env.NODE_ENV === 'production') {
+    throw createError({ statusCode: 404, message: 'Not found' })
+  }
   if (paymentGatewayConfigured()) {
     throw createError({ statusCode: 404, message: 'Not found' })
   }
