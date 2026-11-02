@@ -7,39 +7,12 @@ vi.mock('resend', () => ({
 }))
 
 import {
-  emailVerificationTemplate,
   passwordResetTemplate,
   bookingConfirmationTemplate,
   bookingCancellationTemplate,
   doctorWelcomeTemplate,
   sessionReminderTemplate,
 } from '../../server/utils/email'
-
-describe('emailVerificationTemplate', () => {
-  it('returns a string', () => {
-    expect(typeof emailVerificationTemplate('Ahmed', 'https://example.com/verify?token=abc')).toBe('string')
-  })
-
-  it('contains the recipient name', () => {
-    expect(emailVerificationTemplate('Ahmed', 'https://example.com/verify?token=abc')).toContain('Ahmed')
-  })
-
-  it('contains the verification URL', () => {
-    expect(emailVerificationTemplate('Ahmed', 'https://example.com/verify?token=abc')).toContain(
-      'https://example.com/verify?token=abc',
-    )
-  })
-
-  it('contains expiry mention', () => {
-    expect(emailVerificationTemplate('Ahmed', 'https://example.com/verify?token=abc')).toContain('24')
-  })
-
-  it('is valid HTML', () => {
-    const html = emailVerificationTemplate('Ahmed', 'https://example.com/verify?token=abc')
-    expect(html.startsWith('<')).toBe(true)
-    expect(html).toContain('</html>')
-  })
-})
 
 describe('passwordResetTemplate', () => {
   it('returns a string', () => {

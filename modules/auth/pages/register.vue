@@ -4,6 +4,8 @@ import { getApiMessage } from '~/lib/api'
 
 definePageMeta({ layout: 'default', middleware: 'guest' })
 
+const { fetchMe } = useAuth()
+
 const registerSchema = z
   .object({
     name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -21,7 +23,6 @@ const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const error = ref('')
-const registered = ref(false)
 const submitting = ref(false)
 
 async function onSubmit() {
@@ -49,7 +50,8 @@ async function onSubmit() {
         password: password.value,
       },
     })
-    registered.value = true
+    await fetchMe()
+    await navigateTo('/dashboard')
   } catch (e) {
     error.value = getApiMessage(e)
   } finally {
@@ -77,7 +79,6 @@ async function onSubmit() {
       style="z-index: 2;"
     >
       <Card
-        v-if="!registered"
         class="auth-card w-[90%] sm:w-full max-w-[450px] rounded-3xl border border-white/10 p-6 sm:p-8 shadow-2xl backdrop-blur-[10px] m-auto"
         style="background-color: rgba(20, 20, 30, 0.85);"
       >
@@ -176,30 +177,6 @@ async function onSubmit() {
               Log in
             </NuxtLink>
           </p>
-        </CardFooter>
-      </Card>
-
-      <!-- Check your email verification state -->
-      <Card
-        v-else
-        class="auth-card w-[90%] sm:w-full max-w-[450px] rounded-3xl border border-white/10 p-6 sm:p-8 shadow-2xl backdrop-blur-[10px] m-auto"
-        style="background-color: rgba(20, 20, 30, 0.85);"
-      >
-        <CardHeader class="p-0 pb-4">
-          <CardTitle class="auth-title text-2xl font-semibold tracking-tight text-white">
-            Check your email
-          </CardTitle>
-          <CardDescription class="auth-subtitle mt-2 text-sm text-white/70">
-            We sent a verification link to <strong class="text-white">{{ email }}</strong>. Click it to activate your account.
-          </CardDescription>
-        </CardHeader>
-        <CardContent class="p-0">
-          <p class="text-sm text-white/60 text-center">Didn't receive it? Check your spam folder.</p>
-        </CardContent>
-        <CardFooter class="p-0 pt-6">
-          <NuxtLink to="/login" class="text-sm font-semibold text-primary hover:underline text-center w-full">
-            Back to login
-          </NuxtLink>
         </CardFooter>
       </Card>
     </div>

@@ -1,7 +1,10 @@
-import { describe, expect, it, beforeAll, afterAll } from 'vitest'
+import { describe, expect, it, vi, afterAll } from 'vitest'
 import { prisma } from '~/server/utils/prisma'
 import handler from '~/modules/auth/server/api/auth/register.post'
-import { createApiEvent, expectApiError, createTestUser, deleteTestUser } from '../helpers'
+import { sendEmail } from '~/server/utils/email'
+import { createApiEvent, expectApiError, getAuthCookie, getSetCookie, createTestUser, deleteTestUser } from '../helpers'
+
+vi.mock('~/server/utils/email', () => ({ sendEmail: vi.fn() }))
 
 describe('POST /api/auth/register', () => {
   const emails: string[] = []
@@ -10,7 +13,7 @@ describe('POST /api/auth/register', () => {
     await prisma.user.deleteMany({ where: { email: { in: emails } } })
   })
 
-  it('registers a valid patient and returns 201', async () => {
+  it('registers a valid patient as active and signs them in with no email sent', async () => {
     const email = `register-${Date.now()}@test.com`
     emails.push(email)
     const event = createApiEvent({
@@ -19,18 +22,28 @@ describe('POST /api/auth/register', () => {
       body: { name: 'Ahmed', email, password: 'Password123!' },
     })
 
-    const res = await handler(event) as { message: string }
+    const res = await handler(event) as { id: string; name: string; email: string; accountType: string }
 
     expect(event.node.res.statusCode).toBe(201)
-    expect(res.message).toBe('Registration successful. Please check your email.')
+    expect(res.id).toBeTruthy()
+    expect(res.name).toBe('Ahmed')
+    expect(res.email).toBe(email)
+    expect(res.accountType).toBe('PATIENT')
+
+    // Signed in: the same auth_token session cookie the login handler sets
+    expect(getAuthCookie(event)).toBeTruthy()
+    expect(getSetCookie(event).find((c) => c.startsWith('auth_token='))).toContain('HttpOnly')
 
     const user = await prisma.user.findUnique({ where: { email } })
     expect(user).not.toBeNull()
     expect(user?.accountType).toBe('PATIENT')
-    expect(user?.emailVerified).toBe(false)
+    expect(user?.emailVerified).toBe(true)
     expect(user?.isActive).toBe(true)
-    expect(user?.emailVerificationToken).toBeTruthy()
+    expect(user?.emailVerificationToken).toBeNull()
     expect(user?.password).not.toBe('Password123!')
+
+    // No verification (or any other) email is sent on registration
+    expect(vi.mocked(sendEmail)).not.toHaveBeenCalled()
   })
 
   it('rejects a duplicate email with 400', async () => {

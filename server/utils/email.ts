@@ -76,17 +76,6 @@ export async function sendEmail({ to, subject, html }: { to: string; subject: st
   }
 }
 
-export function emailVerificationTemplate(name: string, verificationUrl: string): string {
-  return wrap(`<tr><td style="padding:24px 40px 8px 40px;">
-  <h1 style="margin:0;font-size:22px;font-weight:600;color:${INK};">Hi ${name},</h1>
-  <p style="margin:16px 0 0 0;font-size:16px;line-height:1.6;color:#4D4D4D;">Welcome to Tawasul Academy. Please confirm your email address to activate your account and start booking sessions.</p>
-</td></tr>
-${button(verificationUrl, 'Verify my email')}
-<tr><td style="padding:0 40px 8px 40px;">
-  <p style="margin:0;font-size:14px;line-height:1.5;color:#888888;">This link expires in 24 hours. If you didn't create an account, you can safely ignore this email.</p>
-</td></tr>`)
-}
-
 export function passwordResetTemplate(name: string, resetUrl: string): string {
   return wrap(`<tr><td style="padding:24px 40px 8px 40px;">
   <h1 style="margin:0;font-size:22px;font-weight:600;color:${INK};">Hi ${name},</h1>

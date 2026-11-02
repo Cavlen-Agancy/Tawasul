@@ -75,7 +75,7 @@ describe('POST /api/auth/login', () => {
     }
   })
 
-  it('rejects an unverified email with 403', async () => {
+  it('logs in an unverified user (verification is no longer required)', async () => {
     const user = await createTestUser({ emailVerified: false, email: `login-unverified-${Date.now()}@test.com` })
     toDelete.push(user.id)
 
@@ -85,12 +85,11 @@ describe('POST /api/auth/login', () => {
       body: { email: user.email, password: 'CorrectPass123!' },
     })
 
-    try {
-      await handler(event)
-      throw new Error('expected an error')
-    } catch (e) {
-      expectApiError(e, 403, 'Please verify your email before logging in')
-    }
+    const res = await handler(event) as { id: string; email: string; accountType: string }
+
+    expect(res.id).toBe(user.id)
+    expect(res.email).toBe(user.email)
+    expect(getAuthCookie(event)).toBeTruthy()
   })
 
   it('rejects a deactivated account with 403', async () => {

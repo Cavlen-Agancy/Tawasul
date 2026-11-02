@@ -1,6 +1,6 @@
-import { defineEventHandler, readBody, createError, setCookie } from 'h3'
+import { defineEventHandler, readBody, createError } from 'h3'
 import { prisma } from '~/server/utils/prisma'
-import { comparePassword, generateJWT } from '~/server/utils/auth'
+import { comparePassword, setAuthSessionCookie } from '~/server/utils/auth'
 import { loginSchema, validationMessage } from '~/server/utils/validation'
 
 function safeUser(user: {
@@ -63,18 +63,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, message: 'Your account has been deactivated' })
   }
 
-  const token = generateJWT({
+  setAuthSessionCookie(event, {
     userId: user.id,
     email: user.email,
     accountType: user.accountType,
-  })
-
-  setCookie(event, 'auth_token', token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 60 * 60 * 24 * 7,
-    path: '/',
   })
 
   return safeUser(user)

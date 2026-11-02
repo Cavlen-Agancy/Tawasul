@@ -37,7 +37,7 @@ async function loginAs(page: Page, email: string, password: string) {
 }
 
 test.describe('Patient Registration Flow', () => {
-  test('registers a new patient and shows the check-your-email screen', async ({ page }) => {
+  test('registers a new patient and redirects to /dashboard signed in', async ({ page }) => {
     const email = `test-patient-${Date.now()}@example.com`
     await gotoReady(page, '/register')
     await page.getByTestId('register-name').fill('Test Patient')
@@ -48,33 +48,8 @@ test.describe('Patient Registration Flow', () => {
     await page.getByTestId('register-submit').click()
     await apiDone
 
-    await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible()
-    await expect(page.getByText(/verification link to/)).toBeVisible()
-  })
-})
-
-test.describe('Email Verification Flow', () => {
-  test('verifies the email with a valid token', async ({ page }) => {
-    const prisma = new PrismaClient()
-    const email = `verify-${Date.now()}@example.com`
-    const hashed = await bcrypt.hash('TestPass123!', 12)
-    await prisma.user.create({
-      data: {
-        name: 'Verify Tester',
-        email,
-        password: hashed,
-        accountType: 'PATIENT',
-        emailVerified: false,
-        isActive: true,
-        emailVerificationToken: 'verify-token-e2e',
-        emailVerificationExpiry: new Date(Date.now() + 60 * 60 * 1000),
-      },
-    })
-    await prisma.$disconnect()
-
-    await gotoReady(page, '/verify-email?token=verify-token-e2e')
-    await expect(page.getByTestId('verify-success')).toContainText('Email verified. You can now log in.')
-    await expect(page.getByRole('link', { name: 'Go to login' })).toBeVisible()
+    await page.waitForURL('**/dashboard/**', { timeout: 30_000 })
+    await expect(page.getByRole('heading', { name: 'My Appointments' })).toBeVisible()
   })
 })
 

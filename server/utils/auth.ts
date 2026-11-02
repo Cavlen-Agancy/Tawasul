@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import jwt, { type SignOptions } from 'jsonwebtoken'
 import crypto from 'node:crypto'
-import { createError, type H3Event } from 'h3'
+import { createError, setCookie, type H3Event } from 'h3'
 import { getServerRuntimeConfig } from '~/server/utils/runtime'
 
 export interface AuthUser {
@@ -34,6 +34,18 @@ export function verifyJWT(token: string): AuthUser {
 
 export function generateToken(): string {
   return crypto.randomBytes(32).toString('hex')
+}
+
+export function setAuthSessionCookie(event: H3Event, user: AuthUser): string {
+  const token = generateJWT(user)
+  setCookie(event, 'auth_token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 60 * 60 * 24 * 7,
+    path: '/',
+  })
+  return token
 }
 
 export function requireAuth(event: H3Event, accountTypes?: string[]): AuthUser {
