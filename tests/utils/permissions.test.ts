@@ -31,7 +31,9 @@ beforeEach(() => {
 describe('requirePermission', () => {
   it('resolves when permission exists', async () => {
     mockedFindMany.mockResolvedValue([{ resource: 'APPOINTMENTS', action: 'READ' } as never])
-    await expect(requirePermission(mockEvent(), 'APPOINTMENTS', 'READ')).resolves.toBeUndefined()
+    await expect(requirePermission(mockEvent(), 'APPOINTMENTS', 'READ')).resolves.toMatchObject({
+      accountType: 'STAFF',
+    })
   })
 
   it('throws 403 when no permissions found', async () => {
@@ -56,17 +58,30 @@ describe('requirePermission', () => {
     }
   })
 
-  it('calls requireAuth with STAFF', async () => {
+  it('calls requireAuth with STAFF and ADMIN', async () => {
     mockedFindMany.mockResolvedValue([{ resource: 'APPOINTMENTS', action: 'READ' } as never])
     await requirePermission(mockEvent(), 'APPOINTMENTS', 'READ')
-    expect(mockedRequireAuth).toHaveBeenCalledWith(expect.anything(), ['STAFF'])
+    expect(mockedRequireAuth).toHaveBeenCalledWith(expect.anything(), ['STAFF', 'ADMIN'])
   })
 
-  it('queries correct resource and action', async () => {
+  it('queries correct resource and action for STAFF', async () => {
     mockedFindMany.mockResolvedValue([{ resource: 'APPOINTMENTS', action: 'READ' } as never])
     await requirePermission(mockEvent(), 'APPOINTMENTS', 'READ')
     expect(mockedFindMany).toHaveBeenCalledWith({
       where: { userId: 'u1', resource: 'APPOINTMENTS', action: 'READ' },
     })
+  })
+
+  it('bypasses the STAFF permission table for ADMIN without querying permissions', async () => {
+    mockedRequireAuth.mockReturnValue({
+      userId: 'admin-1',
+      email: 'admin@tawasul.com',
+      accountType: 'ADMIN',
+    })
+
+    await expect(requirePermission(mockEvent(), 'SETTINGS', 'UPDATE')).resolves.toMatchObject({
+      accountType: 'ADMIN',
+    })
+    expect(mockedFindMany).not.toHaveBeenCalled()
   })
 })

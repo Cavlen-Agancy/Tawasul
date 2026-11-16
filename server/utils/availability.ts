@@ -6,6 +6,7 @@ export interface Slot {
   doctorName: string
   startTime: string
   endTime: string
+  sessionDuration: number
   service: string
 }
 
@@ -92,23 +93,48 @@ function serviceFor(doctor: { specializations?: string[] }): string {
 }
 
 /**
- * Single source of truth for slot availability across all active doctors on a given date.
+ * Slot occupancy: a CONFIRMED booking always blocks; a PENDING booking blocks
+ * while its hold is active. Legacy PENDING rows without a hold remain blocking.
  */
-export async function getAvailableSlots(date: string): Promise<Slot[]> {
+function activeBookingFilter(now: Date) {
+  return {
+    OR: [
+      { status: 'CONFIRMED' as const },
+      {
+        status: 'PENDING' as const,
+        OR: [
+          { holdExpiresAt: null },
+          { holdExpiresAt: { gt: now } },
+        ],
+      },
+    ],
+  }
+}
+
+/**
+ * Single source of truth for slot availability, optionally scoped to one doctor.
+ */
+export async function getAvailableSlots(date: string, doctorId?: string, excludeBookingId?: string): Promise<Slot[]> {
   const target = parseDateUTC(date)
   const dayOfWeek = target.getUTCDay()
 
-  // Public holidays are non-working days (see holidays.ts business rule):
-  // no slots are offered regardless of standing doctor availability.
   if (isHoliday(date)) return []
+
+  const globalBlocked = await prisma.globalBlockedDate.findUnique({
+    where: { date: target },
+    select: { id: true },
+  })
+  if (globalBlocked) return []
 
   const today = new Date()
   const isToday = formatDateISO(today) === date
+  const nowMinutes = timeToMinutes(`${pad2(today.getHours())}:${pad2(today.getMinutes())}`)
 
   const availabilities = await prisma.availability.findMany({
     where: {
       dayOfWeek,
-      doctor: { isActive: true },
+      ...(doctorId ? { doctorId } : {}),
+      doctor: { isActive: true, user: { isActive: true } },
     },
     include: {
       doctor: {
@@ -122,17 +148,16 @@ export async function getAvailableSlots(date: string): Promise<Slot[]> {
   const bookings = await prisma.booking.findMany({
     where: {
       date: target,
-      status: 'CONFIRMED',
+      ...activeBookingFilter(today),
+      ...(doctorId ? { doctorId } : {}),
     },
-    select: { doctorId: true, startTime: true, endTime: true },
+    select: { id: true, doctorId: true, startTime: true, endTime: true },
   })
 
   const blocked = await prisma.blockedSlot.findMany({
-    where: { date: target },
+    where: { date: target, ...(doctorId ? { doctorId } : {}) },
     select: { doctorId: true, startTime: true, endTime: true },
   })
-
-  const nowMinutes = timeToMinutes(`${pad2(today.getHours())}:${pad2(today.getMinutes())}`)
 
   const slots: Slot[] = []
 
@@ -143,28 +168,26 @@ export async function getAvailableSlots(date: string): Promise<Slot[]> {
     const start = timeToMinutes(availability.startTime)
     const end = timeToMinutes(availability.endTime)
     const duration = availability.sessionDuration
-
     if (duration <= 0 || end <= start) continue
 
-    const doctorBookings = bookings.filter((b) => b.doctorId === doctor.id)
+    const doctorBookings = bookings.filter(
+      (b) => b.doctorId === doctor.id && (!excludeBookingId || b.id !== excludeBookingId),
+    )
     const doctorBlocked = blocked.filter((b) => b.doctorId === doctor.id)
 
     for (let slotStart = start; slotStart + duration <= end; slotStart += duration) {
       const slotEnd = slotStart + duration
-
       if (isToday && slotStart <= nowMinutes) continue
 
-      const booked = doctorBookings.some((b) => overlaps(timeToMinutes(b.startTime), timeToMinutes(b.endTime), slotStart, slotEnd))
-      if (booked) continue
-
-      const isBlocked = doctorBlocked.some((b) => overlaps(timeToMinutes(b.startTime), timeToMinutes(b.endTime), slotStart, slotEnd))
-      if (isBlocked) continue
+      if (doctorBookings.some((b) => overlaps(timeToMinutes(b.startTime), timeToMinutes(b.endTime), slotStart, slotEnd))) continue
+      if (doctorBlocked.some((b) => overlaps(timeToMinutes(b.startTime), timeToMinutes(b.endTime), slotStart, slotEnd))) continue
 
       slots.push({
         doctorId: doctor.id,
         doctorName: doctor.user.name,
         startTime: `${pad2(Math.floor(slotStart / 60))}:${pad2(slotStart % 60)}`,
         endTime: `${pad2(Math.floor(slotEnd / 60))}:${pad2(slotEnd % 60)}`,
+        sessionDuration: duration,
         service: serviceFor(doctor as { specializations?: string[] }),
       })
     }
@@ -175,12 +198,14 @@ export async function getAvailableSlots(date: string): Promise<Slot[]> {
 }
 
 /**
- * Returns every date in a month that has at least one available slot.
+ * Returns every date in a month that has at least one available slot,
+ * optionally scoped to one doctor.
  */
-export async function getAvailableDates(month: number, year: number): Promise<string[]> {
+export async function getAvailableDates(month: number, year: number, doctorId?: string): Promise<string[]> {
   const availabilities = await prisma.availability.findMany({
     where: {
-      doctor: { isActive: true },
+      ...(doctorId ? { doctorId } : {}),
+      doctor: { isActive: true, user: { isActive: true } },
     },
     include: {
       doctor: {
@@ -193,14 +218,15 @@ export async function getAvailableDates(month: number, year: number): Promise<st
 
   const firstDay = new Date(year, month - 1, 1)
   const lastDay = new Date(year, month, 0)
-
   const monthStart = new Date(Date.UTC(year, month - 1, 1))
   const monthEnd = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
+  const today = new Date()
 
   const bookings = await prisma.booking.findMany({
     where: {
       date: { gte: monthStart, lte: monthEnd },
-      status: 'CONFIRMED',
+      ...(doctorId ? { doctorId } : {}),
+      ...activeBookingFilter(today),
     },
     select: { doctorId: true, date: true, startTime: true, endTime: true },
   })
@@ -208,11 +234,16 @@ export async function getAvailableDates(month: number, year: number): Promise<st
   const blocked = await prisma.blockedSlot.findMany({
     where: {
       date: { gte: monthStart, lte: monthEnd },
+      ...(doctorId ? { doctorId } : {}),
     },
     select: { doctorId: true, date: true, startTime: true, endTime: true },
   })
 
-  const today = new Date()
+  const globalBlockedDates = await prisma.globalBlockedDate.findMany({
+    where: { date: { gte: monthStart, lte: monthEnd } },
+    select: { date: true },
+  }) ?? []
+  const globallyBlocked = new Set(globalBlockedDates.map((b) => formatDateUTC(b.date)))
 
   const available: string[] = []
 
@@ -222,11 +253,10 @@ export async function getAvailableDates(month: number, year: number): Promise<st
     const dayOfWeek = current.getDay()
     const isToday = formatDateISO(today) === dateISO
 
-    // Holidays are non-working: never report them as available.
     if (isHoliday(dateISO)) continue
+    if (globallyBlocked.has(dateISO)) continue
 
     const dayAvailabilities = availabilities.filter((a) => a.dayOfWeek === dayOfWeek)
-
     let hasSlot = false
 
     for (const availability of dayAvailabilities) {
@@ -236,21 +266,17 @@ export async function getAvailableDates(month: number, year: number): Promise<st
       const start = timeToMinutes(availability.startTime)
       const end = timeToMinutes(availability.endTime)
       const duration = availability.sessionDuration
-
       if (duration <= 0 || end <= start) continue
 
       const doctorBookings = bookings.filter((b) => b.doctorId === doctor.id && formatDateUTC(b.date) === dateISO)
       const doctorBlocked = blocked.filter((b) => b.doctorId === doctor.id && formatDateUTC(b.date) === dateISO)
-
       const nowMinutes = timeToMinutes(`${pad2(today.getHours())}:${pad2(today.getMinutes())}`)
 
       for (let slotStart = start; slotStart + duration <= end; slotStart += duration) {
         if (isToday && slotStart <= nowMinutes) continue
         const slotEnd = slotStart + duration
-        const booked = doctorBookings.some((b) => overlaps(timeToMinutes(b.startTime), timeToMinutes(b.endTime), slotStart, slotEnd))
-        if (booked) continue
-        const isBlocked = doctorBlocked.some((b) => overlaps(timeToMinutes(b.startTime), timeToMinutes(b.endTime), slotStart, slotEnd))
-        if (isBlocked) continue
+        if (doctorBookings.some((b) => overlaps(timeToMinutes(b.startTime), timeToMinutes(b.endTime), slotStart, slotEnd))) continue
+        if (doctorBlocked.some((b) => overlaps(timeToMinutes(b.startTime), timeToMinutes(b.endTime), slotStart, slotEnd))) continue
         hasSlot = true
         break
       }

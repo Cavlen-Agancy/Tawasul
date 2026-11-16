@@ -3,6 +3,7 @@ export interface MeetingLobbyResponse {
   role: 'patient' | 'doctor' | 'staff'
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED'
   canJoin: boolean
+  sessionType?: 'ONLINE' | 'IN_CLINIC'
   patientName: string
   doctorName: string
   date: string

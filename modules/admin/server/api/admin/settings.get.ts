@@ -8,7 +8,7 @@ export function maskKey(value: string | null): string {
 }
 
 export default defineEventHandler(async (event) => {
-  await requirePermission(event, 'SETTINGS', 'READ')
+  const auth = await requirePermission(event, 'SETTINGS', 'READ')
 
   const settings = await prisma.settings.findUnique({ where: { id: 'singleton' } })
   if (!settings) {
@@ -24,6 +24,8 @@ export default defineEventHandler(async (event) => {
     paymentGateway: settings.paymentGateway,
     paymentGatewayKey: maskKey(settings.paymentGatewayKey),
     paymentGatewaySecret: maskKey(settings.paymentGatewaySecret),
+    // Session Join Mode is ADMIN-only; STAFF with SETTINGS:READ must not see it.
+    ...(auth.accountType === 'ADMIN' ? { sessionJoinMode: settings.sessionJoinMode } : {}),
     sessionPricePerHour: Number(settings.sessionPricePerHour),
     defaultSessionDuration: settings.defaultSessionDuration,
     defaultWorkingStart: settings.defaultWorkingStart,

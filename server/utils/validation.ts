@@ -24,18 +24,25 @@ export const resetPasswordSchema = z.object({
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/
 const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/
 
-export const availableDatesQuerySchema = z.object({
+export const monthYearQuerySchema = z.object({
   month: z.coerce.number().int().min(1).max(12),
   year: z.coerce.number().int().min(1000).max(9999),
 })
 
+export const availableDatesQuerySchema = monthYearQuerySchema.extend({
+  doctorId: z.string().min(1, 'Doctor is required'),
+})
+
 export const availableSlotsQuerySchema = z.object({
   date: z.string().regex(dateRegex, 'Invalid date format'),
+  doctorId: z.string().min(1, 'Doctor is required'),
 })
 
 export const createBookingSchema = z.object({
+  doctorId: z.string().min(1, 'Doctor is required'),
   date: z.string().regex(dateRegex, 'Invalid date format'),
   startTime: z.string().regex(timeRegex, 'Invalid time format'),
+  sessionType: z.enum(['ONLINE', 'IN_CLINIC']).optional().default('ONLINE'),
 })
 
 export const initiatePaymentSchema = z.object({
@@ -145,11 +152,16 @@ export const settingsPatchSchema = z.object({
   paymentGateway: z.string().max(30).optional(),
   paymentGatewayKey: z.string().max(500).optional(),
   paymentGatewaySecret: z.string().max(500).optional(),
+  sessionJoinMode: z.enum(['PRODUCTION', 'TEST']).optional(),
   sessionPricePerHour: z.number().min(0).max(1000000).optional(),
   defaultSessionDuration: z.number().int().refine((n) => [30, 45, 60].includes(n), 'defaultSessionDuration must be 30, 45, or 60').optional(),
   defaultWorkingStart: z.string().regex(timeRegex, 'Invalid time format').optional(),
   defaultWorkingEnd: z.string().regex(timeRegex, 'Invalid time format').optional(),
 }).passthrough()
+
+export const sessionJoinModePatchSchema = z.object({
+  mode: z.enum(['PRODUCTION', 'TEST']),
+})
 
 /**
  * Extracts a single human-readable message from a ZodError.

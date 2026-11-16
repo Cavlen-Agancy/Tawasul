@@ -98,6 +98,8 @@ export const translations = {
     // General Session States
     'session.state.startsSoonTitle': 'Your session starts soon',
     'session.state.startsSoonDesc': 'The session room opens 5 minutes before the scheduled time. Please return then to join.',
+    'session.state.endedTitle': 'This session has ended',
+    'session.state.endedDesc': 'The appointment time window has closed. You can no longer join or re-enter this session.',
     'session.state.backToAppointments': 'Back to Appointments',
     'session.state.backToCalendar': 'Back to Calendar',
     'session.state.loadErrorTitle': 'Unable to load session',
@@ -203,6 +205,8 @@ export const translations = {
     // General Session States
     'session.state.startsSoonTitle': 'تبدأ الجلسة قريباً',
     'session.state.startsSoonDesc': 'تفتح غرفة الجلسة قبل موعدها المحدد بـ 5 دقائق. يرجى العودة في الوقت المحدد للانضمام.',
+    'session.state.endedTitle': 'انتهت هذه الجلسة',
+    'session.state.endedDesc': 'انتهت الفترة الزمنية المسموح بها لهذه الجلسة، ولم يعد بالإمكان الانضمام إليها أو إعادة الدخول.',
     'session.state.backToAppointments': 'العودة للمواعيد',
     'session.state.backToCalendar': 'العودة لجدول المواعيد',
     'session.state.loadErrorTitle': 'تعذر فتح الجلسة',

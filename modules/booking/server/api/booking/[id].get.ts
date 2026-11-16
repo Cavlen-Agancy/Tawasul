@@ -44,6 +44,7 @@ export default defineEventHandler(async (event) => {
     endTime: booking.endTime,
     service: booking.service,
     status: booking.status,
+    sessionType: booking.sessionType,
     paymentStatus: booking.payment?.status ?? 'PENDING',
     amount: Number(booking.payment?.amount ?? 0),
     currency: booking.payment?.currency ?? 'EGP',

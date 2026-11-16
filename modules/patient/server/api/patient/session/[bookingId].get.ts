@@ -1,7 +1,17 @@
+import { randomUUID } from 'node:crypto'
 import { defineEventHandler, getRouterParam, createError } from 'h3'
+import { SESSION_JOIN_TEST_TTL_SECONDS } from '~/lib/session-join'
 import { prisma } from '~/server/utils/prisma'
 import { requireAuth } from '~/server/utils/auth'
-import { canJoinMeetingAt, meetingWindow } from '~/server/utils/meeting'
+import {
+  assertOnlineConfirmedBooking,
+  assertPatientSessionOwner,
+  assertSessionWindow,
+  buildSessionParticipantIdentity,
+  sessionTokenTtlSeconds,
+  sessionWindowCloseAt,
+} from '~/server/utils/session-access'
+import { ensureSessionRoom } from '~/server/utils/session-room'
 import { generateLiveKitToken } from '~/server/utils/livekit-token'
 
 export default defineEventHandler(async (event) => {
@@ -29,47 +39,37 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Booking not found' })
   }
 
-  if (booking.userId !== auth.userId) {
-    throw createError({ statusCode: 403, message: 'Forbidden' })
-  }
-
-  
-  const sessionTestMode = process.env.NODE_ENV === 'development' && process.env.NUXT_PUBLIC_ENABLE_SESSION_TEST_MODE === 'true'
-
-  if (!sessionTestMode && booking.status !== 'CONFIRMED') {
-    throw createError({ statusCode: 403, message: 'Forbidden' })
-  }
-
-  if (booking.sessionType === 'IN_CLINIC') {
-    throw createError({ statusCode: 400, message: 'This is an in-clinic session.' })
-  }
+  // Authorization failures intentionally occur before status/window details are
+  // exposed, to avoid leaking another patient's booking/session state.
+  assertPatientSessionOwner(auth, booking, booking.user.isActive)
+  assertOnlineConfirmedBooking(booking)
+  const mode = await assertSessionWindow(booking)
 
   const now = Date.now()
-  if (!sessionTestMode && !canJoinMeetingAt(booking, now)) {
-    throw createError({ statusCode: 403, message: 'Session is not available at this time' })
-  }
-  let room = booking.sessionRoom
-  if (!room) {
-    const { closeAt } = meetingWindow(booking)
-    const expiresAt = new Date(closeAt)
-    const roomName = `tawasul-${bookingId}`
-    room = await prisma.sessionRoom.upsert({
-      where: { bookingId },
-      create: { bookingId, roomName, expiresAt },
-      update: {},
-    })
-  }
+  const ttlSeconds = sessionTokenTtlSeconds(booking, now, mode)
+  const appointmentEnd = sessionWindowCloseAt(booking)
+  // TEST mode keeps the room alive for the token lifetime so "any time" joins
+  // also work after the scheduled end. PRODUCTION retains exact-end termination.
+  const closeAt = mode === 'TEST'
+    ? Math.max(appointmentEnd, now + SESSION_JOIN_TEST_TTL_SECONDS * 1000)
+    : appointmentEnd
+  // Every fresh lobby entry gets a new server-side generation. Old tokens
+  // remain connected to the previous generation and cannot be admitted again.
+  const entryId = randomUUID()
+  const room = await ensureSessionRoom(bookingId, closeAt, entryId)
 
   const liveKitToken = await generateLiveKitToken({
     roomName: room.roomName,
     userName: booking.user.name,
-    userId: booking.user.id,
+    userId: buildSessionParticipantIdentity(booking.user.id, entryId),
     role: 'member',
+    ttlSeconds,
   })
 
   return {
     roomName: room.roomName,
     liveKitToken,
+    expiresAt: new Date(closeAt).toISOString(),
     sessionInfo: {
       doctorName: booking.doctor?.user?.name || 'Healthcare Provider',
       patientName: booking.user.name,

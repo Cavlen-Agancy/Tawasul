@@ -24,13 +24,6 @@ definePageMeta({
   middleware: ['auth', 'doctor-only'],
 })
 
-const config = useRuntimeConfig()
-const sessionTestMode = import.meta.dev && config.public.enableSessionTestMode === true
-
-if (sessionTestMode) {
-  console.warn('[DEV] Session test mode enabled: time/status UI restrictions are bypassed.')
-}
-
 const { bookings, error, fetchBookings } = useDoctorDashboard()
 
 const detailOpen = ref(false)
@@ -45,10 +38,14 @@ const detail = ref<{
   endTime: string
   service: string
   status: string
+  sessionType: 'ONLINE' | 'IN_CLINIC'
   paymentStatus: string | null
 } | null>(null)
 
 const now = ref(Date.now())
+// Server-computed per-booking eligibility; the mode itself is never exposed.
+type JoinEligibility = { canJoin: boolean; reason?: string }
+const joinEligibility = ref<Record<string, JoinEligibility>>({})
 
 // Calendar instance reference
 const mainCalendarRef = ref<InstanceType<typeof FullCalendar> | null>(null)
@@ -260,12 +257,6 @@ function isPastStr(dateStr: string): boolean {
   return dateStr < todayStr()
 }
 
-function parseDateTime(dateISO: string, time: string): Date {
-  const [y, m, d] = dateISO.split('-').map((v) => parseInt(v, 10))
-  const [hh, mm] = time.split(':').map((v) => parseInt(v, 10))
-  return new Date(y, (m || 1) - 1, d, hh || 0, mm || 0, 0, 0)
-}
-
 function formatTime(time: string): string {
   if (!time) return ''
   const [hh, mm] = time.split(':').map((v) => parseInt(v, 10))
@@ -289,12 +280,30 @@ function formatDateLong(dateISO: string): string {
   })
 }
 
-function canJoinBooking(b: { date: string; startTime: string; endTime: string }): boolean {
-  if (sessionTestMode) return true
-  const t = now.value
-  const open = parseDateTime(b.date, b.startTime).getTime() - 5 * 60 * 1000
-  const close = parseDateTime(b.date, b.endTime).getTime() + 15 * 60 * 1000
-  return t >= open && t <= close
+async function refreshJoinEligibility(): Promise<void> {
+  try {
+    const res = await $fetch<{ eligibility: Array<{ bookingId: string } & JoinEligibility> }>(
+      '/api/session/join-eligibility',
+    )
+    joinEligibility.value = Object.fromEntries(
+      res.eligibility.map((entry) => [
+        entry.bookingId,
+        { canJoin: entry.canJoin, reason: entry.reason },
+      ]),
+    )
+  } catch {
+    // Fail closed: the server token endpoint remains authoritative.
+    joinEligibility.value = {}
+  }
+}
+
+function canJoinBooking(b: { id: string }): boolean {
+  return joinEligibility.value[b.id]?.canJoin === true
+}
+
+function joinWindowMessage(b: { id: string } | null): string | undefined {
+  if (!b) return undefined
+  return joinEligibility.value[b.id]?.reason
 }
 
 // Filtered Bookings for the Main Calendar (client-side; endpoint takes date range only)
@@ -515,10 +524,14 @@ onMounted(async () => {
   now.value = Date.now()
   window.setInterval(() => {
     now.value = Date.now()
+    void refreshJoinEligibility()
   }, 60 * 1000)
   window.addEventListener('keydown', onEscapeKey)
   const t = new Date()
-  await fetchBookings(toISODate(new Date(t.getFullYear(), t.getMonth(), 1)), toISODate(new Date(t.getFullYear(), t.getMonth() + 1, 0)))
+  await Promise.all([
+    fetchBookings(toISODate(new Date(t.getFullYear(), t.getMonth(), 1)), toISODate(new Date(t.getFullYear(), t.getMonth() + 1, 0))),
+    refreshJoinEligibility(),
+  ])
   calendarKey.value += 1
   updateHeaderTitle()
 })
@@ -916,20 +929,19 @@ onBeforeUnmount(() => {
               </div>
 
               <!-- Join Session -->
-              <div>
-                <div v-if="sessionTestMode" class="mb-2 text-center text-xs font-bold text-amber-500 bg-amber-500/10 py-1 rounded">وضع الاختبار مفعّل</div>
+              <div v-if="detail.status === 'CONFIRMED' && detail.sessionType === 'ONLINE'">
                 <Button
                   class="w-full"
                   data-testid="join-session"
                   :disabled="!canJoinBooking(detail)"
-                  :title="detail && !canJoinBooking(detail) ? 'Available 5 minutes before your session' : undefined"
+                  :title="joinWindowMessage(detail)"
                   @click="joinSession"
                 >
                   <Video class="size-4" aria-hidden="true" />
                   Join Session
                 </Button>
                 <p v-if="!canJoinBooking(detail)" class="mt-1.5 text-center text-xs text-muted-foreground">
-                  Available 5 minutes before your session
+                  {{ joinWindowMessage(detail) }}
                 </p>
               </div>
             </template>

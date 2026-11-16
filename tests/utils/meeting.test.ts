@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canJoinMeetingAt, meetingWindow, MEETING_OPEN_EARLY_MIN, MEETING_CLOSE_LATE_MIN } from '../../server/utils/meeting'
+import { canJoinMeetingAt, meetingWindow, MEETING_OPEN_EARLY_MIN } from '../../server/utils/meeting'
 
 /**
  * Builds a "today at hh:mm" local Date for wall-clock expectations.
@@ -17,23 +17,22 @@ function todayAsDbDate(): Date {
 }
 
 describe('meetingWindow', () => {
-  it('opens MEETING_OPEN_EARLY_MIN minutes before start and closes MEETING_CLOSE_LATE_MIN after end', () => {
+  it('opens MEETING_OPEN_EARLY_MIN minutes before start and closes exactly at the appointment end', () => {
     const booking = { date: todayAsDbDate(), startTime: '10:00', endTime: '11:00' }
     const expectedStart = todayAt(10).getTime()
     const expectedEnd = todayAt(11).getTime()
 
     const { openAt, closeAt } = meetingWindow(booking)
     expect(openAt).toBe(expectedStart - MEETING_OPEN_EARLY_MIN * 60 * 1000)
-    expect(closeAt).toBe(expectedEnd + MEETING_CLOSE_LATE_MIN * 60 * 1000)
+    expect(closeAt).toBe(expectedEnd)
   })
 })
 
-describe('canJoinMeetingAt (5-minute join rule)', () => {
+describe('canJoinMeetingAt (5-minute early, exact end close)', () => {
   it('is joinable at exactly start minus the early buffer', () => {
     const booking = { date: todayAsDbDate(), startTime: '10:00', endTime: '11:00' }
-    const { openAt: open, closeAt } = meetingWindow(booking)
-    expect(canJoinMeetingAt(booking, open)).toBe(true)
-    expect(canJoinMeetingAt(booking, closeAt)).toBe(true)
+    const { openAt } = meetingWindow(booking)
+    expect(canJoinMeetingAt(booking, openAt)).toBe(true)
   })
 
   it('is not joinable one minute before the window opens', () => {
@@ -42,7 +41,13 @@ describe('canJoinMeetingAt (5-minute join rule)', () => {
     expect(canJoinMeetingAt(booking, openAt - 60 * 1000)).toBe(false)
   })
 
-  it('is not joinable one minute after the window closes', () => {
+  it('is not joinable at the exact appointment end', () => {
+    const booking = { date: todayAsDbDate(), startTime: '10:00', endTime: '11:00' }
+    const { closeAt } = meetingWindow(booking)
+    expect(canJoinMeetingAt(booking, closeAt)).toBe(false)
+  })
+
+  it('is not joinable after the appointment end', () => {
     const booking = { date: todayAsDbDate(), startTime: '10:00', endTime: '11:00' }
     const { closeAt } = meetingWindow(booking)
     expect(canJoinMeetingAt(booking, closeAt + 60 * 1000)).toBe(false)
@@ -50,7 +55,8 @@ describe('canJoinMeetingAt (5-minute join rule)', () => {
 
   it('is joinable strictly inside the window', () => {
     const booking = { date: todayAsDbDate(), startTime: '10:00', endTime: '11:00' }
-    const { openAt } = meetingWindow(booking)
+    const { openAt, closeAt } = meetingWindow(booking)
     expect(canJoinMeetingAt(booking, openAt + 5 * 60 * 1000)).toBe(true)
+    expect(canJoinMeetingAt(booking, closeAt - 1000)).toBe(true)
   })
 })

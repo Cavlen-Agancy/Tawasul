@@ -1,10 +1,10 @@
 import { defineEventHandler, getQuery, createError } from 'h3'
 import { getEgyptianHolidays } from '~/server/utils/holidays'
-import { availableDatesQuerySchema } from '~/server/utils/validation'
+import { monthYearQuerySchema } from '~/server/utils/validation'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
-  const parsed = availableDatesQuerySchema.safeParse(query)
+  const parsed = monthYearQuerySchema.safeParse(query)
   if (!parsed.success) {
     throw createError({ statusCode: 400, message: 'Invalid month or year' })
   }

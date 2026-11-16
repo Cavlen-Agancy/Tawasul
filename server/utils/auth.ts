@@ -58,3 +58,11 @@ export function requireAuth(event: H3Event, accountTypes?: string[]): AuthUser {
   }
   return user
 }
+
+/**
+ * Strict platform-administrator gate. Used for settings whose access must not
+ * be delegated through the STAFF permission table.
+ */
+export function requireAdmin(event: H3Event): AuthUser {
+  return requireAuth(event, ['ADMIN'])
+}

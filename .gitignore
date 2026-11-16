@@ -31,3 +31,6 @@ playwright-report/
 .DS_Store
 .idea/
 .vscode/
+
+# Local test credentials (not to be committed)
+TEST-ACCOUNTS.local.md

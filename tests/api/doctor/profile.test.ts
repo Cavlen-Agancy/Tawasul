@@ -180,7 +180,7 @@ describe('GET /api/doctor/session/:bookingId', () => {
       }) as never)
       expect.unreachable('should have thrown')
     } catch (e) {
-      expectApiError(e, 403, 'Session is not available')
+      expectApiError(e, 403, 'Session is not available at this time')
     }
   })
 })

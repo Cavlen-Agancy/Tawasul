@@ -117,17 +117,19 @@ model Booking {
   startTime   String
   endTime     String
   service     String
-  status      BookingStatus @default(PENDING)
-  notes       String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  sessionType SessionType   @default(ONLINE)
+  status        BookingStatus @default(PENDING)
+  notes         String?
+  holdExpiresAt DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  sessionType   SessionType   @default(ONLINE)
   doctor      Doctor?       @relation("DoctorBookings", fields: [doctorId], references: [id])
   user        User          @relation("PatientBookings", fields: [userId], references: [id], onDelete: Cascade)
   doctorNotes DoctorNote[]
   payment     Payment?
   sessionRoom SessionRoom?
 
+  @@index([status, holdExpiresAt])
   @@map("bookings")
 }
 
@@ -160,13 +162,17 @@ model Payment {
 }
 
 model SessionRoom {
-  id        String   @id @default(cuid())
-  bookingId String   @unique
-  roomName  String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  id                    String    @id @default(cuid())
+  bookingId             String    @unique
+  roomName              String    @unique
+  expiresAt             DateTime
+  currentEntryId        String?
+  admittedParticipantSid String?
+  terminatedAt          DateTime?
+  createdAt             DateTime  @default(now())
+  booking               Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
+  @@index([expiresAt, terminatedAt])
   @@map("session_rooms")
 }
 
@@ -179,6 +185,7 @@ model Settings {
   paymentGateway         String   @default("paymob")
   paymentGatewayKey      String   @default("")
   paymentGatewaySecret   String   @default("")
+  sessionJoinMode        SessionJoinMode @default(PRODUCTION)
   sessionPricePerHour    Decimal  @default(0) @db.Decimal(10, 2)
   defaultSessionDuration Int      @default(60)
   defaultWorkingStart    String   @default("09:00")
@@ -192,6 +199,7 @@ enum AccountType {
   PATIENT
   DOCTOR
   STAFF
+  ADMIN
 }
 
 enum BookingStatus {
@@ -211,6 +219,11 @@ enum PaymentStatus {
 enum SessionType {
   ONLINE
   IN_CLINIC
+}
+
+enum SessionJoinMode {
+  PRODUCTION
+  TEST
 }
 
 enum Resource {

@@ -356,6 +356,13 @@ export function useLiveKitSession(options: UseLiveKitSessionOptions) {
   room.on(RoomEvent.Disconnected, () => {
     devLog(`${rolePrefix} room disconnected`)
     connectionState.value = ConnectionState.Disconnected
+    // LiveKit emits Reconnecting for recoverable interruptions and Disconnected
+    // only when the connection cannot continue. Surface the terminal state on
+    // the current route so callers can offer retry instead of silently leaving.
+    if (loadingStage.value !== 'idle') {
+      loadingStage.value = 'failed'
+      connectionError.value = connectionError.value || t('session.state.connectError')
+    }
     if (options.onDisconnected) {
       options.onDisconnected()
     }

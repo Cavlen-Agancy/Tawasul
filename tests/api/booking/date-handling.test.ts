@@ -5,7 +5,7 @@ import slotsHandler from '~/modules/booking/server/api/booking/available-slots.g
 import appointmentsHandler from '~/modules/patient/server/api/patient/appointments.get'
 import { prisma } from '~/server/utils/prisma'
 import { createApiEvent, createTestUser, deleteTestUser } from '../helpers'
-import { createTestAdminSchedule, deleteTestAdminSchedule, restoreSeedWeekendSchedules, deleteTestBooking, nextDateWithDayOfWeek } from './helpers'
+import { createTestDoctor, deleteTestDoctor, deleteTestBooking, nextDateWithDayOfWeek } from './helpers'
 
 /**
  * Regression tests for the calendar off-by-one bug: a patient booking
@@ -19,13 +19,12 @@ import { createTestAdminSchedule, deleteTestAdminSchedule, restoreSeedWeekendSch
 describe('booking calendar-day handling (no off-by-one)', () => {
   const toDeleteUsers: string[] = []
   const toDeleteBookings: string[] = []
-  const toDeleteSchedules: string[] = []
+  const toDeleteDoctors: Array<{ doctorId: string; userId: string }> = []
 
   afterAll(async () => {
     await Promise.all(toDeleteBookings.map((id) => deleteTestBooking(id)))
-    await Promise.all(toDeleteSchedules.map((id) => deleteTestAdminSchedule(id)))
+    await Promise.all(toDeleteDoctors.map(({ doctorId, userId }) => deleteTestDoctor(doctorId, userId)))
     await Promise.all(toDeleteUsers.map((id) => deleteTestUser(id)))
-    await restoreSeedWeekendSchedules()
   })
 
   it('POST /api/booking/create stores the requested calendar day exactly', async () => {
@@ -33,19 +32,14 @@ describe('booking calendar-day handling (no off-by-one)', () => {
     toDeleteUsers.push(patient.id)
 
     const dateStr = nextDateWithDayOfWeek(0)
-    const { adminScheduleId } = await createTestAdminSchedule({
-      dayOfWeek: 0,
-      startTime: '09:00',
-      endTime: '12:00',
-      sessionDuration: 60,
-    })
-    toDeleteSchedules.push(adminScheduleId)
+    const doctor = await createTestDoctor({ dayOfWeek: 0, startTime: '09:00', endTime: '12:00', sessionDuration: 60 })
+    toDeleteDoctors.push({ doctorId: doctor.doctor.id, userId: doctor.user.id })
 
     const event = createApiEvent({
       method: 'POST',
       url: '/api/booking/create',
       context: { user: { userId: patient.id, email: patient.email, accountType: 'PATIENT' } },
-      body: { date: dateStr, startTime: '09:00' },
+      body: { doctorId: doctor.doctor.id, date: dateStr, startTime: '09:00' },
     })
     const res = await createHandler(event) as { bookingId: string }
     toDeleteBookings.push(res.bookingId)
@@ -85,26 +79,21 @@ describe('booking calendar-day handling (no off-by-one)', () => {
     toDeleteUsers.push(patient.id)
 
     const dateStr = nextDateWithDayOfWeek(0)
-    const { adminScheduleId } = await createTestAdminSchedule({
-      dayOfWeek: 0,
-      startTime: '09:00',
-      endTime: '12:00',
-      sessionDuration: 60,
-    })
-    toDeleteSchedules.push(adminScheduleId)
+    const doctor = await createTestDoctor({ dayOfWeek: 0, startTime: '09:00', endTime: '12:00', sessionDuration: 60 })
+    toDeleteDoctors.push({ doctorId: doctor.doctor.id, userId: doctor.user.id })
 
     const created = await createHandler(createApiEvent({
       method: 'POST',
       url: '/api/booking/create',
       context: { user: { userId: patient.id, email: patient.email, accountType: 'PATIENT' } },
-      body: { date: dateStr, startTime: '09:00' },
+      body: { doctorId: doctor.doctor.id, date: dateStr, startTime: '09:00' },
     })) as { bookingId: string }
     toDeleteBookings.push(created.bookingId)
     await prisma.booking.update({ where: { id: created.bookingId }, data: { status: 'CONFIRMED' } })
 
     const res = await slotsHandler(createApiEvent({
       method: 'GET',
-      url: `/api/booking/available-slots?date=${dateStr}`,
+      url: `/api/booking/available-slots?date=${dateStr}&doctorId=${doctor.doctor.id}`,
     })) as { slots: Array<{ startTime: string }> }
     const times = res.slots.map((s) => s.startTime)
     // 09:00 is taken on the booked day itself (not shifted to another day).

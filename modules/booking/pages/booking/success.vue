@@ -23,7 +23,28 @@ async function load() {
   loading.value = false
 }
 
-onMounted(load)
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+onMounted(async () => {
+  await load()
+  // Provider webhooks may arrive just after the redirect. Poll briefly so the
+  // page reflects automatic confirmation without requiring a manual reload.
+  if (booking.value && booking.value.status !== 'CONFIRMED') {
+    let attempts = 0
+    pollTimer = setInterval(async () => {
+      attempts += 1
+      await load()
+      if (booking.value?.status === 'CONFIRMED' || attempts >= 10) {
+        if (pollTimer) clearInterval(pollTimer)
+        pollTimer = null
+      }
+    }, 3000)
+  }
+})
+
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer)
+})
 
 function formatDateLabel(date: string): string {
   const d = new Date(`${date}T00:00:00`)
@@ -42,10 +63,12 @@ function formatDateLabel(date: string): string {
         <CardHeader class="items-center p-0 pb-6 text-center">
           <CheckCircle2 class="h-14 w-14 text-primary" />
           <CardTitle class="text-2xl font-semibold tracking-tight">
-            Booking Request Received
+            {{ booking.status === 'CONFIRMED' ? 'Booking Confirmed' : 'Booking Request Received' }}
           </CardTitle>
           <CardDescription class="mt-2 text-sm">
-            Your booking request has been received. We will review and confirm your session shortly.
+            {{ booking.status === 'CONFIRMED'
+              ? 'Your payment was verified and your session is confirmed.'
+              : 'Your booking request has been received. Confirmation will appear here after payment verification.' }}
           </CardDescription>
         </CardHeader>
         <CardContent class="p-0">

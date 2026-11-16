@@ -73,7 +73,7 @@ export function expectApiError(error: unknown, statusCode: number, message: stri
 let fixtureCounter = 0
 
 export interface TestUserOptions {
-  accountType?: 'PATIENT' | 'DOCTOR' | 'STAFF'
+  accountType?: 'PATIENT' | 'DOCTOR' | 'STAFF' | 'ADMIN'
   email?: string
   password?: string
   emailVerified?: boolean
@@ -91,7 +91,13 @@ export async function createTestUser(options: TestUserOptions = {}) {
     where: { email },
     create: {
       email,
-      name: options.accountType === 'STAFF' ? 'Test Staff' : options.accountType === 'DOCTOR' ? 'Test Doctor' : 'Test Patient',
+      name: options.accountType === 'STAFF'
+        ? 'Test Staff'
+        : options.accountType === 'ADMIN'
+          ? 'Test Admin'
+          : options.accountType === 'DOCTOR'
+            ? 'Test Doctor'
+            : 'Test Patient',
       password: await hashPassword(options.password ?? 'CorrectPass123!'),
       accountType: options.accountType ?? 'PATIENT',
       phone: null,

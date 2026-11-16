@@ -6,6 +6,7 @@ import {
   verifyJWT,
   generateToken,
   requireAuth,
+  requireAdmin,
 } from '../../server/utils/auth'
 
 function mockEvent(user: unknown) {
@@ -97,6 +98,11 @@ describe('verifyJWT', () => {
     const token = generateJWT({ userId: 'u1', email: 'a@b.com', accountType: 'STAFF' })
     const decoded = verifyJWT(token)
     expect(decoded).toMatchObject({ userId: 'u1', email: 'a@b.com', accountType: 'STAFF' })
+  })
+
+  it('round-trips the ADMIN account type', () => {
+    const token = generateJWT({ userId: 'a1', email: 'admin@b.com', accountType: 'ADMIN' })
+    expect(verifyJWT(token)).toMatchObject({ userId: 'a1', accountType: 'ADMIN' })
   })
 
   it('throws on invalid token', () => {
@@ -193,6 +199,25 @@ describe('requireAuth', () => {
       expect.unreachable('should have thrown')
     } catch (error: unknown) {
       expect((error as { statusCode?: number }).statusCode).toBe(403)
+    }
+  })
+})
+
+describe('requireAdmin', () => {
+  it('returns an ADMIN user', () => {
+    const event = mockEvent({ userId: 'a1', email: 'admin@b.com', accountType: 'ADMIN' }) as never
+    expect(requireAdmin(event).accountType).toBe('ADMIN')
+  })
+
+  it('rejects STAFF, DOCTOR and PATIENT', () => {
+    for (const accountType of ['STAFF', 'DOCTOR', 'PATIENT']) {
+      const event = mockEvent({ userId: 'u1', email: 'u@b.com', accountType }) as never
+      try {
+        requireAdmin(event)
+        expect.unreachable('should have thrown')
+      } catch (error: unknown) {
+        expect((error as { statusCode?: number }).statusCode).toBe(403)
+      }
     }
   })
 })

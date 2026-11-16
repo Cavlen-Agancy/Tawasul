@@ -6,7 +6,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (!isLoggedIn.value) {
     return navigateTo('/login', { redirectCode: 302 })
   }
-  if (user.value?.accountType !== 'STAFF') {
+  const isAdmin = user.value?.accountType === 'ADMIN'
+  if (user.value?.accountType !== 'STAFF' && !isAdmin) {
     return navigateTo(dashboardFor(user.value?.accountType), { redirectCode: 302 })
   }
 
@@ -24,7 +25,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
     else if (to.path.startsWith('/admin/settings')) resource = 'SETTINGS'
   }
 
-  if (resource && !hasPermission(resource, action)) {
+  // ADMIN bypasses the STAFF permission table entirely.
+  if (!isAdmin && resource && !hasPermission(resource, action)) {
     return navigateTo('/admin', { redirectCode: 302 })
   }
 })
@@ -35,6 +37,8 @@ function dashboardFor(accountType?: string): string {
       return '/dashboard'
     case 'DOCTOR':
       return '/doctor'
+    case 'ADMIN':
+      return '/admin'
     default:
       return '/login'
   }

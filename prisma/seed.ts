@@ -13,6 +13,7 @@ async function main() {
     paymentGateway: 'paymob' as const,
     paymentGatewayKey: '',
     paymentGatewaySecret: '',
+    sessionJoinMode: 'PRODUCTION' as const,
     sessionPricePerHour: 0,
     defaultSessionDuration: 60,
     defaultWorkingStart: '09:00',
@@ -41,12 +42,14 @@ async function main() {
       email,
       password: hashedPassword,
       name,
-      accountType: 'STAFF',
+      accountType: 'ADMIN',
       emailVerified: true,
       isActive: true,
     },
     update: {
       name,
+      // The seed admin is the explicitly designated platform administrator.
+      accountType: 'ADMIN',
       isActive: true,
     },
   })

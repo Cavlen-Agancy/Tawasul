@@ -13,6 +13,7 @@ function dashboardFor(accountType?: string): string {
     case 'DOCTOR':
       return '/doctor'
     case 'STAFF':
+    case 'ADMIN':
       return '/admin'
     default:
       return '/dashboard'

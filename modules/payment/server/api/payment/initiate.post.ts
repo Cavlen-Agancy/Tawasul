@@ -30,6 +30,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Booking already confirmed' })
   }
 
+  if (booking.status === 'CANCELLED') {
+    throw createError({ statusCode: 400, message: 'Booking is cancelled' })
+  }
+
+  if (!booking.doctorId) {
+    throw createError({ statusCode: 400, message: 'This booking needs admin assistance' })
+  }
+
   if (!booking.payment) {
     throw createError({ statusCode: 400, message: 'Payment not found for this booking' })
   }

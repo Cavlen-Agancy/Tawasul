@@ -147,4 +147,24 @@ describe('POST /api/auth/login', () => {
       ]),
     )
   })
+
+  it('logs in an ADMIN user without STAFF permissions', async () => {
+    const user = await createTestUser({
+      emailVerified: true,
+      accountType: 'ADMIN',
+      email: `login-admin-${Date.now()}@test.com`,
+    })
+    toDelete.push(user.id)
+
+    const event = createApiEvent({
+      method: 'POST',
+      url: '/api/auth/login',
+      body: { email: user.email, password: 'CorrectPass123!' },
+    })
+
+    const res = await handler(event) as { accountType: string; permissions?: unknown }
+
+    expect(res.accountType).toBe('ADMIN')
+    expect(res).not.toHaveProperty('permissions')
+  })
 })

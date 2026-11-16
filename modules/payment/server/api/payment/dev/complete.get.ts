@@ -1,6 +1,7 @@
 import { defineEventHandler, getQuery, sendRedirect, createError } from 'h3'
 import { paymentGatewayConfigured } from '~/server/utils/payment'
 import { handleSuccessfulPayment } from '~/server/utils/booking-status'
+import { prisma } from '~/server/utils/prisma'
 
 /**
  * POST /api/payment/dev/complete
@@ -22,6 +23,19 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Booking ID is required' })
   }
 
-  await handleSuccessfulPayment(bookingId)
+  const payment = await prisma.payment.findUnique({
+    where: { bookingId },
+    select: { amount: true, currency: true },
+  })
+  if (!payment) {
+    throw createError({ statusCode: 400, message: 'Payment not found' })
+  }
+  const confirmed = await handleSuccessfulPayment(bookingId, {
+    amount: Number(payment.amount),
+    currency: payment.currency,
+  })
+  if (!confirmed) {
+    throw createError({ statusCode: 400, message: 'Invalid payment data' })
+  }
   await sendRedirect(event, `/booking/success?bookingId=${encodeURIComponent(bookingId)}`, 302)
 })

@@ -2,6 +2,7 @@
 import { ArrowLeft } from 'lucide-vue-next'
 import { quickConsultServices } from '~/lib/home-content'
 import { siteConfig } from '~/lib/site'
+import type { PublicDoctor } from '~/modules/booking/composables/types'
 
 definePageMeta({ layout: 'default' })
 
@@ -57,6 +58,19 @@ const clientName = ref('')
 const clientPhone = ref('')
 const selectedService = ref('استشارة نفسية متخصصة (فردية)')
 const formError = ref('')
+
+const publicDoctors = ref<PublicDoctor[]>([])
+
+async function loadPublicDoctors() {
+  try {
+    const data = await $fetch<{ items?: PublicDoctor[]; doctors: PublicDoctor[] }>('/api/public/doctors', {
+      query: { page: 1, pageSize: 12 },
+    })
+    publicDoctors.value = data.items ?? data.doctors
+  } catch {
+    publicDoctors.value = []
+  }
+}
 
 const statsContainerRef = ref<HTMLElement | null>(null)
 const mobileStatsRef = ref<HTMLElement | null>(null)
@@ -133,6 +147,7 @@ function handleBooking(overrideMode?: 'online' | 'in-person') {
 }
 
 onMounted(() => {
+  void loadPublicDoctors()
   startSlideshow()
   if (typeof IntersectionObserver !== 'undefined') {
     const observer = new IntersectionObserver(
@@ -605,6 +620,38 @@ const courses: TrainingCourse[] = [
             استكشف جميع مساراتنا التدريبية ←
           </a>
         </div>
+      </div>
+    </section>
+
+    <section v-if="publicDoctors.length > 0" class="mx-auto w-full max-w-6xl px-4 py-12">
+      <div class="mb-6 text-center">
+        <h2 class="text-2xl font-bold text-foreground">اختر طبيبك</h2>
+        <p class="mt-2 text-sm text-muted-foreground">اختر المتخصص المناسب ثم اختر الموعد المناسب لك.</p>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <NuxtLink
+          v-for="doctor in publicDoctors"
+          :key="doctor.id"
+          :to="`${siteConfig.booking.basePath}?doctorId=${encodeURIComponent(doctor.id)}`"
+          class="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/60"
+          :data-testid="`home-doctor-${doctor.id}`"
+        >
+          <img
+            v-if="doctor.photo"
+            :src="doctor.photo"
+            :alt="doctor.name"
+            class="size-14 rounded-full object-cover"
+          >
+          <span v-else class="flex size-14 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
+            {{ doctor.name.slice(0, 1) }}
+          </span>
+          <span class="min-w-0">
+            <span class="block truncate text-sm font-semibold text-foreground">{{ doctor.name }}</span>
+            <span class="block truncate text-xs text-muted-foreground">
+              {{ doctor.specializations?.[0] || 'أخصائي صحة نفسية' }}
+            </span>
+          </span>
+        </NuxtLink>
       </div>
     </section>
 

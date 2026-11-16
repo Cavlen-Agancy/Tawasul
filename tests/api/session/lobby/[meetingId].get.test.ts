@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { User } from '@prisma/client'
 import handler from '~/modules/session/server/api/meeting/lobby/[meetingId].get'
+import { prisma } from '~/server/utils/prisma'
 import { createApiEvent, expectApiError, createTestUser, deleteTestUser } from '../../helpers'
 import { createPatient, createBookedFixture, deletePatientBookingFixture, deletePatient } from '../../patient/helpers'
 import { createTestDoctor, deleteTestDoctor, type TestDoctorFixture } from '../../booking/helpers'
@@ -22,6 +23,7 @@ interface LobbyResponse {
   role: 'patient' | 'doctor' | 'staff'
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED'
   canJoin: boolean
+  sessionType?: 'ONLINE' | 'IN_CLINIC'
   patientName: string
   doctorName: string
   date: string
@@ -108,7 +110,7 @@ describe('GET /api/meeting/lobby/:meetingId', () => {
     try {
       const res = (await handler(request(fixture.bookingId, staff))) as LobbyResponse
       expect(res.role).toBe('staff')
-      expect(res.canJoin).toBe(true)
+      expect(res.canJoin).toBe(false)
     } finally {
       vi.restoreAllMocks()
       await deletePatientBookingFixture(fixture, patient)
@@ -167,6 +169,89 @@ describe('GET /api/meeting/lobby/:meetingId', () => {
       expect(res.status).toBe('CONFIRMED')
       expect(res.canJoin).toBe(false)
     } finally {
+      await deletePatientBookingFixture(fixture, patient)
+    }
+  })
+
+  it('returns canJoin false exactly at the appointment end', async () => {
+    useFixedNow()
+    const patient = await createPatient({ email: `lobby-end-${Date.now()}@test.com` })
+    const now = new Date()
+    const fixture = await createBookedFixture(patient, {
+      status: 'CONFIRMED',
+      date: new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())),
+      startTime: '12:00',
+      endTime: '13:00',
+    })
+    try {
+      const res = (await handler(request(fixture.bookingId, patient))) as LobbyResponse
+      expect(res.status).toBe('CONFIRMED')
+      expect(res.canJoin).toBe(false)
+    } finally {
+      vi.restoreAllMocks()
+      await deletePatientBookingFixture(fixture, patient)
+    }
+  })
+
+  it('TEST mode relaxes only the lobby clock, not membership or status', async () => {
+    useFixedNow()
+    const settings = await prisma.settings.findUnique({
+      where: { id: 'singleton' },
+      select: { sessionJoinMode: true },
+    })
+    const previousMode = settings?.sessionJoinMode ?? 'PRODUCTION'
+    await prisma.settings.update({
+      where: { id: 'singleton' },
+      data: { sessionJoinMode: 'TEST' },
+    })
+
+    const owner = await createPatient({ email: `lobby-test-owner-${Date.now()}@test.com` })
+    const other = await createPatient({ email: `lobby-test-other-${Date.now()}@test.com` })
+    const now = new Date()
+    const ended = await createBookedFixture(owner, {
+      status: 'CONFIRMED',
+      date: new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())),
+      startTime: '08:00',
+      endTime: '09:00',
+    })
+
+    try {
+      const res = (await handler(request(ended.bookingId, owner))) as LobbyResponse
+      expect(res.canJoin).toBe(true)
+
+      try {
+        await handler(request(ended.bookingId, other))
+        expect.unreachable('should have thrown')
+      } catch (e) {
+        expectApiError(e, 403, 'Forbidden')
+      }
+    } finally {
+      await prisma.settings.update({
+        where: { id: 'singleton' },
+        data: { sessionJoinMode: previousMode },
+      }).catch(() => undefined)
+      vi.restoreAllMocks()
+      await deletePatientBookingFixture(ended, owner)
+      await deletePatient(other)
+    }
+  })
+
+  it('returns canJoin false for an in-clinic booking', async () => {
+    useFixedNow()
+    const patient = await createPatient({ email: `lobby-clinic-${Date.now()}@test.com` })
+    const now = new Date()
+    const fixture = await createBookedFixture(patient, {
+      status: 'CONFIRMED',
+      sessionType: 'IN_CLINIC',
+      date: new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())),
+      startTime: '12:58',
+      endTime: '14:00',
+    })
+    try {
+      const res = (await handler(request(fixture.bookingId, patient))) as LobbyResponse
+      expect(res.canJoin).toBe(false)
+    } finally {
+      vi.restoreAllMocks()
       await deletePatientBookingFixture(fixture, patient)
     }
   })

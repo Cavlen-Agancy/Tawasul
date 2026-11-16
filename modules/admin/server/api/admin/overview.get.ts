@@ -4,21 +4,23 @@ import { requireAuth } from '~/server/utils/auth'
 import { formatDateUTC } from '~/server/utils/availability'
 
 export default defineEventHandler(async (event) => {
-  const auth = requireAuth(event, ['STAFF'])
+  const auth = requireAuth(event, ['STAFF', 'ADMIN'])
 
-  const permissions = await prisma.permission.findMany({
-    where: { userId: auth.userId },
-  })
-
-  const hasStaffPerm = permissions.some((p) => p.resource === 'STAFF')
-  const hasSettingsPerm = permissions.some((p) => p.resource === 'SETTINGS')
-  const isSuperAdmin = permissions.length >= 6
-
-  if (!hasStaffPerm && !hasSettingsPerm && !isSuperAdmin) {
-    throw createError({
-      statusCode: 403,
-      message: 'You do not have permission to view the admin overview',
+  if (auth.accountType !== 'ADMIN') {
+    const permissions = await prisma.permission.findMany({
+      where: { userId: auth.userId },
     })
+
+    const hasStaffPerm = permissions.some((p) => p.resource === 'STAFF')
+    const hasSettingsPerm = permissions.some((p) => p.resource === 'SETTINGS')
+    const isSuperAdmin = permissions.length >= 6
+
+    if (!hasStaffPerm && !hasSettingsPerm && !isSuperAdmin) {
+      throw createError({
+        statusCode: 403,
+        message: 'You do not have permission to view the admin overview',
+      })
+    }
   }
 
   const now = new Date()

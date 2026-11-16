@@ -200,11 +200,15 @@ export function usePatientDashboard() {
     }
   }
 
-  async function fetchAvailableDates(month: number, year: number): Promise<string[]> {
+  async function fetchAvailableDates(month: number, year: number, doctorId?: string | null): Promise<string[]> {
     fetchError.value = null
+    if (!doctorId) {
+      availableDates.value = []
+      return []
+    }
     try {
       const data = await $fetch<{ dates: string[] }>('/api/booking/available-dates', {
-        query: { month, year },
+        query: { month, year, doctorId },
       })
       availableDates.value = data.dates
       return data.dates
@@ -215,11 +219,15 @@ export function usePatientDashboard() {
     }
   }
 
-  async function fetchAvailableSlots(date: string): Promise<AvailableSlot[]> {
+  async function fetchAvailableSlots(date: string, doctorId?: string | null): Promise<AvailableSlot[]> {
     fetchError.value = null
+    if (!doctorId) {
+      availableSlots.value = []
+      return []
+    }
     try {
       const data = await $fetch<{ slots: AvailableSlot[] }>('/api/booking/available-slots', {
-        query: { date },
+        query: { date, doctorId },
       })
       availableSlots.value = data.slots
       return data.slots
@@ -301,9 +309,15 @@ export function usePatientDashboard() {
     bookingFlowTime.value = null
     bookingFlowLoading.value = true
     bookingFlowError.value = null
+    const doctorId = allBookings.value[0]?.doctorId
+    if (!doctorId) {
+      bookingFlowSlots.value = []
+      bookingFlowLoading.value = false
+      return []
+    }
     try {
       const data = await $fetch<{ slots: AvailableSlot[] }>('/api/booking/available-slots', {
-        query: { date },
+        query: { date, doctorId },
       })
       bookingFlowSlots.value = data.slots
       return data.slots

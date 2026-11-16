@@ -416,6 +416,23 @@ export function useAdminDashboard() {
     return null
   }
 
+  async function fetchSessionJoinMode(): Promise<'PRODUCTION' | 'TEST' | null> {
+    const data = await unwrap(() =>
+      $fetch<{ mode: 'PRODUCTION' | 'TEST' }>('/api/admin/session-join-mode'),
+    )
+    return data?.mode ?? null
+  }
+
+  async function updateSessionJoinMode(mode: 'PRODUCTION' | 'TEST'): Promise<'PRODUCTION' | 'TEST' | null> {
+    const data = await unwrap(() =>
+      $fetch<{ mode: 'PRODUCTION' | 'TEST' }>('/api/admin/session-join-mode', {
+        method: 'PATCH',
+        body: { mode },
+      }),
+    )
+    return data?.mode ?? null
+  }
+
   async function fetchOverview(): Promise<AdminOverview | null> {
     const data = await unwrap(() => $fetch<AdminOverview>('/api/admin/overview'))
     if (data) {
@@ -483,6 +500,8 @@ export function useAdminDashboard() {
     settings,
     fetchSettings,
     updateSettings,
+    fetchSessionJoinMode,
+    updateSessionJoinMode,
     overview,
     fetchOverview,
     fetchBooking,

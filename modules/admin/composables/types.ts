@@ -151,6 +151,8 @@ export interface AdminSettings {
   paymentGateway: string
   paymentGatewayKey: string
   paymentGatewaySecret: string
+  /** Only returned to ADMIN; omitted for STAFF responses. */
+  sessionJoinMode?: 'PRODUCTION' | 'TEST'
   sessionPricePerHour: number
   defaultSessionDuration: number
   defaultWorkingStart: string

@@ -40,8 +40,8 @@ export default defineEventHandler(async (event) => {
   }
 
   if (!isStaff && booking.status === 'CONFIRMED') {
-    // PENDING bookings have no doctor assigned yet and can be cancelled
-    // immediately; the 24-hour rule protects confirmed doctor schedules only.
+    // The 24-hour rule protects confirmed doctor schedules. Pending holds can
+    // be cancelled immediately and release their slot.
     const sessionStart = parseISODate(formatBookingDate(booking.date))
     const [h, m] = booking.startTime.split(':').map((p) => parseInt(p, 10))
     sessionStart.setHours(h || 0, m || 0, 0, 0)
@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
   await prisma.$transaction([
     prisma.booking.update({ where: { id }, data: { status: 'CANCELLED' } }),
     prisma.payment.updateMany({
-      where: { bookingId: id, status: { not: 'REFUNDED' } },
+      where: { bookingId: id, status: 'SUCCESS' },
       data: { status: 'REFUNDED' },
     }),
   ])

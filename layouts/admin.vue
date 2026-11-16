@@ -76,7 +76,9 @@ const navItems: NavItem[] = [
 ]
 
 const canSeeOverview = computed(() => {
-  if (!user.value || user.value.accountType !== 'STAFF') return false
+  if (!user.value) return false
+  if (user.value.accountType === 'ADMIN') return true
+  if (user.value.accountType !== 'STAFF') return false
   return (
     hasPermission('STAFF', 'READ') ||
     hasPermission('SETTINGS', 'READ') ||

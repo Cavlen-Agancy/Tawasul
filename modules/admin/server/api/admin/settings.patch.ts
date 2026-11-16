@@ -9,12 +9,18 @@ function maskKey(value: string | null): string {
 }
 
 export default defineEventHandler(async (event) => {
-  await requirePermission(event, 'SETTINGS', 'UPDATE')
+  const auth = await requirePermission(event, 'SETTINGS', 'UPDATE')
 
   const body = await readBody<unknown>(event).catch(() => undefined)
   const parsed = settingsPatchSchema.safeParse(body)
   if (!parsed.success) {
     throw createError({ statusCode: 400, message: validationMessage(parsed.error) })
+  }
+
+  // Session Join Mode is a platform-administrator decision. STAFF permissions
+  // do not delegate it, even with SETTINGS:UPDATE.
+  if (parsed.data.sessionJoinMode !== undefined && auth.accountType !== 'ADMIN') {
+    throw createError({ statusCode: 403, message: 'Admin access required' })
   }
 
   const data: Record<string, unknown> = {}
@@ -41,6 +47,7 @@ export default defineEventHandler(async (event) => {
     paymentGateway: settings.paymentGateway,
     paymentGatewayKey: maskKey(settings.paymentGatewayKey),
     paymentGatewaySecret: maskKey(settings.paymentGatewaySecret),
+    ...(auth.accountType === 'ADMIN' ? { sessionJoinMode: settings.sessionJoinMode } : {}),
     sessionPricePerHour: Number(settings.sessionPricePerHour),
     defaultSessionDuration: settings.defaultSessionDuration,
     defaultWorkingStart: settings.defaultWorkingStart,

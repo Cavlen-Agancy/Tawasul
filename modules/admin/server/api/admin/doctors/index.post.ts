@@ -41,6 +41,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const hashed = await hashPassword(password)
+  const defaultSchedules = await prisma.adminSchedule.findMany({
+    where: { isActive: true },
+    orderBy: { dayOfWeek: 'asc' },
+  })
 
   let slug = slugifyName(name)
   let suffix = 2
@@ -61,6 +65,16 @@ export default defineEventHandler(async (event) => {
         create: {
           slug,
           specializations: [],
+          availability: defaultSchedules.length > 0
+            ? {
+                create: defaultSchedules.map((schedule) => ({
+                  dayOfWeek: schedule.dayOfWeek,
+                  startTime: schedule.startTime,
+                  endTime: schedule.endTime,
+                  sessionDuration: schedule.sessionDuration,
+                })),
+              }
+            : undefined,
         },
       },
     },

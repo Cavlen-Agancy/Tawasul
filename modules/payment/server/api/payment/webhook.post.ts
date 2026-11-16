@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, readRawBody, getHeader, createError, type H3Event } from 'h3'
+import { defineEventHandler, readBody, readRawBody, getHeader, getQuery, createError, type H3Event } from 'h3'
 import crypto from 'node:crypto'
 import { getServerRuntimeConfig } from '~/server/utils/runtime'
 import { handleSuccessfulPayment, handleFailedPayment } from '~/server/utils/booking-status'
@@ -50,20 +50,35 @@ async function handlePaymobWebhook(event: H3Event): Promise<{ message: string }>
   }
 
   const providedHmac = getHeader(event, 'x-hmac') ?? getHeader(event, 'hmac')
+    ?? (typeof getQuery(event).hmac === 'string' ? String(getQuery(event).hmac) : '')
   if (!providedHmac) {
-    throw createError({ statusCode: 400, message: 'Invalid signature' })
-  }
-  const expectedHmac = crypto.createHmac('sha512', hmacSecret).update(parsed.raw).digest('hex')
-  if (providedHmac !== expectedHmac) {
     throw createError({ statusCode: 400, message: 'Invalid signature' })
   }
 
   const { body } = parsed
-  const success = String(body.success) === 'true'
+  const expectedHmac = crypto
+    .createHmac('sha512', hmacSecret)
+    .update(paymobHmacPayload(body))
+    .digest('hex')
+  if (!safeEqual(providedHmac, expectedHmac)) {
+    throw createError({ statusCode: 400, message: 'Invalid signature' })
+  }
+
+  const payload = paymentPayload(body)
+  const success = String(payload.success) === 'true'
   const bookingId = extractBookingId(body)
   if (bookingId) {
     if (success) {
-      await handleSuccessfulPayment(bookingId)
+      if (payload.amountCents === undefined || !payload.currency) {
+        throw createError({ statusCode: 400, message: 'Invalid payment data' })
+      }
+      const verified = await handleSuccessfulPayment(bookingId, {
+        amount: toMajorUnits(payload.amountCents),
+        currency: payload.currency,
+      })
+      if (!verified) {
+        throw createError({ statusCode: 400, message: 'Invalid payment data' })
+      }
     } else {
       await handleFailedPayment(bookingId)
     }
@@ -98,11 +113,21 @@ async function handleStripeWebhook(event: H3Event): Promise<{ message: string }>
   }
 
   const { body } = parsed
+  const payload = paymentPayload(body)
   const bookingId = extractBookingId(body)
   const type = typeof body.type === 'string' ? body.type : ''
   if (bookingId) {
     if (type === 'checkout.session.completed') {
-      await handleSuccessfulPayment(bookingId)
+      if (payload.amountCents === undefined || !payload.currency) {
+        throw createError({ statusCode: 400, message: 'Invalid payment data' })
+      }
+      const verified = await handleSuccessfulPayment(bookingId, {
+        amount: toMajorUnits(payload.amountCents),
+        currency: payload.currency,
+      })
+      if (!verified) {
+        throw createError({ statusCode: 400, message: 'Invalid payment data' })
+      }
     } else if (type === 'checkout.session.async_payment_failed') {
       await handleFailedPayment(bookingId)
     }
@@ -111,12 +136,86 @@ async function handleStripeWebhook(event: H3Event): Promise<{ message: string }>
   return { message: 'Webhook received' }
 }
 
-function extractBookingId(body: Record<string, unknown>): string | undefined {
-  const metadata = body.metadata as Record<string, unknown> | undefined
-  if (metadata && typeof metadata.bookingId === 'string') return metadata.bookingId
+function safeEqual(actual: string, expected: string): boolean {
+  const a = Buffer.from(actual, 'utf8')
+  const b = Buffer.from(expected, 'utf8')
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
 
-  const order = body.order as Record<string, unknown> | undefined
-  if (order && typeof order.bookingId === 'string') return order.bookingId
+/**
+ * Paymob's official transaction HMAC concatenates these fields in order.
+ * Missing fields are treated as empty strings; the gateway sends all fields.
+ */
+function paymobHmacPayload(body: Record<string, unknown>): string {
+  const obj = (body.obj as Record<string, unknown> | undefined) ?? body
+  const order = obj.order as Record<string, unknown> | undefined
+  const source = obj.source_data as Record<string, unknown> | undefined
+  const value = (input: unknown): string => {
+    if (input === undefined || input === null) return ''
+    return String(input)
+  }
+  return [
+    value(obj.amount_cents),
+    value(obj.created_at),
+    value(obj.currency),
+    value(obj.error_occured),
+    value(obj.has_parent_transaction),
+    value(obj.id),
+    value(obj.integration_id),
+    value(obj.is_3d_secure),
+    value(obj.is_auth),
+    value(obj.is_capture),
+    value(obj.is_refunded),
+    value(obj.is_standalone_payment),
+    value(obj.is_voided),
+    value(order?.id),
+    value(obj.owner),
+    value(obj.pending),
+    value(source?.pan),
+    value(source?.sub_type),
+    value(source?.type),
+    value(obj.success),
+  ].join('')
+}
+
+function paymentPayload(body: Record<string, unknown>): {
+  success: unknown
+  amountCents?: number
+  currency?: string
+} {
+  const data = body.data as Record<string, unknown> | undefined
+  const nestedObject = data?.object as Record<string, unknown> | undefined
+  const paymobObject = body.obj as Record<string, unknown> | undefined
+  const source = nestedObject ?? paymobObject ?? body
+
+  const rawAmount = source.amount_cents ?? source.amount_total ?? source.amount
+  const amount = typeof rawAmount === 'number' ? rawAmount : Number(rawAmount)
+  const currency = typeof source.currency === 'string' ? source.currency : undefined
+
+  return {
+    success: source.success ?? body.success,
+    amountCents: Number.isFinite(amount) ? amount : undefined,
+    currency,
+  }
+}
+
+function toMajorUnits(amountCents: number | undefined): number | undefined {
+  if (amountCents === undefined) return undefined
+  return amountCents / 100
+}
+
+function extractBookingId(body: Record<string, unknown>): string | undefined {
+  const data = body.data as Record<string, unknown> | undefined
+  const nestedObject = data?.object as Record<string, unknown> | undefined
+  const paymobObject = body.obj as Record<string, unknown> | undefined
+
+  for (const source of [body, nestedObject, paymobObject]) {
+    if (!source) continue
+    const metadata = source.metadata as Record<string, unknown> | undefined
+    if (metadata && typeof metadata.bookingId === 'string') return metadata.bookingId
+    const order = source.order as Record<string, unknown> | undefined
+    if (order && typeof order.bookingId === 'string') return order.bookingId
+  }
 
   return undefined
 }

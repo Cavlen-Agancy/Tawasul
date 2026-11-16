@@ -45,7 +45,10 @@ const {
   settings,
   fetchSettings,
   updateSettings,
+  fetchSessionJoinMode,
+  updateSessionJoinMode,
 } = useAdminDashboard()
+const { isAdmin } = useAuth()
 const { toast } = useToast()
 
 const activeTab = ref('schedule')
@@ -54,6 +57,7 @@ const platformForm = ref({ platformName: '', contactEmail: '', contactPhone: '',
 const pricingForm = ref({ sessionPricePerHour: 0, defaultSessionDuration: 60 })
 const hoursForm = ref({ defaultWorkingStart: '09:00', defaultWorkingEnd: '17:00' })
 const gatewayForm = ref({ paymentGateway: 'paymob', paymentGatewayKey: '', paymentGatewaySecret: '' })
+const sessionModeForm = ref<{ sessionJoinMode: 'PRODUCTION' | 'TEST' }>({ sessionJoinMode: 'PRODUCTION' })
 const updateKeys = ref(false)
 const showSecret = ref(false)
 const savingSection = ref<string | null>(null)
@@ -78,6 +82,24 @@ function fillSettingsForms() {
     paymentGateway: settings.value.paymentGateway ?? 'paymob',
     paymentGatewayKey: settings.value.paymentGatewayKey ?? '',
     paymentGatewaySecret: settings.value.paymentGatewaySecret ?? '',
+  }
+}
+
+async function saveSessionJoinMode() {
+  savingSection.value = 'sessionJoinMode'
+  try {
+    const saved = await updateSessionJoinMode(sessionModeForm.value.sessionJoinMode)
+    if (saved) {
+      sessionModeForm.value.sessionJoinMode = saved
+      toast({ title: 'Session join mode saved', variant: 'success' })
+    }
+  } catch (e) {
+    toast({
+      title: (e as { data?: { message?: string } }).data?.message || 'Could not save session join mode',
+      variant: 'destructive',
+    })
+  } finally {
+    savingSection.value = null
   }
 }
 
@@ -230,6 +252,11 @@ function formatDateLabel(dateISO: string): string {
 onMounted(() => {
   void fetchAll()
   void fetchSettings().then(() => fillSettingsForms())
+  if (isAdmin.value) {
+    void fetchSessionJoinMode().then((mode) => {
+      if (mode) sessionModeForm.value.sessionJoinMode = mode
+    })
+  }
 })
 </script>
 
@@ -747,6 +774,54 @@ onMounted(() => {
             </CardContent>
           </Card>
 
+          <div class="space-y-6">
+          <!-- Session join mode: security-sensitive, ADMIN-only -->
+          <Card v-if="isAdmin" class="h-fit rounded-2xl border border-border shadow-soft" data-testid="session-join-mode-card">
+            <CardHeader class="border-b border-border/70 pb-4">
+              <CardTitle class="text-base font-bold text-foreground">Session Join Mode</CardTitle>
+              <CardDescription class="text-xs">
+                Controls when patients may enter a LiveKit session.
+              </CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-4 p-6">
+              <div class="space-y-1.5">
+                <label class="block text-sm font-semibold text-foreground" for="session-join-mode">
+                  Join time mode
+                </label>
+                <select
+                  id="session-join-mode"
+                  v-model="sessionModeForm.sessionJoinMode"
+                  class="flex h-11 w-full rounded-xl border border-input bg-muted/40 px-3 text-sm text-foreground focus:border-primary focus:bg-background focus:outline-none focus:ring-4 focus:ring-primary/20"
+                  data-testid="session-join-mode"
+                >
+                  <option value="PRODUCTION">PRODUCTION — 5 min before until appointment end</option>
+                  <option value="TEST">TEST — join at any time (testing only)</option>
+                </select>
+              </div>
+
+              <div
+                v-if="sessionModeForm.sessionJoinMode === 'TEST'"
+                class="rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm leading-relaxed text-foreground"
+                role="note"
+              >
+                <span class="font-semibold">Security warning:</span> TEST mode lets patients join
+                sessions outside the normal time window. Patients still need an active account,
+                their own CONFIRMED online booking, and doctor admission. Use only in an isolated
+                test environment and switch back to PRODUCTION when testing is finished.
+              </div>
+
+              <Button
+                class="w-full gap-2 text-sm font-semibold shadow-xs"
+                data-testid="save-session-join-mode"
+                :disabled="savingSection === 'sessionJoinMode'"
+                @click="saveSessionJoinMode"
+              >
+                <Save class="size-3.5" />
+                {{ savingSection === 'sessionJoinMode' ? 'Saving…' : 'Save Session Join Mode' }}
+              </Button>
+            </CardContent>
+          </Card>
+
           <!-- Live Preview Card -->
           <Card class="h-fit rounded-2xl border border-border bg-muted/20 p-5 shadow-soft space-y-3.5">
             <span class="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -773,6 +848,7 @@ onMounted(() => {
               These details appear in appointment confirmation emails, session invitations, and the public page footer.
             </p>
           </Card>
+          </div>
         </div>
       </TabsContent>
 

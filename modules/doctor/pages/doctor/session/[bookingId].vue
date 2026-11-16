@@ -35,6 +35,7 @@ interface SessionInfo {
 interface SessionTokenResponse {
   roomName: string
   liveKitToken: string
+  expiresAt?: string
   sessionInfo?: SessionInfo
 }
 
@@ -67,6 +68,7 @@ async function fetchToken() {
   try {
     const res = await $fetch<SessionTokenResponse>(`/api/doctor/session/${bookingId}`)
     tokenData.value = res
+    scheduleAutoEnd(res.expiresAt)
     if (import.meta.dev) console.log('[Doctor][Session] token received')
   } catch (e: unknown) {
     tokenError.value = e as typeof tokenError.value
@@ -83,16 +85,57 @@ function refresh() {
   bootSession()
 }
 
-// Check if outside join window
+// Check if outside join window / after the appointment end
+const sessionErrorMessage = computed(() =>
+  tokenError.value?.data?.message || tokenError.value?.message || '',
+)
+const isSessionEnded = computed(() =>
+  tokenError.value?.statusCode === 403 && sessionErrorMessage.value.toLowerCase().includes('ended'),
+)
 const isOutsideJoinWindow = computed(() => {
   if (!tokenError.value) return false
   const status = tokenError.value.statusCode
-  const msg = tokenError.value.data?.message || tokenError.value.message || ''
-  return status === 403 && (msg.includes('not available') || msg.includes('window') || msg.includes('time'))
+  return status === 403 && (
+    isSessionEnded.value ||
+    sessionErrorMessage.value.includes('not available') ||
+    sessionErrorMessage.value.includes('window') ||
+    sessionErrorMessage.value.includes('time')
+  )
 })
 
 // Set before the LiveKit composable so `onDisconnected` can read it.
 const confirmedExit = ref(false)
+let autoEndTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearAutoEndTimer() {
+  if (autoEndTimer) {
+    clearTimeout(autoEndTimer)
+    autoEndTimer = null
+  }
+}
+
+function onSessionTimeEnded() {
+  if (confirmedExit.value) return
+  confirmedExit.value = true
+  showLeaveModal.value = false
+  clearAutoEndTimer()
+  void leaveSession().finally(() => {
+    router.push('/doctor/calendar?sessionEnded=1')
+  })
+}
+
+function scheduleAutoEnd(expiresAt?: string) {
+  clearAutoEndTimer()
+  if (!expiresAt) return
+  const endMs = new Date(expiresAt).getTime()
+  if (!Number.isFinite(endMs)) return
+  const remaining = endMs - Date.now()
+  if (remaining <= 0) {
+    onSessionTimeEnded()
+    return
+  }
+  autoEndTimer = setTimeout(onSessionTimeEnded, remaining)
+}
 
 // Initialize LiveKit composable for Doctor
 const {
@@ -136,9 +179,9 @@ const {
   token,
   isModerator: true,
   onDisconnected: () => {
-    // Intentional leave (End Session) navigates on its own after disconnect.
-    // Skipping here avoids a second, post-unmount push to the same route.
-    if (confirmedExit.value) return
+    // A transient LiveKit disconnect must not redirect an active doctor. The
+    // page shows the terminal/retry state; explicit leave navigates on its own.
+    if (!confirmedExit.value) return
     router.push('/doctor/calendar')
   },
 })
@@ -239,6 +282,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  clearAutoEndTimer()
   if (sessionTimerInterval) {
     clearInterval(sessionTimerInterval)
     sessionTimerInterval = null
@@ -270,6 +314,7 @@ if (typeof window !== 'undefined') {
 async function onConfirmLeave() {
   confirmedExit.value = true
   showLeaveModal.value = false
+  clearAutoEndTimer()
   if (import.meta.dev) console.log('[Doctor][Session] leaving')
   await leaveSession()
   await router.push('/doctor/calendar')
@@ -351,9 +396,11 @@ function formatDate(val: string | Date | undefined) {
         <div class="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
           <Clock class="size-8" />
         </div>
-        <h2 class="text-2xl font-bold tracking-tight text-foreground">{{ t('session.state.startsSoonTitle') }}</h2>
+        <h2 class="text-2xl font-bold tracking-tight text-foreground">
+          {{ isSessionEnded ? t('session.state.endedTitle') : t('session.state.startsSoonTitle') }}
+        </h2>
         <p class="mt-3 text-sm text-muted-foreground leading-relaxed">
-          {{ t('session.state.startsSoonDesc') }}
+          {{ isSessionEnded ? t('session.state.endedDesc') : t('session.state.startsSoonDesc') }}
         </p>
         <div class="mt-8 flex justify-center">
           <NuxtLink

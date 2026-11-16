@@ -55,6 +55,29 @@ describe('GET /api/auth/me', () => {
     expect(res.permissions).toEqual(expect.arrayContaining([{ resource: 'PATIENTS', action: 'READ' }]))
   })
 
+  it('returns ADMIN without STAFF permissions', async () => {
+    const user = await createTestUser({
+      emailVerified: true,
+      email: `me-admin-${Date.now()}@test.com`,
+      accountType: 'ADMIN',
+    })
+    toDelete.push(user.id)
+    const token = generateJWT({ userId: user.id, email: user.email, accountType: 'ADMIN' })
+
+    const event = createApiEvent({
+      method: 'GET',
+      url: '/api/auth/me',
+      cookies: { auth_token: token },
+      context: { user: { userId: user.id, email: user.email, accountType: 'ADMIN' } },
+    })
+
+    const res = await handler(event) as unknown as Record<string, unknown>
+
+    expect(res.accountType).toBe('ADMIN')
+    expect(res).not.toHaveProperty('permissions')
+    expect(res).not.toHaveProperty('password')
+  })
+
   it('rejects unauthenticated requests with 401', async () => {
     const event = createApiEvent({ method: 'GET', url: '/api/auth/me' })
 

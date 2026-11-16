@@ -73,6 +73,8 @@ export default defineNuxtConfig({
     public: {
       appUrl: process.env.APP_URL || 'http://localhost:3000',
       liveKitUrl: process.env.LIVEKIT_URL || 'ws://localhost:7880',
+      // Deprecated no-op retained for environment compatibility. Session
+      // routes never bypass authentication, ownership, status, or time checks.
       enableSessionTestMode: process.env.NUXT_PUBLIC_ENABLE_SESSION_TEST_MODE === 'true',
       stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
     },

@@ -29,6 +29,7 @@ export interface CreateBookedFixtureOpts {
   service?: string
   paymentStatus?: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED'
   amount?: number
+  sessionType?: 'ONLINE' | 'IN_CLINIC'
 }
 
 export async function createBookedFixture(
@@ -52,6 +53,7 @@ export async function createBookedFixture(
       endTime: opts.endTime ?? '11:00',
       service: opts.service ?? 'Marital Counseling',
       status: opts.status ?? 'CONFIRMED',
+      sessionType: opts.sessionType ?? 'ONLINE',
     },
   })
 

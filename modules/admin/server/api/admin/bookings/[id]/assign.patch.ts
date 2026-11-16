@@ -35,6 +35,12 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Only PENDING bookings can be assigned' })
   }
 
+  // Legacy remediation only: normal new bookings already carry the patient's
+  // selected doctor and must be confirmed through verified payment.
+  if (booking.doctorId) {
+    throw createError({ statusCode: 400, message: 'This booking already has a doctor' })
+  }
+
   const doctor = await prisma.doctor.findUnique({
     where: { id: doctorId },
     include: { user: { select: { name: true, email: true } } },

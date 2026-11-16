@@ -545,7 +545,7 @@ async function openReschedule() {
   rsTime.value = null
   rsLoading.value = true
   try {
-    rsSlots.value = await fetchAvailableSlots(detailAppt.value.date)
+    rsSlots.value = await fetchAvailableSlots(detailAppt.value.date, detailAppt.value.doctorId)
   } catch (e) {
     rsError.value = (e as { data?: { message?: string } }).data?.message || 'Could not load available slots'
     rsSlots.value = []
@@ -560,7 +560,7 @@ async function onRsDateChange() {
   rsLoading.value = true
   rsError.value = null
   try {
-    rsSlots.value = await fetchAvailableSlots(rsDate.value)
+    rsSlots.value = await fetchAvailableSlots(rsDate.value, detailAppt.value?.doctorId)
   } catch (e) {
     rsError.value = (e as { data?: { message?: string } }).data?.message || 'Could not load available slots'
     rsSlots.value = []

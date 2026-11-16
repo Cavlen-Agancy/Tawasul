@@ -1,4 +1,4 @@
-export type AuthAccountType = 'PATIENT' | 'DOCTOR' | 'STAFF'
+export type AuthAccountType = 'PATIENT' | 'DOCTOR' | 'STAFF' | 'ADMIN'
 
 export interface AuthUser {
   id: string
@@ -23,12 +23,14 @@ export function useAuth() {
   const isPatient = computed(() => user.value?.accountType === 'PATIENT')
   const isDoctor = computed(() => user.value?.accountType === 'DOCTOR')
   const isStaff = computed(() => user.value?.accountType === 'STAFF')
+  const isAdmin = computed(() => user.value?.accountType === 'ADMIN')
 
   function dashboardFor(accountType?: AuthAccountType): string {
     switch (accountType) {
       case 'DOCTOR':
         return '/doctor'
       case 'STAFF':
+      case 'ADMIN':
         return '/admin'
       default:
         return '/dashboard'
@@ -87,6 +89,8 @@ export function useAuth() {
   }
 
   function hasPermission(resource: string, action: string): boolean {
+    // ADMIN is a distinct platform role with full administrative access.
+    if (user.value?.accountType === 'ADMIN') return true
     if (!user.value || user.value.accountType !== 'STAFF') return false
     const perms = user.value.permissions ?? []
     if (perms.some((p) => p.resource === resource && p.action === action)) return true
@@ -103,6 +107,7 @@ export function useAuth() {
     isPatient,
     isDoctor,
     isStaff,
+    isAdmin,
     fetchMe,
     login,
     logout,

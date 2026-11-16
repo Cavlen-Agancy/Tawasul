@@ -27,6 +27,24 @@ export default async function globalSetup() {
     })
   }
 
+  // Give the staff fixture the same operational permissions as the seed
+  // administrator so the admin overview is rendered for the admin workspace.
+  const staffUser = await prisma.user.findUniqueOrThrow({ where: { email: FIXTURES.staff.email } })
+  const staffPermissions = [
+    'APPOINTMENTS:READ', 'APPOINTMENTS:UPDATE', 'APPOINTMENTS:DELETE',
+    'PATIENTS:READ', 'DOCTORS:CREATE', 'DOCTORS:READ', 'DOCTORS:UPDATE',
+    'PAYMENTS:READ', 'SETTINGS:READ', 'SETTINGS:UPDATE',
+    'STAFF:CREATE', 'STAFF:READ', 'STAFF:UPDATE', 'STAFF:DELETE',
+  ]
+  for (const permission of staffPermissions) {
+    const [resource, action] = permission.split(':')
+    await prisma.permission.upsert({
+      where: { userId_resource_action: { userId: staffUser.id, resource, action } },
+      create: { userId: staffUser.id, resource, action },
+      update: {},
+    })
+  }
+
   await prisma.$disconnect()
 }
 

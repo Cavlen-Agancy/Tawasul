@@ -14,6 +14,7 @@ const backTo = computed<string>(() => {
     case 'DOCTOR':
       return '/doctor'
     case 'STAFF':
+    case 'ADMIN':
       return '/admin'
     default:
       return '/dashboard/appointments'

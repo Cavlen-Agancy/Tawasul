@@ -21,16 +21,24 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: 'Cancelled',
 }
 
+const staffUnsupported = computed(() => meeting.value?.role === 'staff')
 const waiting = computed(() => meeting.value !== null && !meeting.value.canJoin)
-
-function isNotJoinableError(code: number | undefined): boolean {
-  return code === 404 || code === 403 || code === 409
-}
+const sessionEnded = computed(() => {
+  if (!meeting.value) return false
+  const end = new Date(`${meeting.value.date}T${meeting.value.endTime}:00`)
+  return Number.isFinite(end.getTime()) && Date.now() >= end.getTime()
+})
 
 async function refresh() {
   await fetchMeeting(meetingId.value)
   stopPolling()
-  if (meeting.value && !meeting.value.canJoin) {
+  if (
+    meeting.value
+    && !meeting.value.canJoin
+    && meeting.value.role !== 'staff'
+    && meeting.value.sessionType !== 'IN_CLINIC'
+    && !sessionEnded.value
+  ) {
     startPolling()
   }
 }
@@ -39,7 +47,14 @@ function startPolling() {
   if (pollTimer) return
   pollTimer = setInterval(async () => {
     await fetchMeeting(meetingId.value)
-    if (meeting.value?.canJoin) stopPolling()
+    if (
+      meeting.value?.canJoin
+      || meeting.value?.role === 'staff'
+      || meeting.value?.sessionType === 'IN_CLINIC'
+      || sessionEnded.value
+    ) {
+      stopPolling()
+    }
   }, 30 * 1000)
 }
 
@@ -62,14 +77,18 @@ function formatTime(time: string): string {
   return `${hour}:${String(mm).padStart(2, '0')} ${period}`
 }
 
-function onJoin() {
-  if (!meeting.value) return
+async function onJoin() {
+  if (!meeting.value || !meeting.value.canJoin || meeting.value.role === 'staff') return
   joining.value = true
-  // Video provider integration lands behind this seam; for now arriving at the
-  // lobby with canJoin is the reachable target (see phases 3–4 of the plan).
-  window.setTimeout(() => {
-    joining.value = false
-  }, 800)
+
+  // The canonical session page owns the LiveKit connection, waiting room, and
+  // doctor-admit transition. The lobby only routes authorized participants to it.
+  const target = meeting.value.role === 'doctor'
+    ? `/doctor/session/${meetingId.value}`
+    : `/dashboard/session/${meetingId.value}`
+
+  await navigateTo(target)
+  joining.value = false
 }
 
 onMounted(refresh)
@@ -84,6 +103,21 @@ onBeforeUnmount(stopPolling)
       <Skeleton class="h-64 w-full" />
     </div>
 
+    <!-- Staff cannot join video sessions -->
+    <div
+      v-else-if="staffUnsupported"
+      class="rounded-2xl border border-border bg-card p-8 text-center"
+      data-testid="meeting-staff-unsupported"
+    >
+      <Lock class="mx-auto size-12 text-destructive" />
+      <h2 class="mt-4 text-xl font-semibold text-foreground">
+        Staff video access is not available
+      </h2>
+      <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+        Staff accounts can view the meeting state but cannot join or manage the video room.
+      </p>
+    </div>
+
     <!-- Error / not authorized / not confirmed / not found -->
     <div
       v-else-if="status === 'error' || waiting"
@@ -93,12 +127,20 @@ onBeforeUnmount(stopPolling)
       <Clock3 v-if="waiting" class="mx-auto size-12 text-primary" />
       <Lock v-else class="mx-auto size-12 text-destructive" />
       <h2 class="mt-4 text-xl font-semibold text-foreground">
-        {{ waiting ? 'Meeting not open yet' : 'Meeting unavailable' }}
+        {{ waiting ? (sessionEnded ? 'Meeting has ended' : 'Meeting not open yet') : 'Meeting unavailable' }}
       </h2>
       <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
         <template v-if="meeting">
-          This appointment is {{ STATUS_LABEL[meeting.status] || meeting.status }}. It can be joined starting
-          5 minutes before the session and up to 15 minutes after it ends.
+          <template v-if="meeting.sessionType === 'IN_CLINIC'">
+            This is an in-clinic appointment and has no online video room.
+          </template>
+          <template v-else-if="sessionEnded">
+            This appointment has ended and can no longer be joined.
+          </template>
+          <template v-else>
+            This appointment is {{ STATUS_LABEL[meeting.status] || meeting.status }}. It can be joined starting
+            5 minutes before the session and until it ends.
+          </template>
         </template>
         <template v-else>{{ message }}</template>
       </p>
@@ -144,7 +186,7 @@ onBeforeUnmount(stopPolling)
         </dl>
 
         <div class="mt-8 flex flex-col items-center gap-3">
-          <!-- Video provider seam: replace onJoin with real LiveKit/WebRTC integration. -->
+          <!-- Routes to the canonical LiveKit session page, which owns the waiting room/admit flow. -->
           <Button
             size="lg"
             data-testid="join-meeting"

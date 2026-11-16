@@ -1,7 +1,8 @@
 import { defineEventHandler, getRouterParam, createError } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requireAuth, type AuthUser } from '~/server/utils/auth'
-import { canJoinMeetingAt } from '~/server/utils/meeting'
+import { getSessionJoinMode } from '~/server/utils/session-join-mode'
+import { canJoinSessionAt } from '~/lib/session-join'
 
 export type MeetingRole = 'patient' | 'doctor' | 'staff'
 
@@ -50,13 +51,18 @@ export default defineEventHandler(async (event) => {
   }
 
   const now = Date.now()
-  const canJoin = booking.status === 'CONFIRMED' && canJoinMeetingAt(booking, now)
+  const mode = await getSessionJoinMode()
+  const canJoin = role !== 'staff'
+    && booking.status === 'CONFIRMED'
+    && booking.sessionType === 'ONLINE'
+    && canJoinSessionAt(booking, now, mode)
 
   return {
     meetingId: booking.id,
     role,
     status: booking.status,
     canJoin,
+    sessionType: booking.sessionType,
     patientName: booking.user.name,
     doctorName: booking.doctor?.user?.name ?? '',
     date: formatDateLocal(booking.date),

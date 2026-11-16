@@ -1,8 +1,7 @@
 import { defineEventHandler, getRouterParam, readBody, createError } from 'h3'
 import { prisma } from '~/server/utils/prisma'
 import { requireAuth } from '~/server/utils/auth'
-import { getAdminAvailableSlots } from '~/server/utils/admin-availability'
-import { formatDateUTC, timeToMinutes } from '~/server/utils/availability'
+import { formatDateUTC, getAvailableSlots, timeToMinutes } from '~/server/utils/availability'
 import { isHoliday } from '~/server/utils/holidays'
 import { z } from 'zod'
 
@@ -54,8 +53,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'The clinic is closed on this day' })
   }
 
-  // Re-validate the new slot against the global admin schedule.
-  const availableSlots = await getAdminAvailableSlots(dateStr)
+  // New/transitional bookings are doctor-specific. Legacy unassigned rows are
+  // left for admin remediation rather than silently rescheduled without a doctor.
+  if (!booking.doctorId) {
+    throw createError({ statusCode: 400, message: 'This booking needs admin assistance' })
+  }
+
+  // Re-validate the new slot against the booked doctor's schedule and blocks.
+  const availableSlots = await getAvailableSlots(dateStr, booking.doctorId, booking.id)
   const slot = availableSlots.find((s) => s.startTime === startTime)
   if (!slot) {
     throw createError({ statusCode: 400, message: 'This slot is no longer available' })
@@ -68,11 +73,21 @@ export default defineEventHandler(async (event) => {
   const newStart = timeToMinutes(startTime)
   const newEnd = newStart + sessionDuration
 
+  const now = new Date()
   const competing = await prisma.booking.findMany({
     where: {
       date: booking.date,
-      status: { not: 'CANCELLED' },
       id: { not: id },
+      OR: [
+        { status: 'CONFIRMED' },
+        {
+          status: 'PENDING',
+          OR: [
+            { holdExpiresAt: null },
+            { holdExpiresAt: { gt: now } },
+          ],
+        },
+      ],
     },
     select: { startTime: true, endTime: true },
   })

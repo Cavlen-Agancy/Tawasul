@@ -31,6 +31,8 @@ describe('useTheme composable', () => {
           remove: vi.fn((cls: string) => classListMock.delete(cls)),
           contains: vi.fn((cls: string) => classListMock.has(cls)),
         },
+        setAttribute: vi.fn(),
+        removeAttribute: vi.fn(),
       },
       querySelector: vi.fn((selector: string) => {
         if (selector === 'meta[name="theme-color"]') {

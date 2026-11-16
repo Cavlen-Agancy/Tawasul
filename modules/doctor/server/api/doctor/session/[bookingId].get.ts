@@ -1,7 +1,15 @@
 import { defineEventHandler, getRouterParam, createError } from 'h3'
+import { SESSION_JOIN_TEST_TTL_SECONDS } from '~/lib/session-join'
 import { prisma } from '~/server/utils/prisma'
 import { requireAuth } from '~/server/utils/auth'
-import { canJoinMeetingAt, meetingWindow } from '~/server/utils/meeting'
+import {
+  assertDoctorSessionOwner,
+  assertOnlineConfirmedBooking,
+  assertSessionWindow,
+  sessionTokenTtlSeconds,
+  sessionWindowCloseAt,
+} from '~/server/utils/session-access'
+import { ensureSessionRoom } from '~/server/utils/session-room'
 import { generateLiveKitToken } from '~/server/utils/livekit-token'
 
 export default defineEventHandler(async (event) => {
@@ -14,7 +22,7 @@ export default defineEventHandler(async (event) => {
 
   const doctor = await prisma.doctor.findUnique({
     where: { userId: auth.userId },
-    include: { user: true },
+    include: { user: { select: { id: true, name: true, isActive: true } } },
   })
   if (!doctor) {
     throw createError({ statusCode: 404, message: 'Doctor profile not found' })
@@ -22,50 +30,45 @@ export default defineEventHandler(async (event) => {
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { sessionRoom: true, user: true },
+    include: {
+      sessionRoom: true,
+      user: { select: { id: true, name: true, isActive: true } },
+    },
   })
 
   if (!booking) {
     throw createError({ statusCode: 404, message: 'Booking not found' })
   }
 
-  if (booking.doctorId !== doctor.id) {
+  assertDoctorSessionOwner(doctor, booking)
+  assertOnlineConfirmedBooking(booking)
+  if (!booking.user.isActive) {
     throw createError({ statusCode: 403, message: 'Forbidden' })
   }
-
-  
-  const sessionTestMode = process.env.NODE_ENV === 'development' && process.env.NUXT_PUBLIC_ENABLE_SESSION_TEST_MODE === 'true'
-
-  if (!sessionTestMode && booking.status !== 'CONFIRMED') {
-    throw createError({ statusCode: 403, message: 'Forbidden' })
-  }
+  const mode = await assertSessionWindow(booking)
 
   const now = Date.now()
-  if (!sessionTestMode && !canJoinMeetingAt(booking, now)) {
-    throw createError({ statusCode: 403, message: 'Session is not available' })
-  }
-  let room = booking.sessionRoom
-  if (!room) {
-    const { closeAt } = meetingWindow(booking)
-    const expiresAt = new Date(closeAt)
-    const roomName = `tawasul-${bookingId}`
-    room = await prisma.sessionRoom.upsert({
-      where: { bookingId },
-      create: { bookingId, roomName, expiresAt },
-      update: {},
-    })
-  }
+  const ttlSeconds = sessionTokenTtlSeconds(booking, now, mode)
+  const appointmentEnd = sessionWindowCloseAt(booking)
+  // TEST mode keeps the room available for the token lifetime; PRODUCTION
+  // still terminates the room at the exact appointment end.
+  const closeAt = mode === 'TEST'
+    ? Math.max(appointmentEnd, now + SESSION_JOIN_TEST_TTL_SECONDS * 1000)
+    : appointmentEnd
+  const room = await ensureSessionRoom(bookingId, closeAt)
 
   const liveKitToken = await generateLiveKitToken({
     roomName: room.roomName,
     userName: doctor.user.name,
     userId: doctor.user.id,
     role: 'moderator',
+    ttlSeconds,
   })
 
   return {
     roomName: room.roomName,
     liveKitToken,
+    expiresAt: new Date(closeAt).toISOString(),
     sessionInfo: {
       doctorName: doctor.user.name,
       patientName: booking.user.name,

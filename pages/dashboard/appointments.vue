@@ -32,13 +32,6 @@ definePageMeta({
   middleware: ['auth', 'patient-only'],
 })
 
-const config = useRuntimeConfig()
-const sessionTestMode = import.meta.dev && config.public.enableSessionTestMode === true
-
-if (sessionTestMode) {
-  console.warn('[DEV] Session test mode enabled: time/status UI restrictions are bypassed.')
-}
-
 const {
   allBookings,
   availableSlots,
@@ -78,6 +71,9 @@ const anchorDate = ref(new Date())
 const calendarRef = ref<InstanceType<typeof FullCalendar> | null>(null)
 const calendarKey = ref(0)
 const now = ref(Date.now())
+// Server-computed per-booking eligibility; the mode itself is never exposed.
+type JoinEligibility = { canJoin: boolean; reason?: string }
+const joinEligibility = ref<Record<string, JoinEligibility>>({})
 const loadedMonthKey = ref('')
 const knownAvailable = ref<Set<string>>(new Set())
 
@@ -183,13 +179,29 @@ function sessionMinutes(appt: Appointment): number {
   return Math.max(0, Math.round((sessionEnd(appt).getTime() - sessionStart(appt).getTime()) / 60000))
 }
 
+async function refreshJoinEligibility(): Promise<void> {
+  try {
+    const res = await $fetch<{ eligibility: Array<{ bookingId: string } & JoinEligibility> }>(
+      '/api/session/join-eligibility',
+    )
+    joinEligibility.value = Object.fromEntries(
+      res.eligibility.map((entry) => [
+        entry.bookingId,
+        { canJoin: entry.canJoin, reason: entry.reason },
+      ]),
+    )
+  } catch {
+    // Fail closed: the server token endpoint remains authoritative.
+    joinEligibility.value = {}
+  }
+}
+
 function canJoin(appt: Appointment): boolean {
-  if (sessionTestMode) return true
-  const t = now.value
-  return (
-    t >= sessionStart(appt).getTime() - 5 * 60 * 1000 &&
-    t <= sessionEnd(appt).getTime() + 15 * 60 * 1000
-  )
+  return joinEligibility.value[appt.id]?.canJoin === true
+}
+
+function joinWindowMessage(appt: Appointment): string | undefined {
+  return joinEligibility.value[appt.id]?.reason
 }
 
 function canModify(appt: Appointment): boolean {
@@ -358,9 +370,8 @@ async function onDateClick(info: DateClickArg) {
   }
   anchorDate.value = info.date
   closeDetail()
-  flowYear.value = info.date.getFullYear()
-  flowMonth.value = info.date.getMonth()
-  openBookingFlow(dateStr)
+  // /book is the single canonical booking experience.
+  await navigateTo(`/book?date=${encodeURIComponent(dateStr)}`)
 }
 
 function onEventClick(info: EventClickArg) {
@@ -553,7 +564,7 @@ async function openReschedule() {
   rsTime.value = null
   rsLoading.value = true
   try {
-    rsSlots.value = await fetchAvailableSlots(detailAppt.value.date)
+    rsSlots.value = await fetchAvailableSlots(detailAppt.value.date, detailAppt.value.doctorId)
   } catch (e) {
     rsError.value = (e as { data?: { message?: string } }).data?.message || 'Could not load available slots'
     rsSlots.value = []
@@ -568,7 +579,7 @@ async function onRsDateChange() {
   rsLoading.value = true
   rsError.value = null
   try {
-    rsSlots.value = await fetchAvailableSlots(rsDate.value)
+    rsSlots.value = await fetchAvailableSlots(rsDate.value, detailAppt.value?.doctorId)
   } catch (e) {
     rsError.value = (e as { data?: { message?: string } }).data?.message || 'Could not load available slots'
     rsSlots.value = []
@@ -620,22 +631,15 @@ async function confirmCancel() {
 
 async function bookSlot(dateStr: string, time?: string) {
   closeDetail()
-  flowYear.value = parseInt(dateStr.slice(0, 4), 10)
-  flowMonth.value = parseInt(dateStr.slice(5, 7), 10) - 1
-  openBookingFlow(dateStr)
-  goBookingStep(2)
-  if (time) {
-    await fetchBookingFlowSlots(dateStr)
-    selectBookingFlowTime(time)
-  }
+  const query = new URLSearchParams({ date: dateStr })
+  if (time) query.set('time', time)
+  await navigateTo(`/book?${query.toString()}`)
 }
 
-function openNewBooking() {
+async function openNewBooking() {
   closeDetail()
-  const d = new Date()
-  flowYear.value = d.getFullYear()
-  flowMonth.value = d.getMonth()
-  openBookingFlow(toISODate(anchorDate.value) >= todayStr() ? toISODate(anchorDate.value) : todayStr())
+  const date = toISODate(anchorDate.value) >= todayStr() ? toISODate(anchorDate.value) : todayStr()
+  await navigateTo(`/book?date=${encodeURIComponent(date)}`)
 }
 
 const flowMonthLabel = computed(
@@ -735,12 +739,17 @@ onMounted(async () => {
   now.value = Date.now()
   nowTimer = setInterval(() => {
     now.value = Date.now()
+    void refreshJoinEligibility()
   }, 60 * 1000)
   window.addEventListener('keydown', onEscapeKey)
   const t = new Date()
   const key = `${t.getFullYear()}-${t.getMonth() + 1}`
   loadedMonthKey.value = key
-  await Promise.all([fetchAllBookings(), loadMonthDates(t.getMonth() + 1, t.getFullYear())])
+  await Promise.all([
+    fetchAllBookings(),
+    loadMonthDates(t.getMonth() + 1, t.getFullYear()),
+    refreshJoinEligibility(),
+  ])
   calendarKey.value += 1
 })
 
@@ -1132,13 +1141,12 @@ onBeforeUnmount(() => {
 
           <div class="my-4 border-t border-border"></div>
 
-          <div v-if="(sessionTestMode || detailAppt.status === 'CONFIRMED') && sessionTypeOf(detailAppt) === 'ONLINE'">
-            <div v-if="sessionTestMode" class="mb-2 text-center text-xs font-bold text-amber-500 bg-amber-500/10 py-1 rounded">وضع الاختبار مفعّل</div>
+          <div v-if="detailAppt.status === 'CONFIRMED' && sessionTypeOf(detailAppt) === 'ONLINE'">
             <Button
               class="w-full"
               :variant="canJoin(detailAppt) ? 'default' : 'secondary'"
               :disabled="!canJoin(detailAppt)"
-              :title="!canJoin(detailAppt) ? 'Available 5 minutes before your session' : undefined"
+              :title="joinWindowMessage(detailAppt)"
               :data-testid="`join-${detailAppt.id}`"
               @click="joinSession(detailAppt!)"
             >
@@ -1146,7 +1154,7 @@ onBeforeUnmount(() => {
               Join Session
             </Button>
             <p v-if="!canJoin(detailAppt)" class="mt-1.5 text-center text-xs text-muted-foreground">
-              Available 5 minutes before your session
+              {{ joinWindowMessage(detailAppt) }}
             </p>
           </div>
 
